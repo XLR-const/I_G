@@ -1,0 +1,32 @@
+
+import pygame
+from setting import *
+class Map:
+    text_map = [
+        ['1', '1', '1', '1', '1', '1', '1', '1', '1', '1'],
+        ['1', '_', '_', '_', '_', '_', '_', '_', '_', '1'],
+        ['1', '_', '_', '_', '_', '_', '_', '_', '_', '1'],
+        ['1', '_', '_', '_', '_', '_', '_', '_', '_', '1'],
+        ['1', '_', '_', '_', '_', '_', '_', '_', '_', '1'],
+        ['1', '_', '_', '_', '_', '_', '_', '_', '_', '1'],
+        ['1', '_', '_', '_', '_', '_', '_', '_', '_', '1'],
+        ['1', '_', '_', '_', '_', '_', '_', '_', '_', '1'],
+        ['1', '_', '_', '_', '_', '_', '_', '_', '_', '1'],
+        ['1', '1', '1', '1', '1', '1', '1', '1', '1', '1']
+    ]
+    
+    def __init__(self, game):
+        self.game = game
+        self.world_map = {}
+        self.get_map()
+
+    def get_map(self):
+        for j, row in enumerate(self.text_map):
+            for i, char in enumerate(row):
+                if char == '1':
+                    self.world_map[(i, j)] = char # Сохраняем координаты стен
+
+    def draw(self): # screen возьмем из self.game.screen
+        for pos in self.world_map:
+            pygame.draw.rect(self.game.screen, 'gray', 
+                             (pos[0] * TILE, pos[1] * TILE, TILE, TILE), 2)
