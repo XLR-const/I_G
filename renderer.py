@@ -18,3 +18,5 @@ class Renderer:
         # Рисуем в левом верхнем углу
         self.game.screen.blit(fps_render, (10, 10))
     
+    def draw_crosshair(self):
+        pygame.draw.circle(self.game.screen, 'red', (WIDTH // 2, HEIGHT // 2), 4, 1)
