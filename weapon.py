@@ -1,7 +1,7 @@
 import pygame as pg
 import math
 from setting import *
-
+from random import uniform
 
 class Weapon:
     def __init__(self, game, name, damage, reload_time, is_continuous=False):
@@ -23,6 +23,13 @@ class Weapon:
             self.reloading = True
             self.last_shot_time = pg.time.get_ticks()
             self.sound.play()
+            
+            hit_x, hit_y, dist, side = self.get_hit_pos()
+            
+            # Particle effect
+            for _ in range(10):
+                p_pos = (hit_x + uniform(-0.02, 0.02), hit_y + uniform(-0.02, 0.02))
+                self.game.particles.append(Particle(self.game, p_pos, (255, 200, 50), uniform(0.001, 0.005)))
 
     def update_animation(self):
         if self.reloading:
@@ -34,6 +41,61 @@ class Weapon:
                 self.recoil = 0
         else:
             self.elapsed = 9999
+    # DDA alg        
+    def get_hit_pos(self):
+        
+        ox, oy = self.game.player.x, self.game.player.y
+        x_map, y_map = int(ox), int(oy)
+        
+        angle = self.game.player.angle
+        sin_a = math.sin(angle)
+        cos_a = math.cos(angle)
+
+        delta_dist_x = abs(1 / cos_a) if cos_a != 0 else 1e30
+        delta_dist_y = abs(1 / sin_a) if sin_a != 0 else 1e30
+
+        if cos_a < 0:
+            step_x = -1
+            side_dist_x = (ox - x_map) * delta_dist_x
+        else:
+            step_x = 1
+            side_dist_x = (x_map + 1.0 - ox) * delta_dist_x
+
+        if sin_a < 0:
+            step_y = -1
+            side_dist_y = (oy - y_map) * delta_dist_y
+        else:
+            step_y = 1
+            side_dist_y = (y_map + 1.0 - oy) * delta_dist_y
+
+        # Цикл DDA до первой стены
+        side = 0
+        while True:
+            if side_dist_x < side_dist_y:
+                side_dist_x += delta_dist_x
+                x_map += step_x
+                side = 0
+            else:
+                side_dist_y += delta_dist_y
+                y_map += step_y
+                side = 1
+            
+            # Проверяем карту
+            if (x_map, y_map) in self.game.map.world_map:
+                break
+
+        # 5. Считаем финальную дистанцию
+        if side == 0:
+            dist = side_dist_x - delta_dist_x
+        else:
+            dist = side_dist_y - delta_dist_y
+
+        # Точные координаты точки удара на карте
+        hit_x = ox + dist * cos_a
+        hit_y = oy + dist * sin_a
+
+        return hit_x, hit_y, dist, side
+
 
 class Pistol(Weapon):
     def __init__(self, game):
@@ -193,3 +255,53 @@ class PlasmaGun(Weapon):
 
         if self.reloading and self.elapsed < 100:
             pg.draw.circle(self.game.screen, (200, 0, 255), (cx, int(by - 370)), 70)
+
+class Particle:
+    def __init__(self, game, pos, color, speed):
+        self.game = game
+        self.x, self.y = pos
+        # gravity
+        self.z = 0
+        self.v_z = uniform(-0.02, 0.01)
+        self.gravity = 0.002
+        self.color = color
+        self.speed = speed
+        self.angle = uniform(0, math.tau)
+        self.life_time = 200
+        self.start_time = pg.time.get_ticks()
+        
+    def update(self):
+        dt = self.game.delta_time
+        self.x += math.cos(self.angle) * self.speed * dt
+        self.y += math.sin(self.angle) * self.speed * dt
+        
+        # Oz
+        self.v_z += self.gravity
+        self.z += self.v_z * dt
+        
+    def draw(self):
+        dx = self.x - self.game.player.x
+        dy = self.y - self.game.player.y
+        theta = math.atan2(dy, dx)
+        delta = theta - self.game.player.angle
+        
+        if dx > 0 and self.game.player.angle > math.pi: delta += math.tau
+        elif dx < 0 and self.game.player.angle < math.pi: delta -= math.tau
+        
+        if -HALF_FOV < delta < HALF_FOV:
+            dist = math.hypot(dx, dy)
+            dist *= math.cos(delta)
+            
+            if dist > 0.1:
+                screen_x = (delta / FOV + 0.5) * WIDTH
+                
+                # МАГИЯ: Смещаем Y в зависимости от Z и дистанции
+                # Мы делим z на dist, чтобы чем дальше искра, тем меньше было её смещение
+                screen_y = HALF_HEIGHT + self.z * (SCREEN_DIST / dist)
+                
+                size = int(SCREEN_DIST / (dist * 100)) 
+                
+                # Рисуем только если искра не улетела за пределы экрана по вертикали
+                if 0 < screen_y < HEIGHT and size > 0:
+                    pg.draw.circle(self.game.screen, self.color, (int(screen_x), int(screen_y)), size)
+        

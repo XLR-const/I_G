@@ -6,7 +6,7 @@ from player import Player
 from raycasting import RayCasting
 from renderer import Renderer
 from weapon import Weapon, Pistol, Shotgun, MachineGun, PlasmaGun
-
+from weapon import Particle
 class Game:
     def __init__(self):
         pygame.init()
@@ -23,6 +23,9 @@ class Game:
         self.shot_sound = pygame.mixer.Sound('resources/pistol_shot.wav')
         self.shot_sound.set_volume(0.2)
         self.new_game()
+        
+        # Particles
+        self.particles = []
 
     def new_game(self):
         self.map = Map(self)
@@ -44,7 +47,10 @@ class Game:
             if self.weapon.is_continuous and not self.weapon.reloading:
                 self.weapon.fire()
                 # self.shot_sound.play() # Если есть звук
-    
+
+        self.particles = [p for p in self.particles if pygame.time.get_ticks() - p.start_time < p.life_time]
+        for p in self.particles:
+            p.update()
         self.delta_time = self.clock.tick(FPS)
         pygame.display.set_caption(f'FPS: {self.clock.get_fps() :.1f}')
 
@@ -55,8 +61,12 @@ class Game:
         self.renderer.draw_fps()
         #self.map.draw()
         #self.player.draw()
+        for p in self.particles:
+            p.draw()
         self.weapon.draw()
         self.renderer.draw_crosshair()
+        
+        
         pygame.display.flip()
 
     def check_events(self):
