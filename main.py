@@ -10,9 +10,13 @@ class Game:
     def __init__(self):
         pygame.init()
         pygame.mouse.set_visible(False)
-        self.screen = pygame.display.set_mode((WIDTH, HEIGHT))
+        #pygame.event.set_grab(True)
+        #self.screen = pygame.display.set_mode((WIDTH, HEIGHT))
+        self.screen = pygame.display.set_mode(RES, pygame.FULLSCREEN)
         self.clock = pygame.time.Clock() 
         self.delta_time = 1
+        self.font = pygame.font.SysFont('Arial', 30, bold=True)
+
         self.new_game()
 
     def new_game(self):
@@ -30,6 +34,7 @@ class Game:
         #self.screen.fill('black') # Очистка экрана перед каждым кадром
         self.renderer.draw_background()
         self.raycasting.ray_cast()
+        self.renderer.draw_fps()
         #self.map.draw()
         #self.player.draw()
         pygame.display.flip()

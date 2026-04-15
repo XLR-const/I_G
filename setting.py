@@ -2,8 +2,10 @@ import math
 # Game setting
 WIDTH = 1600
 HEIGHT = 900
+RES = (1920, 1080)
+HALF_WIDTH = WIDTH // 2
 HALF_HEIGHT = HEIGHT // 2
-FPS = 60
+FPS = 300
 TILE = 100 # Коэффициент масштабирования
 
 # Players settings
@@ -11,7 +13,7 @@ PLAYER_POS = (1.5, 5)
 PLAYER_ANGLE = 0
 PLAYER_SPEED = 0.004
 PLAYER_ROT_SPEED = 0.002
-PLAYER_SIZE_SCALE = 60 # Коллизия игрока
+PLAYER_SIZE_SCALE = 0.2 # Коллизия игрока внутри клетки
 
 # Mouse control
 MOUSE_SENSITIVITY = 0.002
