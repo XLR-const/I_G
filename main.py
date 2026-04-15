@@ -5,7 +5,7 @@ from map import Map
 from player import Player
 from raycasting import RayCasting
 from renderer import Renderer
-from weapon import Weapon
+from weapon import Weapon, Pistol, Shotgun, MachineGun, PlasmaGun
 
 class Game:
     def __init__(self):
@@ -29,10 +29,22 @@ class Game:
         self.player = Player(self)
         self.raycasting = RayCasting(self)
         self.renderer = Renderer(self)
-        self.weapon = Weapon(self)
-
+        # Guns
+        self.inventory = [Pistol(self), Shotgun(self), MachineGun(self), PlasmaGun(self)]
+        
+        self.current_weapon_index = 0
+        self.weapon = self.inventory[self.current_weapon_index]
+        
+        
     def update(self):
         self.player.update()
+        # Проверка зажатой ЛКМ для автоматического оружия
+        mouse_buttons = pygame.mouse.get_pressed()
+        if mouse_buttons[0]: # 0 - это левая кнопка
+            if self.weapon.is_continuous and not self.weapon.reloading:
+                self.weapon.fire()
+                # self.shot_sound.play() # Если есть звук
+    
         self.delta_time = self.clock.tick(FPS)
         pygame.display.set_caption(f'FPS: {self.clock.get_fps() :.1f}')
 
@@ -54,9 +66,29 @@ class Game:
                 sys.exit()
             if event.type == pygame.MOUSEBUTTONDOWN:
                 # Теперь проверяем КНОПКУ (1 - левая) и статус перезарядки
-                if event.button == 1 and not self.weapon.reloading:
-                    self.weapon.fire()
-                    self.shot_sound.play()
+                if event.button == 1:
+                    if not self.weapon.reloading and not self.weapon.is_continuous:
+                        self.weapon.fire()
+                        
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_1: 
+                    self.current_weapon_index = 0
+                if event.key == pygame.K_2: 
+                    self.current_weapon_index = 1
+                if event.key == pygame.K_3: 
+                    self.current_weapon_index = 2
+                if event.key == pygame.K_4: 
+                    self.current_weapon_index = 3
+                # Обновляем ссылку на активное оружие
+                self.weapon = self.inventory[self.current_weapon_index]
+
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                if event.button == 4: # Колесо вверх
+                    self.current_weapon_index = (self.current_weapon_index + 1) % len(self.inventory)
+                if event.button == 5: # Колесо вниз
+                    self.current_weapon_index = (self.current_weapon_index - 1) % len(self.inventory)
+                self.weapon = self.inventory[self.current_weapon_index]
+
 
     def run(self):
         while True:
