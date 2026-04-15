@@ -118,25 +118,61 @@ class Shotgun(Weapon):
 
 class MachineGun(Weapon):
     def __init__(self, game):
-        # Очень быстрая перезарядка (90мс) для эффекта очереди
+        # Быстрая стрельба (90мс) и флаг автоматического огня (True)
         super().__init__(game, "Machine Gun", 5, 90, True)
 
     def draw(self):
         self.update_animation()
-        # Постоянная мелкая тряска при стрельбе
-        shake = math.sin(pg.time.get_ticks() * 0.1) * 5 if self.reloading else 0
-        cx, by = WIDTH // 2 + shake, HEIGHT + 100 + self.recoil
+        
+        time = pg.time.get_ticks()
+        # Скорость вращения: быстро при стрельбе, медленно в покое
+        rot_speed = 0.06 if self.reloading else 0.01
+        
+        # Тряска при стрельбе
+        shake = math.sin(time * 0.3) * 6 if self.reloading else 0
+        cx, by = WIDTH // 2 + shake, HEIGHT + 120 + self.recoil
 
-        # ТРИ СТВОЛА (Миниган)
-        for i in [-40, 0, 40]:
-            pg.draw.polygon(self.game.screen, (60, 60, 60), [
-                (cx + i - 20, by - 150), (cx + i + 20, by - 150),
-                (cx + i + 15, by - 400), (cx + i - 15, by - 400)
-            ])
-            pg.draw.circle(self.game.screen, (10, 10, 10), (int(cx + i), int(by - 400)), 15)
+        # 1. МАССИВНЫЙ КОРПУС (Задняя часть)
+        pg.draw.polygon(self.game.screen, (30, 30, 30), [
+            (cx - 180, by), (cx + 180, by),
+            (cx + 140, by - 180), (cx - 140, by - 180)
+        ])
 
+        # 2. БЛОК ГИГАНТСКИХ СТВОЛОВ (4 штуки для массивности)
+        # Увеличиваем разлет (80) и базовую толщину (30)
+        for i in range(4):
+            angle = time * rot_speed + i * (math.pi / 2)
+            offset = math.cos(angle) * 80
+            # Эффект перспективы для толщины ствола
+            thickness = 30 + math.sin(angle) * 10
+            
+            # Рисуем ствол только если он на переднем плане
+            if math.sin(angle) > -0.5:
+                # Цвет с градиентом для объема
+                color_val = 50 + int(math.sin(angle) * 20)
+                color = (color_val, color_val, color_val)
+                
+                # Сами трубы стволов
+                pg.draw.rect(self.game.screen, color, 
+                             (cx + offset - thickness // 2, by - 420, thickness, 240))
+                
+                # Массивные дульные срезы
+                pg.draw.circle(self.game.screen, (10, 10, 10), 
+                               (int(cx + offset), int(by - 420)), int(thickness // 1.5))
+                # Блик на срезе для металла
+                pg.draw.circle(self.game.screen, (80, 80, 80), 
+                               (int(cx + offset - 5), int(by - 425)), int(thickness // 4))
+
+        # 3. ВСПЫШКА (Яркая и широкая)
         if self.reloading and self.elapsed < 40:
-            pg.draw.circle(self.game.screen, (255, 255, 150), (cx, int(by - 420)), 60)
+            f_y = int(by - 440)
+            pg.draw.circle(self.game.screen, (255, 200, 50), (cx, f_y), 80)
+            pg.draw.circle(self.game.screen, (255, 255, 255), (cx, f_y), 30)
+
+        # Прицел
+        pg.draw.circle(self.game.screen, 'red', (WIDTH // 2, HEIGHT // 2), 4, 1)
+
+
 
 class PlasmaGun(Weapon):
     def __init__(self, game):
