@@ -3,6 +3,7 @@ import sys
 from setting import *
 from map import Map
 from player import Player
+from raycasting import RayCasting
 
 class Game:
     def __init__(self):
@@ -16,6 +17,7 @@ class Game:
     def new_game(self):
         self.map = Map(self)
         self.player = Player(self)
+        self.raycasting = RayCasting(self)
 
     def update(self):
         self.player.update()
@@ -24,8 +26,9 @@ class Game:
 
     def draw(self):
         self.screen.fill('black') # Очистка экрана перед каждым кадром
-        self.map.draw()
-        self.player.draw()
+        self.raycasting.ray_cast()
+        #self.map.draw()
+        #self.player.draw()
         pygame.display.flip()
 
     def check_events(self):
