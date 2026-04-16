@@ -36,10 +36,24 @@ class Player:
     def check_wall_collision(self, dx, dy):
         # Коллизия: проверяем новую позицию по каждой оси отдельно для "скольжения"
         # 0.2 — это небольшой радиус игрока, чтобы не прилипать вплотную к стене
+        # Радиус игрока + радиус NPC
+        collision_dist = 0.6 
+        
         scale = 0.2
-        if (int(self.x + dx + (scale if dx > 0 else -scale)), int(self.y)) not in self.game.map.world_map:
+        can_move_x = (int(self.x + dx + (scale if dx > 0 else -scale)), int(self.y)) not in self.game.map.world_map
+        can_move_y = (int(self.x), int(self.y + dy + (scale if dy > 0 else -scale))) not in self.game.map.world_map
+
+        # Проверка коллизии с NPC
+        for npc in self.game.npcs:
+            if npc.alive:
+                if math.hypot(self.x + dx - npc.x, self.y - npc.y) < collision_dist:
+                    can_move_x = False
+                if math.hypot(self.x - npc.x, self.y + dy - npc.y) < collision_dist:
+                    can_move_y = False
+
+        if can_move_x: 
             self.x += dx
-        if (int(self.x), int(self.y + dy + (scale if dy > 0 else -scale))) not in self.game.map.world_map:
+        if can_move_y: 
             self.y += dy
 
     def mouse_control(self):

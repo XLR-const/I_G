@@ -24,7 +24,31 @@ class Weapon:
             self.last_shot_time = pg.time.get_ticks()
             self.sound.play()
             
+            # Walls
             hit_x, hit_y, dist, side = self.get_hit_pos()
+            
+            # NPC
+            for npc in self.game.npcs:
+                if not npc.alive:
+                    continue
+                
+                # Вектор от игрока к NPC
+                dx = npc.x - self.game.player.x
+                dy = npc.y - self.game.player.y
+                dist_npc = math.hypot(dx, dy)
+                
+                # Угол на NPC
+                theta = math.atan2(dy, dx)
+                # Разница с углом взгляда игрока
+                delta = theta - self.game.player.angle
+                delta = (delta + math.pi) % math.tau - math.pi
+                
+                
+                view_width = npc.size / dist_npc 
+    
+                if abs(delta) < view_width and dist_npc < dist and math.cos(delta) > 0:
+                    npc.get_damage(self.damage)
+                
             
             # Particle effect
             for _ in range(10):
@@ -100,12 +124,12 @@ class Weapon:
 class Pistol(Weapon):
     def __init__(self, game):
         super().__init__(game, "Pistol", 10, 150)
-
+    # 10 урона и 150 мс перезарядки
     def draw(self):
         self.update_animation()
         cx, by = WIDTH // 2, HEIGHT + self.recoil
 
-        # ТВОЯ ЛЮБИМАЯ МОДЕЛЬ (Корпус)
+        
         pg.draw.polygon(self.game.screen, (35, 35, 35), [
             (cx - 110, by), (cx + 110, by),
             (cx + 70, by - 350), (cx - 70, by - 350)
@@ -127,6 +151,7 @@ class Pistol(Weapon):
 
         # Прицел
         pg.draw.circle(self.game.screen, 'red', (WIDTH // 2, HEIGHT // 2), 4, 1)
+
 class Shotgun(Weapon):
     def __init__(self, game):
         # Урон 50, перезарядка 800мс
@@ -181,7 +206,7 @@ class Shotgun(Weapon):
 class MachineGun(Weapon):
     def __init__(self, game):
         # Быстрая стрельба (90мс) и флаг автоматического огня (True)
-        super().__init__(game, "Machine Gun", 5, 90, True)
+        super().__init__(game, "Machine Gun", 15, 90, True)
 
     def draw(self):
         self.update_animation()
@@ -234,11 +259,9 @@ class MachineGun(Weapon):
         # Прицел
         pg.draw.circle(self.game.screen, 'red', (WIDTH // 2, HEIGHT // 2), 4, 1)
 
-
-
 class PlasmaGun(Weapon):
     def __init__(self, game):
-        super().__init__(game, "Plasma Gun", 30, 400)
+        super().__init__(game, "Plasma Gun", 100, 400)
 
     def draw(self):
         self.update_animation()
