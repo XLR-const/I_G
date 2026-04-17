@@ -73,6 +73,7 @@ class Game:
         for p in self.particles:
             p.draw()
         self.weapon.draw()
+        self.renderer.draw_interface()
         self.renderer.draw_crosshair()
         
         

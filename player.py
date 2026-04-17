@@ -7,6 +7,7 @@ class Player:
         self.game = game
         self.x, self.y = PLAYER_POS
         self.angle = PLAYER_ANGLE
+        self.hp = 100
         # Сразу ставим мышь в центр при создании игрока
         pg.mouse.set_pos([WIDTH // 2, HEIGHT // 2])
 

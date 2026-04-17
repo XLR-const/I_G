@@ -111,3 +111,4 @@ class NPC:
                         self.game.screen.blit(img, (x, HALF_HEIGHT - proj_height // 2), 
                                               (sub_x, 0, SCALE, proj_height))
         
+        
