@@ -41,7 +41,10 @@ class Game:
         self.weapon = self.inventory[self.current_weapon_index]
         # NPC
         self.npcs = [NPC(self, pos=(p[0] + 0.5, p[1] + 0.5)) for p in self.map.npc_positions]
-        
+        for npc in self.npcs:
+            npc.generate_waypoints_auto(4)
+            npc.state = "PATROL"
+            
     def update(self):
         self.player.update()
         # Проверка зажатой ЛКМ для автоматического оружия
