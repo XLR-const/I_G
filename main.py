@@ -8,6 +8,7 @@ from renderer import Renderer
 from weapon import Weapon, Pistol, Shotgun, MachineGun, PlasmaGun
 from weapon import Particle
 from npc import NPC
+from pathfinding import PathFinder
 
 class Game:
     def __init__(self):
@@ -44,6 +45,7 @@ class Game:
         for npc in self.npcs:
             npc.generate_waypoints_auto(4)
             npc.state = "PATROL"
+        self.pathfinder = PathFinder(self)
             
     def update(self):
         self.player.update()

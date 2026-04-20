@@ -11,7 +11,7 @@ class NPC:
         self.x, self.y = pos[0] + 0.5, pos[1] + 0.5
         self.alive = True
         # движение
-        self.speed = 0.1
+        self.speed = 0.3
         self.radius = 0.35 # радиус коллизии
         
         # автомат действия
@@ -42,6 +42,11 @@ class NPC:
         self.image = pygame.image.load('resources/npc/solder.png').convert_alpha()
         self.sprite_width, self.sprite_height = self.image.get_size()
         self.sprite_ratio = self.sprite_width / self.sprite_height
+        
+        # A* параметры
+        self.path = []
+        self.last_path_update = 0
+        self.current_target_index = 0
         
     def get_damage(self, damage):
         if not self.alive:
@@ -251,10 +256,13 @@ class NPC:
         new_x = self.x + dx
         new_y = self.y + dy
         
+        
         if not self.check_collision(new_x, self.y):
             self.x = new_x
         if not self.check_collision(self.x, new_y):
             self.y = new_y
+            
+       
             
     def shoot(self):
         now = pygame.time.get_ticks()
@@ -281,7 +289,7 @@ class NPC:
         
         distance_to_player = math.hypot(self.x - self.game.player.x, self.y - self.game.player.y)
         can_see = self.has_line_of_sight()
-        #can_see = False
+        #can_see = True
         # ЕСЛИ ПОЛУЧИЛ УРОН
         if self.state == "HURT":
             if pygame.time.get_ticks() > self.state_timer:
@@ -332,52 +340,65 @@ class NPC:
                 self.state = "CHASE"
         
         elif self.state == "CHASE":
-            # Boids alg
-            # ПОИСК СОСЕДЕЙ ДЛЯ СТАИ
+            # === ОБНОВЛЕНИЕ ПУТИ A* ===
+            now = pygame.time.get_ticks()
+            if not hasattr(self, 'last_path_update'):
+                self.last_path_update = 0
+                self.path = []
+                self.current_target_index = 0
             
-            neighbors = []
-            for other in self.game.npcs:
-                if other is not self and other.alive:
-                    dist = math.hypot(self.x - other.x, self.y - other.y)
-                    if dist < 3.0:  # радиус стаи 3 клетки
-                        neighbors.append(other)
+            if now - self.last_path_update >= 200:
+                self.last_path_update = now
+                
+                raw_path = self.game.pathfinder.a_star(
+                    (self.x, self.y),
+                    (self.game.player.x, self.game.player.y)
+                )
+                
+                if raw_path and len(raw_path) > 0:
+                    self.path = [(cell[0] + 0.5, cell[1] + 0.5) for cell in raw_path]
+                    self.current_target_index = 0
+                    if len(self.path) > 1:
+                        dist_to_first = math.hypot(self.path[0][0] - self.x, self.path[0][1] - self.y)
+                        if dist_to_first < 0.3:
+                            self.current_target_index = 1
+                else:
+                    self.path = []
             
-            # --- СИЛА СТАИ (BOID FLOCKING) ---
-            if self.flocking_enabled:
-                flock_x, flock_y = self.get_flocking_force(neighbors, dt)
+            # === ДВИЖЕНИЕ ПО ПУТИ ===
+            if self.path and self.current_target_index < len(self.path):
+                target_x, target_y = self.path[self.current_target_index]
+                dx = target_x - self.x
+                dy = target_y - self.y
+                dist = math.hypot(dx, dy)
+                
+                if dist < 0.6:
+                    self.current_target_index += 1
+                else:
+                    if dist > 0.01:
+                        move_x = (dx / dist) * self.speed * dt
+                        move_y = (dy / dist) * self.speed * dt
+                        self.try_move(move_x, move_y)
             else:
-                flock_x, flock_y = 0, 0
+                # Fallback — прямая линия
+                dx = self.game.player.x - self.x
+                dy = self.game.player.y - self.y
+                dist = math.hypot(dx, dy)
+                if dist > 0.01:
+                    move_x = (dx / dist) * self.speed * dt
+                    move_y = (dy / dist) * self.speed * dt
+                    self.try_move(move_x, move_y)
             
-            # --- ДВИЖЕНИЕ К ИГРОКУ ---
-            to_player_x = self.game.player.x - self.x
-            to_player_y = self.game.player.y - self.y
-            player_dist = math.hypot(to_player_x, to_player_y)
-            if player_dist > 0.01:
-                to_player_x /= player_dist
-                to_player_y /= player_dist
-            
-            # --- СУММИРУЕМ ВСЕ СИЛЫ ---
-            move_x = (to_player_x * self.speed * dt) + (flock_x * self.speed * dt)
-            move_y = (to_player_y * self.speed * dt) + (flock_y * self.speed * dt)
-            
-            # --- ОТТАЛКИВАНИЕ ОТ ДРУГИХ NPC (SEPARATION) ---
-            for other in self.game.npcs:
-                if other is not self and other.alive:
-                    dist = math.hypot(self.x - other.x, self.y - other.y)
-                    if dist < 0.8:
-                        angle = math.atan2(self.y - other.y, self.x - other.x)
-                        force = (0.8 - dist) * 0.5
-                        move_x += math.cos(angle) * force * dt * self.speed
-                        move_y += math.sin(angle) * force * dt * self.speed
-            
-            self.try_move(move_x, move_y)
-            
-            if distance_to_player <= self.shoot_range and can_see:
+            # === ПРОВЕРКА АТАКИ ===
+            distance_to_player = math.hypot(self.x - self.game.player.x, self.y - self.game.player.y)
+            if distance_to_player <= self.shoot_range and self.has_line_of_sight():
                 self.state = "ATTACK"
                 
         elif self.state == "ATTACK":
-            self.shoot()
-            if distance_to_player > self.shoot_range or not can_see:
+            if self.has_line_of_sight():  # ← ТОЛЬКО ЕСЛИ ВИДИТ
+                self.shoot()
+            
+            if distance_to_player > self.shoot_range or not self.has_line_of_sight():
                 self.state = "CHASE"
         
         
@@ -391,8 +412,8 @@ class NPC:
             for dist in range(2, 6):
                 check_x = int(self.x) + dx * dist
                 check_y = int(self.y) + dy * dist
-                height_map = len(self.game.map.text_map)
-                width_map = len(self.game.map.text_map[0])
+                height_map = self.game.map.height
+                width_map = self.game.map.width
                 
                 if (0 <= check_x < width_map and 0 <= check_y < height_map):  # размер твоей карты
                     if not self.game.map.is_wall(check_x, check_y):
@@ -468,4 +489,54 @@ class NPC:
         cohesion_force_y = to_center_y * 0.2
         
         return (align_force_x + cohesion_force_x, align_force_y + cohesion_force_y)
+    
+    def update_path_to_player(self):
+        """Обновляет путь к игроку через A*"""
+        now = pygame.time.get_ticks()
+        if not hasattr(self, 'last_path_update'):
+            self.last_path_update = 0
+            self.path = []
+            self.current_target_index = 0
+        
+        if now - self.last_path_update < 300:  # обновляем раз в 300 мс
+            return
+        
+        self.last_path_update = now
+        
+        raw_path = self.game.pathfinder.a_star(
+            (self.x, self.y),
+            (self.game.player.x, self.game.player.y)
+        )
+        
+        if raw_path:
+            # Превращаем клетки в мировые координаты (центр клетки)
+            self.path = [(cell[0] + 0.5, cell[1] + 0.5) for cell in raw_path]
+            self.current_target_index = 0
+        else:
+            self.path = []
+
+    def move_along_path(self, dt):
+        """Движение по A* пути"""
+        if not hasattr(self, 'path') or not self.path:
+            return False
+        
+        if self.current_target_index >= len(self.path):
+            return False
+        
+        target_x, target_y = self.path[self.current_target_index]
+        dx = target_x - self.x
+        dy = target_y - self.y
+        dist = math.hypot(dx, dy)
+        
+        if dist < 0.2:
+            # Достигли текущей цели
+            self.current_target_index += 1
+            return True
+        
+        if dist > 0.01:
+            move_x = (dx / dist) * self.speed * dt
+            move_y = (dy / dist) * self.speed * dt
+            self.try_move(move_x, move_y)
+        
+        return True
     

@@ -19,7 +19,7 @@ class Map:
         ['1', '_', '_', '_', '_', '_', '_', '_', '_', '1'],
         ['1', '2', '_', '_', '_', '_', '_', '_', '_', '1'],
         ['1', '_', '_', '_', '_', '_', '_', '_', '_', '1'],
-        ['1', '_', '_', '_', '2', '_', '_', '_', '_', '1'],
+        ['1', '_', '_', '_', '_', '_', '_', '_', '_', '1'],
         ['1', '1', '1', '1', '1', '1', '1', '1', '1', '1']
     ]
     
@@ -28,7 +28,8 @@ class Map:
         self.npc_positions = []
         self.world_map = {}
         self.get_map()
-        
+        self.width = len(self.text_map[0])
+        self.height = len(self.text_map)
 
     def get_map(self):
         for j, row in enumerate(self.text_map):
