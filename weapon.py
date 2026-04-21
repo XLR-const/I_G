@@ -208,7 +208,7 @@ class Shotgun(Weapon):
 class MachineGun(Weapon):
     def __init__(self, game):
         # Быстрая стрельба (90мс) и флаг автоматического огня (True)
-        super().__init__(game, "Machine Gun", 15, 90, True)
+        super().__init__(game, "Machine Gun", 10, 90, True)
 
     def draw(self):
         self.update_animation()

@@ -280,7 +280,7 @@ class NPC:
         dy = self.game.player.y - self.y
         distance = math.hypot(dx, dy)
         
-        if distance > 12:
+        if distance > 20:
             return False
         
         # разделяем луч в проверке на отрезки
@@ -354,7 +354,7 @@ class NPC:
         
         distance_to_player = math.hypot(self.x - self.game.player.x, self.y - self.game.player.y)
         can_see = self.has_line_of_sight()
-        #can_see = True
+        can_see = False
         # ЕСЛИ ПОЛУЧИЛ УРОН
         if self.state == "HURT":
             if pygame.time.get_ticks() > self.state_timer:
