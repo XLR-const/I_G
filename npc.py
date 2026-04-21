@@ -10,6 +10,7 @@ class NPC:
         self.game = game
         self.x, self.y = pos[0] + 0.5, pos[1] + 0.5
         self.alive = True
+        
         # движение
         self.speed = 0.3
         self.radius = 0.35 # радиус коллизии
@@ -42,12 +43,60 @@ class NPC:
         self.image = pygame.image.load('resources/npc/solder.png').convert_alpha()
         self.sprite_width, self.sprite_height = self.image.get_size()
         self.sprite_ratio = self.sprite_width / self.sprite_height
+        self.dead_sprite_path = 'resources/npc/dead.png'
+        self.dead_sprite = None
+        self.dead_x = 0
+        self.dead_y = 0
         
         # A* параметры
         self.path = []
         self.last_path_update = 0
         self.current_target_index = 0
+    
+    def load_dead_sprite(self):
+        try:
+            original = pygame.image.load(self.dead_sprite_path).convert_alpha()
+            new_width = original.get_width() // 1
+            new_height = original.get_height() // 1
+            self.dead_sprite = pygame.transform.scale(original, (new_width, new_height))
+            
+        except:
+            self.dead_sprite = None
+            
+    def die(self):
+        """Смерть NPC — превращаем в труп без логики"""
+        if not self.alive:
+            return
         
+        self.alive = False
+        self.dead_x = self.x
+        self.dead_y = self.y
+        
+        # Загружаем спрайт трупа
+        self.load_dead_sprite()
+        
+        # Меняем спрайт на труп
+        if self.dead_sprite is not None:
+            self.image = self.dead_sprite
+        else:
+            # Заглушка — серый квадрат
+            dead_img = pygame.Surface((int(100 * self.radius), int(100 * self.radius)))
+            dead_img.fill((250, 80, 80))
+            self.image = dead_img
+        
+     
+        self.sprite_width, self.sprite_height = self.image.get_size()
+        self.sprite_ratio = self.sprite_width / self.sprite_height
+        
+        # Частицы крови
+        for _ in range(20):
+            self.game.particles.append(Particle(
+                self.game,
+                (self.x + uniform(-0.2, 0.2), self.y + uniform(-0.2, 0.2)),
+                (150, 0, 0),
+                uniform(0.002, 0.006)
+            ))
+    
     def get_damage(self, damage):
         if not self.alive:
             return
@@ -57,7 +106,7 @@ class NPC:
             self.state = "HURT"
             self.state_timer = pygame.time.get_ticks() + 300
             if self.hp <= 0:
-                self.alive = False
+                #self.alive = False
                 self.color = (50, 50, 50)
                 
             for _ in range(15):
@@ -69,10 +118,14 @@ class NPC:
                 p_x = self.x + (dx / dist) * 0.1 + uniform(-0.1, 0.1)
                 p_y = self.y + (dy / dist) * 0.1 + uniform(-0.1, 0.1)
                 self.game.particles.append(Particle(self.game, (p_x, p_y), (200, 0, 0), uniform(0.002, 0.005)))
+        if self.hp <= 0:
+            self.die()
     
     def update(self):
         if not self.alive:
-            return 
+            self.x = self.dead_x
+            self.y = self.dead_y
+            return
         
         dt = self.game.delta_time
         if dt > 0.033:
@@ -90,8 +143,15 @@ class NPC:
     
     def draw(self):
         if not self.alive:
-            # Add other dead sprite
-            return
+            draw_x = self.dead_x
+            draw_y = self.dead_y
+        else:
+            draw_x = self.x
+            draw_y = self.y
+        
+        dx = draw_x - self.game.player.x
+        dy = draw_y - self.game.player.y
+            
         """
         # ===== ВИЗУАЛЬНАЯ ОТЛАДКА =====
         # Рисуем красный кружок на 2D карте (если ты её включаешь)
@@ -111,8 +171,7 @@ class NPC:
             pygame.draw.line(self.game.screen, (255, 0, 0), start, end, 2)
         """
         
-        dx = self.x - self.game.player.x
-        dy = self.y - self.game.player.y
+       
         distance = math.hypot(dx, dy)
         
         theta = math.atan2(dy, dx)
@@ -133,6 +192,10 @@ class NPC:
         if proj_height > HEIGHT * 2:
             proj_height = HEIGHT * 2
         proj_width = int(proj_height * self.sprite_ratio)
+        
+        if not self.alive:
+            proj_height //= 2
+            proj_width //= 2
         
         # Позиция центра на экране
         center_x = (HALF_NUM_RAYS + delta / DELTA_ANGLE) * SCALE
@@ -253,6 +316,8 @@ class NPC:
         return False
     
     def try_move(self, dx, dy):
+        if not self.alive:
+            return False
         new_x = self.x + dx
         new_y = self.y + dy
         
@@ -539,4 +604,121 @@ class NPC:
             self.try_move(move_x, move_y)
         
         return True
-    
+
+class Solder(NPC):
+    def __init__(self, game, pos=(8.5, 7.5)):
+        super().__init__(game, pos)
+        self.speed = 0.3
+        self.hp = 100
+        self.damage = 15
+        self.shoot_range = 4
+        self.shoot_delay = 600
+        self.image_path = 'resources/npc/solder.png'
+        self.image = pygame.image.load(self.image_path).convert_alpha()
+        self.sprite_width, self.sprite_height = self.image.get_size()
+        self.sprite_ratio = self.sprite_width / self.sprite_height
+        self.shoot_sound = pygame.mixer.Sound('resources/npc/npc_rifle.wav')
+        self.shoot_sound.set_volume(0.2)
+
+class Jaggernaut(NPC):
+    def __init__(self, game, pos=(8.5, 7.5)):
+        super().__init__(game, pos)
+        self.speed = 0.1
+        self.hp = 300
+        self.damage = 8
+        self.shoot_delay = 150
+        self.shoot_range = 5.0
+        self.radius = 0.5
+        self.color = (100, 100, 200)
+        self.image_path = 'resources/npc/jaggernaut.png'
+        self.image = pygame.image.load(self.image_path).convert_alpha()
+        self.sprite_width, self.sprite_height = self.image.get_size()
+        self.sprite_ratio = self.sprite_width / self.sprite_height
+        self.shoot_sound = pygame.mixer.Sound('resources/npc/npc_machine_gun.wav')
+        self.shoot_sound.set_volume(0.2)
+        
+        
+class Kamikaze(NPC):
+    def __init__(self, game, pos=(8.5, 7.5)):
+        super().__init__(game, pos)
+        self.speed = 3.5
+        self.hp = 40
+        self.damage = 50
+        self.shoot_range = 1.2
+        self.shoot_delay = 0
+        self.radius = 0.4
+        self.color = (200, 50, 50)
+        self.image_path = 'resources/npc/kamikaze.png'
+        self.image = pygame.image.load(self.image_path).convert_alpha()
+        self.sprite_width, self.sprite_height = self.image.get_size()
+        self.sprite_ratio = self.sprite_width / self.sprite_height
+        self.exploded = False
+        self.shoot_sound = pygame.mixer.Sound('resources/npc/npc_explosive.wav')
+        self.shoot_sound.set_volume(0.2)
+
+    def shoot(self):
+        if not self.alive or self.exploded:
+            return
+        
+        self.game.player.hp -= self.damage
+        self.shoot_sound.play()
+        for _ in range(30):
+            self.game.particles.append(Particle(
+                self.game,
+                (self.x + uniform(-0.3, 0.3), self.y + uniform(-0.3, 0.3)),
+                (255, 100, 0),
+                uniform(0.005, 0.02)
+            ))
+        self.alive = False
+        self.exploded = True
+
+        def update_state(self, dt):
+            """Камикадзе всегда в CHASE, и сразу е**шит"""
+            distance_to_player = math.hypot(self.x - self.game.player.x, self.y - self.game.player.y)
+            
+            # Всегда преследуем
+            self.state = "CHASE"
+            
+            # Обновляем путь A*
+            now = pygame.time.get_ticks()
+            if now - self.last_path_update >= 200:
+                self.last_path_update = now
+                raw_path = self.game.pathfinder.a_star((self.x, self.y), (self.game.player.x, self.game.player.y))
+                if raw_path:
+                    self.path = [(cell[0] + 0.5, cell[1] + 0.5) for cell in raw_path]
+                    self.current_target_index = 0
+            
+            # Движение
+            if self.path and self.current_target_index < len(self.path):
+                target_x, target_y = self.path[self.current_target_index]
+                dx = target_x - self.x
+                dy = target_y - self.y
+                dist = math.hypot(dx, dy)
+                if dist < 0.6:
+                    self.current_target_index += 1
+                else:
+                    move_x = (dx / dist) * self.speed * dt
+                    move_y = (dy / dist) * self.speed * dt
+                    self.try_move(move_x, move_y)
+            
+            # Взрыв при приближении
+            if distance_to_player <= self.shoot_range:
+                self.shoot()
+                self.alive = False
+                
+
+class Boss(NPC):
+    """Босс — очень сильный, много здоровья, большой урон"""
+    def __init__(self, game, pos=(8.5, 7.5)):
+        super().__init__(game, pos)
+        self.speed = 0.05
+        self.hp = 1000
+        self.damage = 30
+        self.shoot_delay = 600
+        self.shoot_range = 6.0
+        self.radius = 0.8
+        self.color = (200, 50, 200)
+        self.image_path = 'resources/npc/boss.png'
+        self.image = pygame.image.load(self.image_path).convert_alpha()
+        self.sprite_width, self.sprite_height = self.image.get_size()
+        self.sprite_ratio = self.sprite_width / self.sprite_height

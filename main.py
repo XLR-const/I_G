@@ -7,7 +7,7 @@ from raycasting import RayCasting
 from renderer import Renderer
 from weapon import Weapon, Pistol, Shotgun, MachineGun, PlasmaGun
 from weapon import Particle
-from npc import NPC
+from npc import NPC, Solder, Jaggernaut, Kamikaze, Boss
 from pathfinding import PathFinder
 
 class Game:
@@ -48,8 +48,20 @@ class Game:
             
         self.current_weapon_index = 0
         self.weapon = self.inventory[self.current_weapon_index]
+        
+        
         # NPC
-        self.npcs = [NPC(self, pos=(p[0] + 0.5, p[1] + 0.5)) for p in self.map.npc_positions]
+        #self.npcs = [NPC(self, pos=(p[0] + 0.5, p[1] + 0.5)) for p in self.map.npc_positions]
+        self.npcs = []
+        for npc in self.map.npc_positions:
+            if npc[-1] == '2':
+                self.npcs.append(Solder(self, pos=(npc[0] + 0.5, npc[1] + 0.5)))
+            if npc[-1] == '3':
+                self.npcs.append(Kamikaze(self, pos=(npc[0] + 0.5, npc[1] + 0.5)))
+            if npc[-1] == '4':
+                self.npcs.append(Jaggernaut(self, pos=(npc[0] + 0.5, npc[1] + 0.5)))
+            if npc[-1] == '5':
+                self.npcs.append(Boss(self, pos=(npc[0] + 0.5, npc[1] + 0.5)))
         for npc in self.npcs:
             npc.generate_waypoints_auto(4)
             npc.state = "PATROL"

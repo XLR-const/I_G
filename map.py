@@ -15,10 +15,10 @@ class Map:
         ['1', '_', '_', '_', '_', '_', '_', '_', '_', '1'],
         ['1', '_', '_', '_', '_', '_', '_', '1', '_', '1'],
         ['1', '_', '_', '_', '_', '_', '_', '_', '_', '1'],
-        ['1', '_', '_', '1', '_', '2', '_', '_', '_', '1'],
+        ['1', '_', '_', '1', '_', '3', '_', '_', '_', '1'],
         ['1', '_', '_', '_', '_', '_', '_', '_', '_', '1'],
         ['1', '2', '_', '_', '_', '_', '_', '_', '_', '1'],
-        ['1', '_', '_', '_', '_', '_', '_', '_', '_', '1'],
+        ['1', '_', '_', '_', '4', '_', '3', '_', '_', '1'],
         ['1', '_', '_', '_', '_', '_', '_', '_', '_', '1'],
         ['1', '1', '1', '1', '1', '1', '1', '1', '1', '1']
     ]
@@ -32,12 +32,25 @@ class Map:
         self.height = len(self.text_map)
 
     def get_map(self):
+        """MANUAL:
+        1 - wall
+        2 - solder
+        3 - kamikaze
+        4 - jaga
+        5 - boss1"""
+        
         for j, row in enumerate(self.text_map):
             for i, char in enumerate(row):
                 if char == '1':
                     self.world_map[(i, j)] = char # Сохраняем координаты стен
                 if char == '2':
-                    self.npc_positions.append((i, j))
+                    self.npc_positions.append((i, j, '2'))
+                if char == '3':
+                    self.npc_positions.append((i, j, '3'))
+                if char == '4':
+                    self.npc_positions.append((i, j, '4'))
+                if char == '5':
+                    self.npc_positions.append((i, j, '5'))
 
     def draw(self): 
         for pos in self.world_map:
