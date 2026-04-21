@@ -37,7 +37,15 @@ class Game:
         self.renderer = Renderer(self)
         # Guns
         self.inventory = [Pistol(self), Shotgun(self), MachineGun(self), PlasmaGun(self)]
-        
+        gun_ammo = {
+                "Pistol": 20,
+                "Shotgun": 10,
+                "Machine Gun": 100,
+                "Plasma Gun": 5
+        }
+        for gun in self.inventory:
+            gun.ammo = gun_ammo[gun.name]
+            
         self.current_weapon_index = 0
         self.weapon = self.inventory[self.current_weapon_index]
         # NPC

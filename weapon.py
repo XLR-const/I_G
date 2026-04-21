@@ -14,15 +14,17 @@ class Weapon:
         self.damage = damage
         self.reload_time = reload_time
         self.reloading = False
+        self.ammo = 0
         self.last_shot_time = 0
         self.recoil = 0
         self.is_continuous = is_continuous
 
     def fire(self):
-        if not self.reloading:
+        if not self.reloading and self.ammo > 0:
             self.reloading = True
             self.last_shot_time = pg.time.get_ticks()
             self.sound.play()
+            self.ammo -= 1
             
             # Walls
             hit_x, hit_y, dist, side = self.get_hit_pos()
