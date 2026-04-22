@@ -5,6 +5,9 @@ import pygame
 class RayCasting:
     def __init__(self, game):
         self.game = game
+        # Z-буфер для расстояний до стен каждого луча
+        self.z_buffer = [float('inf')] * NUM_RAYS 
+        
     
     def ray_cast_native(self):
         ox, oy = self.game.player.x, self.game.player.y
@@ -94,8 +97,11 @@ class RayCasting:
             else:
                 dist = side_dist_y - delta_dist_y
 
+            self.z_buffer[i] = dist
+            
             # 5. Убираем "эффект рыбьего глаза" (фикс дисторсии)
             dist *= math.cos(self.game.player.angle - ray_angle)
+            
 
             # 6. Проекция
             proj_height = SCREEN_DIST / (dist + 0.0001)

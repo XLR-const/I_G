@@ -7,6 +7,9 @@ from raycasting import RayCasting
 from renderer import Renderer
 from weapon import Weapon, Pistol, Shotgun, MachineGun, PlasmaGun
 from weapon import Particle
+from npc import NPC, Solder, Jaggernaut, Kamikaze, Boss
+from pathfinding import PathFinder
+
 class Game:
     def __init__(self):
         pygame.init()
@@ -34,11 +37,36 @@ class Game:
         self.renderer = Renderer(self)
         # Guns
         self.inventory = [Pistol(self), Shotgun(self), MachineGun(self), PlasmaGun(self)]
-        
+        gun_ammo = {
+                "Pistol": 20,
+                "Shotgun": 10,
+                "Machine Gun": 100,
+                "Plasma Gun": 5
+        }
+        for gun in self.inventory:
+            gun.ammo = gun_ammo[gun.name]
+            
         self.current_weapon_index = 0
         self.weapon = self.inventory[self.current_weapon_index]
         
         
+        # NPC
+        #self.npcs = [NPC(self, pos=(p[0] + 0.5, p[1] + 0.5)) for p in self.map.npc_positions]
+        self.npcs = []
+        for npc in self.map.npc_positions:
+            if npc[-1] == '2':
+                self.npcs.append(Solder(self, pos=(npc[0] + 0.5, npc[1] + 0.5)))
+            if npc[-1] == '3':
+                self.npcs.append(Kamikaze(self, pos=(npc[0] + 0.5, npc[1] + 0.5)))
+            if npc[-1] == '4':
+                self.npcs.append(Jaggernaut(self, pos=(npc[0] + 0.5, npc[1] + 0.5)))
+            if npc[-1] == '5':
+                self.npcs.append(Boss(self, pos=(npc[0] + 0.5, npc[1] + 0.5)))
+        for npc in self.npcs:
+            npc.generate_waypoints_auto(4)
+            npc.state = "PATROL"
+        self.pathfinder = PathFinder(self)
+            
     def update(self):
         self.player.update()
         # Проверка зажатой ЛКМ для автоматического оружия
@@ -51,6 +79,8 @@ class Game:
         self.particles = [p for p in self.particles if pygame.time.get_ticks() - p.start_time < p.life_time]
         for p in self.particles:
             p.update()
+        for npc in self.npcs:
+            npc.update()
         self.delta_time = self.clock.tick(FPS)
         pygame.display.set_caption(f'FPS: {self.clock.get_fps() :.1f}')
 
@@ -61,9 +91,14 @@ class Game:
         self.renderer.draw_fps()
         #self.map.draw()
         #self.player.draw()
+        self.npcs.sort(key=lambda npc: math.hypot(npc.x - self.player.x, npc.y - self.player.y), reverse=True)
+        for npc in self.npcs:
+            npc.draw()
+        
         for p in self.particles:
             p.draw()
         self.weapon.draw()
+        self.renderer.draw_interface()
         self.renderer.draw_crosshair()
         
         
