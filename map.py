@@ -1,9 +1,9 @@
-
+from string import ascii_letters
 import pygame
 from setting import *
 class Map:
     text_map = [
-        ['1', '1', '1', '1', '1', '1', '1', '1', '1', '1'],
+        ['W', 'W', 'W', 'R', 'O', 'C', 'M', 'B', 'G', '1'],
         ['1', '_', '_', '_', '_', '_', '_', '_', '_', '1'],
         ['1', '_', '_', '_', '_', '_', '_', '1', '_', '1'],
         ['1', '_', '_', '_', '_', '_', '_', '_', '_', '1'],
@@ -41,7 +41,7 @@ class Map:
         
         for j, row in enumerate(self.text_map):
             for i, char in enumerate(row):
-                if char == '1':
+                if char == '1' or char in ascii_letters:
                     self.world_map[(i, j)] = char # Сохраняем координаты стен
                 if char == '2':
                     self.npc_positions.append((i, j, '2'))

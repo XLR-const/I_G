@@ -106,10 +106,16 @@ class RayCasting:
             # 6. Проекция
             proj_height = SCREEN_DIST / (dist + 0.0001)
             
-            # Делаем стены разного оттенка в зависимости от стороны (X или Y)
-            color = (200, 200, 200) if side == 0 else (150, 150, 150)
-            # Дополнительное затенение от дистанции
-            color = [c / (1 + dist * dist * 0.01) for c in color]
+            wall_char = self.game.map.world_map.get((x_map, y_map), '1')
+            color = WALL_COLORS.get(wall_char, (200, 200, 200))
+            
+            # Затенения от положения стены
+            if side == 1:
+                color = (color[0] * 0.7, color[1] * 0.7, color[2] * 0.7)
+            # Затенения от дистанции    
+            color = (int(color[0] / (1 + dist * dist * 0.01)),
+            int(color[1] / (1 + dist * dist * 0.01)),
+            int(color[2] / (1 + dist * dist * 0.01)))
 
             # Фикс прорисовки стен - зубчики
             # Рассчитываем параметры один раз
