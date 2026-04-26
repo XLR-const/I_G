@@ -13,7 +13,6 @@ from level_manager import LevelManager
 
 class Game:
     def __init__(self):
-        #pygame.init()
         pygame.mouse.set_visible(False)
         #pygame.event.set_grab(True)
         #self.screen = pygame.display.set_mode((WIDTH, HEIGHT))
