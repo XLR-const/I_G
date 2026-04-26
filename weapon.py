@@ -18,6 +18,10 @@ class Weapon:
         self.last_shot_time = 0
         self.recoil = 0
         self.is_continuous = is_continuous
+        self.scale_x = CELL_W / 60
+        self.scale_y = CELL_H / 60
+        self.sound_empty_ammo = pg.mixer.Sound('resources/empty.wav')
+        self.sound_empty_ammo.set_volume(0.2)
 
     def fire(self):
         if not self.reloading and self.ammo > 0:
@@ -56,6 +60,8 @@ class Weapon:
             for _ in range(10):
                 p_pos = (hit_x + uniform(-0.02, 0.02), hit_y + uniform(-0.02, 0.02))
                 self.game.particles.append(Particle(self.game, p_pos, (255, 200, 50), uniform(0.001, 0.005)))
+        if self.ammo == 0:
+            self.sound_empty_ammo.play()
 
     def update_animation(self):
         if self.reloading:
@@ -122,6 +128,13 @@ class Weapon:
 
         return hit_x, hit_y, dist, side
 
+    def s(self, x, y=None):
+        """Универсальный метод масштабирования
+        эталонных координат"""
+        if y is None:
+            return int(x * self.scale_x)
+        return (int(x * self.scale_x), int(y * self.scale_y))
+
 
 class Pistol(Weapon):
     def __init__(self, game):
@@ -129,85 +142,137 @@ class Pistol(Weapon):
     # 10 урона и 150 мс перезарядки
     def draw(self):
         self.update_animation()
-        cx, by = WIDTH // 2, HEIGHT + self.recoil
-
+        
+        # Получаем центр экрана через сетку
+        cx = int((GRID_W // 2) * CELL_W)  # 15.5 * CELL_W
+        cy = int((GRID_H // 2) * CELL_H)  # 8.5 * CELL_H
+        
+        # Базовая позиция: от нижнего края экрана
+        # Оригинал: by = HEIGHT + self.recoil
+        # Переводим: от нижнего края отступаем 0 клеток (HEIGHT = GRID_H * CELL_H)
+        bottom_y = GRID_H * CELL_H + self.recoil
+        
+        # Оригинальные значения и их перевод в клетки:
+        # 110 пикселей = 110 / CELL_W клеток (CELL_W = 60 при 1920/32)
+        # 350 пикселей = 350 / CELL_H клеток (CELL_H = 60 при 1080/18)
+        
+        # Корпус пистолета
+        # Оригинал: (cx - 110, by), (cx + 110, by), (cx + 70, by - 350), (cx - 70, by - 350)
+        offset_bottom = int(110 * CELL_W / 60)      # коэффициент от оригинального CELL_W (60)
+        offset_top = int(70 * CELL_W / 60)
+        height = int(350 * CELL_H / 60)              # оригинальная высота 350 при CELL_H=60
         
         pg.draw.polygon(self.game.screen, (35, 35, 35), [
-            (cx - 110, by), (cx + 110, by),
-            (cx + 70, by - 350), (cx - 70, by - 350)
+            (cx - offset_bottom, bottom_y), 
+            (cx + offset_bottom, bottom_y),
+            (cx + offset_top, bottom_y - height), 
+            (cx - offset_top, bottom_y - height)
         ])
+        
         # Затвор
+        # Оригинал: (cx - 70, by - 280), (cx + 70, by - 280), (cx + 60, by - 350), (cx - 60, by - 350)
+        slide_offset_bottom = int(70 * CELL_W / 60)
+        slide_offset_top = int(60 * CELL_W / 60)
+        slide_y = int(280 * CELL_H / 60)
+        
         pg.draw.polygon(self.game.screen, (55, 55, 55), [
-            (cx - 70, by - 280), (cx + 70, by - 280),
-            (cx + 60, by - 350), (cx - 60, by - 350)
+            (cx - slide_offset_bottom, bottom_y - slide_y),
+            (cx + slide_offset_bottom, bottom_y - slide_y),
+            (cx + slide_offset_top, bottom_y - height),
+            (cx - slide_offset_top, bottom_y - height)
         ])
+        
         # Детали (Мушка, Дуло)
-        pg.draw.rect(self.game.screen, (20, 20, 20), (cx - 5, by - 365, 10, 15))
-        pg.draw.circle(self.game.screen, (10, 10, 10), (cx, int(by - 330)), 12)
+        # Оригинал: (cx - 5, by - 365, 10, 15)
+        sight_w = int(10 * CELL_W / 60)
+        sight_h = int(15 * CELL_H / 60)
+        sight_x = cx - sight_w // 2
+        sight_y = bottom_y - int(365 * CELL_H / 60)
+        pg.draw.rect(self.game.screen, (20, 20, 20), (sight_x, sight_y, sight_w, sight_h))
+        
+        # Оригинал: (cx, int(by - 330)), 12
+        muzzle_y = bottom_y - int(330 * CELL_H / 60)
+        muzzle_r = int(12 * CELL_W / 60)
+        pg.draw.circle(self.game.screen, (10, 10, 10), (cx, muzzle_y), muzzle_r)
 
-        # ВОЗВРАЩАЕМ ВСПЫШКУ
+        # Вспышка
         if self.reloading and self.elapsed < 40:
-            f_x, f_y = cx, int(by - 360)
-            pg.draw.circle(self.game.screen, (255, 255, 100), (f_x, f_y), 50)
-            pg.draw.circle(self.game.screen, (255, 255, 255), (f_x, f_y), 20)
+            flash_y = bottom_y - int(360 * CELL_H / 60)
+            flash_r_big = int(50 * CELL_W / 60)
+            flash_r_small = int(20 * CELL_W / 60)
+            pg.draw.circle(self.game.screen, (255, 255, 100), (cx, flash_y), flash_r_big)
+            pg.draw.circle(self.game.screen, (255, 255, 255), (cx, flash_y), flash_r_small)
 
-        # Прицел
-        pg.draw.circle(self.game.screen, 'red', (WIDTH // 2, HEIGHT // 2), 4, 1)
-
+        
 class Shotgun(Weapon):
     def __init__(self, game):
-        # Урон 50, перезарядка 800мс
-        super().__init__(game, "Shotgun", 50, 800)
-
+        super().__init__(game, "Shotgun", 50, 800)    
     def draw(self):
         self.update_animation()
-        # Опускаем модель чуть ниже и усиливаем отдачу
-        cx, by = WIDTH // 2, HEIGHT + 80 + self.recoil * 2.0 
-
+        
+        # Центр экрана = начало 16-й клетки (индекс 16)
+        center_x = (GRID_W // 2) * CELL_W
+        # Для дробовика смещение вниз: оригинал HEIGHT + 80
+        # 80 пикселей = 80 / 60 = 1.33 клетки
+        bottom_y = HEIGHT + int(80 * self.scale_y) + self.recoil * 2.0
+        
         # 1. ДЕРЕВЯННОЕ ЦЕВЬЕ (нижняя часть)
-        # Цвет темного дерева (коричневый)
         WOOD_COLOR = (100, 50, 20)
         pg.draw.polygon(self.game.screen, WOOD_COLOR, [
-            (cx - 220, by), (cx + 220, by),
-            (cx + 170, by - 180), (cx - 170, by - 180)
+            (center_x - self.s(220), bottom_y),
+            (center_x + self.s(220), bottom_y),
+            (center_x + self.s(170), bottom_y - self.s(180)),
+            (center_x - self.s(170), bottom_y - self.s(180))
         ])
+        
         # Тень на дереве для объема
         pg.draw.polygon(self.game.screen, (70, 35, 15), [
-            (cx - 170, by - 180), (cx + 170, by - 180),
-            (cx + 150, by - 210), (cx - 150, by - 210)
+            (center_x - self.s(170), bottom_y - self.s(180)),
+            (center_x + self.s(170), bottom_y - self.s(180)),
+            (center_x + self.s(150), bottom_y - self.s(210)),
+            (center_x - self.s(150), bottom_y - self.s(210))
         ])
-
+        
         # 2. СОПРИКАСАЮЩИЕСЯ СТВОЛЫ (Металл)
         # Левый ствол (вплотную к центру)
         pg.draw.polygon(self.game.screen, (50, 50, 50), [
-            (cx - 90, by - 200), (cx, by - 200),
-            (cx, by - 400), (cx - 75, by - 400)
+            (center_x - self.s(90), bottom_y - self.s(200)),
+            (center_x, bottom_y - self.s(200)),
+            (center_x, bottom_y - self.s(400)),
+            (center_x - self.s(75), bottom_y - self.s(400))
         ])
+        
         # Правый ствол (вплотную к центру)
         pg.draw.polygon(self.game.screen, (60, 60, 60), [
-            (cx, by - 200), (cx + 90, by - 200),
-            (cx + 75, by - 400), (cx, by - 400)
+            (center_x, bottom_y - self.s(200)),
+            (center_x + self.s(90), bottom_y - self.s(200)),
+            (center_x + self.s(75), bottom_y - self.s(400)),
+            (center_x, bottom_y - self.s(400))
         ])
         
         # Разделительная линия между стволами для четкости
-        pg.draw.line(self.game.screen, (20, 20, 20), (cx, by - 200), (cx, by - 400), 2)
-
+        pg.draw.line(self.game.screen, (20, 20, 20), 
+                    (center_x, bottom_y - self.s(200)), 
+                    (center_x, bottom_y - self.s(400)), 2)
+        
         # 3. ДУЛЬНЫЕ СРЕЗЫ
-        pg.draw.circle(self.game.screen, (10, 10, 10), (cx - 42, int(by - 395)), 28)
-        pg.draw.circle(self.game.screen, (10, 10, 10), (cx + 42, int(by - 395)), 28)
-
+        pg.draw.circle(self.game.screen, (10, 10, 10), 
+                      (center_x - self.s(42), bottom_y - self.s(395)), self.s(28))
+        pg.draw.circle(self.game.screen, (10, 10, 10), 
+                      (center_x + self.s(42), bottom_y - self.s(395)), self.s(28))
+        
         # 4. МОЩНАЯ ВСПЫШКА
         if self.reloading and self.elapsed < 50:
-            f_y = int(by - 410)
-            pg.draw.circle(self.game.screen, (255, 140, 0), (cx, f_y), 120)
-            pg.draw.circle(self.game.screen, (255, 255, 180), (cx, f_y), 50)
+            flash_y = bottom_y - self.s(410)
+            pg.draw.circle(self.game.screen, (255, 140, 0), 
+                          (center_x, flash_y), self.s(120))
+            pg.draw.circle(self.game.screen, (255, 255, 180), 
+                          (center_x, flash_y), self.s(50))
+        
 
-        # Прицел
-        pg.draw.circle(self.game.screen, 'red', (WIDTH // 2, HEIGHT // 2), 4, 1)
 
 class MachineGun(Weapon):
     def __init__(self, game):
-        # Быстрая стрельба (90мс) и флаг автоматического огня (True)
         super().__init__(game, "Machine Gun", 10, 90, True)
 
     def draw(self):
@@ -217,23 +282,27 @@ class MachineGun(Weapon):
         # Скорость вращения: быстро при стрельбе, медленно в покое
         rot_speed = 0.06 if self.reloading else 0.01
         
-        # Тряска при стрельбе
-        shake = math.sin(time * 0.3) * 6 if self.reloading else 0
-        cx, by = WIDTH // 2 + shake, HEIGHT + 120 + self.recoil
+        # Тряска при стрельбе: 6 пикселей в клетки
+        shake = math.sin(time * 0.3) * (6 * self.scale_x) if self.reloading else 0
+        # Центр экрана = начало 16-й клетки
+        center_x = (GRID_W // 2) * CELL_W + shake
+        # Смещение вниз: 120 пикселей = 2 клетки
+        bottom_y = HEIGHT + int(120 * self.scale_y) + self.recoil
 
         # 1. МАССИВНЫЙ КОРПУС (Задняя часть)
         pg.draw.polygon(self.game.screen, (30, 30, 30), [
-            (cx - 180, by), (cx + 180, by),
-            (cx + 140, by - 180), (cx - 140, by - 180)
+            (center_x - self.s(180), bottom_y),
+            (center_x + self.s(180), bottom_y),
+            (center_x + self.s(140), bottom_y - self.s(180)),
+            (center_x - self.s(140), bottom_y - self.s(180))
         ])
 
         # 2. БЛОК ГИГАНТСКИХ СТВОЛОВ (4 штуки для массивности)
-        # Увеличиваем разлет (80) и базовую толщину (30)
         for i in range(4):
             angle = time * rot_speed + i * (math.pi / 2)
-            offset = math.cos(angle) * 80
+            offset = math.cos(angle) * self.s(80)
             # Эффект перспективы для толщины ствола
-            thickness = 30 + math.sin(angle) * 10
+            thickness = self.s(30) + math.sin(angle) * self.s(10)
             
             # Рисуем ствол только если он на переднем плане
             if math.sin(angle) > -0.5:
@@ -243,23 +312,33 @@ class MachineGun(Weapon):
                 
                 # Сами трубы стволов
                 pg.draw.rect(self.game.screen, color, 
-                             (cx + offset - thickness // 2, by - 420, thickness, 240))
+                            (int(center_x + offset - thickness // 2), 
+                             bottom_y - self.s(420), 
+                             int(thickness), 
+                             self.s(240)))
                 
                 # Массивные дульные срезы
                 pg.draw.circle(self.game.screen, (10, 10, 10), 
-                               (int(cx + offset), int(by - 420)), int(thickness // 1.5))
+                              (int(center_x + offset), 
+                               bottom_y - self.s(420)), 
+                              int(thickness // 1.5))
                 # Блик на срезе для металла
                 pg.draw.circle(self.game.screen, (80, 80, 80), 
-                               (int(cx + offset - 5), int(by - 425)), int(thickness // 4))
+                              (int(center_x + offset - 5 * self.scale_x), 
+                               bottom_y - self.s(425)), 
+                              int(thickness // 4))
 
         # 3. ВСПЫШКА (Яркая и широкая)
         if self.reloading and self.elapsed < 40:
-            f_y = int(by - 440)
-            pg.draw.circle(self.game.screen, (255, 200, 50), (cx, f_y), 80)
-            pg.draw.circle(self.game.screen, (255, 255, 255), (cx, f_y), 30)
+            flash_y = bottom_y - self.s(440)
+            pg.draw.circle(self.game.screen, (255, 200, 50), 
+                          (int(center_x), flash_y), self.s(80))
+            pg.draw.circle(self.game.screen, (255, 255, 255), 
+                          (int(center_x), flash_y), self.s(30))
 
-        # Прицел
-        pg.draw.circle(self.game.screen, 'red', (WIDTH // 2, HEIGHT // 2), 4, 1)
+        # Прицел (центр экрана)
+        pg.draw.circle(self.game.screen, 'red', 
+                      (WIDTH // 2, HEIGHT // 2), 4, 1)
 
 class PlasmaGun(Weapon):
     def __init__(self, game):
@@ -267,19 +346,30 @@ class PlasmaGun(Weapon):
 
     def draw(self):
         self.update_animation()
-        cx, by = WIDTH // 2, HEIGHT + 80 + self.recoil
+        
+        # Центр экрана = начало 16-й клетки
+        center_x = (GRID_W // 2) * CELL_W
+        # Смещение вниз: 80 пикселей = 1.33 клетки
+        bottom_y = HEIGHT + int(80 * self.scale_y) + self.recoil
 
         # ФУТУРИСТИЧНЫЙ КОРПУС
         pg.draw.polygon(self.game.screen, (20, 40, 80), [
-            (cx - 150, by), (cx + 150, by),
-            (cx + 100, by - 350), (cx - 100, by - 350)
+            (center_x - self.s(150), bottom_y),
+            (center_x + self.s(150), bottom_y),
+            (center_x + self.s(100), bottom_y - self.s(350)),
+            (center_x - self.s(100), bottom_y - self.s(350))
         ])
+        
         # Светящаяся плазменная трубка
         plasma_color = (0, 255, 255) if not self.reloading else (255, 0, 255)
-        pg.draw.rect(self.game.screen, plasma_color, (cx - 20, by - 300, 40, 150), 0, 5)
+        pg.draw.rect(self.game.screen, plasma_color, 
+                    (center_x - self.s(20), bottom_y - self.s(300), self.s(40), self.s(150)), 0, 5)
 
+        # Вспышка при выстреле
         if self.reloading and self.elapsed < 100:
-            pg.draw.circle(self.game.screen, (200, 0, 255), (cx, int(by - 370)), 70)
+            flash_y = bottom_y - self.s(370)
+            pg.draw.circle(self.game.screen, (200, 0, 255), 
+                          (center_x, flash_y), self.s(70))
 
 class Particle:
     def __init__(self, game, pos, color, speed):

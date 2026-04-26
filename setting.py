@@ -1,10 +1,17 @@
 import math
+import pygame
 # Game setting
-WIDTH = 1600
-HEIGHT = 900
-RES = (1920, 1080)
+pygame.init()
+info = pygame.display.Info()
+WIDTH = info.current_w
+HEIGHT = info.current_h
+RES = (WIDTH, HEIGHT)
+GRID_W = 32
+GRID_H = 18
+CELL_W, CELL_H = WIDTH // GRID_W, HEIGHT // GRID_H
 HALF_WIDTH = WIDTH // 2
 HALF_HEIGHT = HEIGHT // 2
+
 FPS = 300
 TILE = 100 # Коэффициент масштабирования
 
@@ -44,3 +51,48 @@ WALL_COLORS = {
     'S': (160, 160, 160),  # пастельно-каменный
     'M': (170, 170, 190),  # пастельно-металлик
 }
+
+# ========== КОНВЕРТЕР КООРДИНАТ СЕТКИ ==========
+def grid_to_pixel(col, row, mod='topleft'):
+    """
+    Преобразует координаты сетки (32×18) в пиксельные координаты экрана.
+    
+    Параметры:
+        col, row - координаты в сетке (0-31, 0-17)
+        mod - точка привязки:
+            'topleft' - верхний левый угол (по умолчанию)
+            'center' - центр клетки
+            'midtop' - середина верхней границы
+            'midbottom' - середина нижней границы
+            'midleft' - середина левой границы
+            'midright' - середина правой границы
+            'topright' - правый верхний угол
+            'bottomleft' - левый нижний угол
+            'bottomright' - правый нижний угол
+    
+    Возвращает:
+        (x, y) - координаты в пикселях
+    """
+    x = col * CELL_W
+    y = row * CELL_H
+    
+    if mod == 'topleft':
+        return (x, y)
+    elif mod == 'center':
+        return (x + CELL_W // 2, y + CELL_H // 2)
+    elif mod == 'midtop':
+        return (x + CELL_W // 2, y)
+    elif mod == 'midbottom':
+        return (x + CELL_W // 2, y + CELL_H)
+    elif mod == 'midleft':
+        return (x, y + CELL_H // 2)
+    elif mod == 'midright':
+        return (x + CELL_W, y + CELL_H // 2)
+    elif mod == 'topright':
+        return (x + CELL_W, y)
+    elif mod == 'bottomleft':
+        return (x, y + CELL_H)
+    elif mod == 'bottomright':
+        return (x + CELL_W, y + CELL_H)
+    else:
+        return (x, y)

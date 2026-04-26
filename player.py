@@ -44,6 +44,22 @@ class Player:
         can_move_x = (int(self.x + dx + (scale if dx > 0 else -scale)), int(self.y)) not in self.game.map.world_map
         can_move_y = (int(self.x), int(self.y + dy + (scale if dy > 0 else -scale))) not in self.game.map.world_map
 
+        # проверка дверей
+        for door in self.game.map.doors:
+            door_x, door_y = int(door.x), int(door.y)
+            
+            # Проверка X движения
+            check_x = int(self.x + dx + (scale if dx > 0 else -scale))
+            if check_x == door_x and int(self.y) == door_y:
+                if door.is_wall():  # если дверь закрыта или закрывается
+                    can_move_x = False
+            
+            # Проверка Y движения
+            check_y = int(self.y + dy + (scale if dy > 0 else -scale))
+            if int(self.x) == door_x and check_y == door_y:
+                if door.is_wall():
+                    can_move_y = False
+        
         # Проверка коллизии с NPC
         for npc in self.game.npcs:
             if npc.alive:

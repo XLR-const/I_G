@@ -292,6 +292,10 @@ class NPC:
             check_y = int(self.y + dy * t)
             if self.game.map.is_wall(check_x, check_y):
                 return False
+            for door in self.game.map.doors:
+                if int(door.x) == int(check_x) and int(door.y) == int(check_y):
+                    if door.is_wall():  # если дверь закрыта
+                        return False
         return True
     
     # Sliding Collision
@@ -637,13 +641,27 @@ class Jaggernaut(NPC):
         self.shoot_sound = pygame.mixer.Sound('resources/npc/npc_machine_gun.wav')
         self.shoot_sound.set_volume(0.2)
         
+class Lightning(NPC):
+    def __init__(self, game, pos=(8.5, 7.5)):
+        super().__init__(game, pos)
+        self.speed = 0.05
+        self.hp = 30
+        self.damage = 10
+        self.shoot_range = 4
+        self.shoot_delay = 600
+        self.image_path = 'resources/npc/lightning.png'
+        self.image = pygame.image.load(self.image_path).convert_alpha()
+        self.sprite_width, self.sprite_height = self.image.get_size()
+        self.sprite_ratio = self.sprite_width / self.sprite_height
+        self.shoot_sound = pygame.mixer.Sound('resources/npc/npc_pistol.wav')
+        self.shoot_sound.set_volume(0.2)
         
 class Kamikaze(NPC):
     def __init__(self, game, pos=(8.5, 7.5)):
         super().__init__(game, pos)
-        self.speed = 3.5
+        self.speed = 1.3
         self.hp = 40
-        self.damage = 50
+        self.damage = 40
         self.shoot_range = 1.2
         self.shoot_delay = 0
         self.radius = 0.4
