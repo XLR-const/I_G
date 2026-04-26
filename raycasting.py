@@ -45,9 +45,14 @@ class RayCasting:
     
     # Внедрение алгоритма DDA            
     def ray_cast(self):
+        #print(f"ray_cast: player at ({ox}, {oy}), map size: {len(self.game.map.world_map)}")
         ox, oy = self.game.player.x, self.game.player.y
         x_map, y_map = int(ox), int(oy)
 
+        # ЗАЩИТА: проверка границ карты
+        if not hasattr(self.game.map, 'width') or not hasattr(self.game.map, 'height'):
+            return  # карта не загружена
+        
         for i in range(NUM_RAYS):
             ray_angle = self.game.player.angle - HALF_FOV + i * DELTA_ANGLE
             sin_a = math.sin(ray_angle)
@@ -90,6 +95,12 @@ class RayCasting:
                 # Проверяем, есть ли стена в этой клетке
                 if (x_map, y_map) in self.game.map.world_map:
                     wall_hit = True
+                # проверка дверей    
+                for door in self.game.map.doors:
+                    if int(door.x) == x_map and int(door.y) == y_map:
+                        if door.is_wall():
+                            wall_hit = True
+                        break
 
             # 4. Считаем финальную дистанцию до стены
             if side == 0: # Вертикаль
@@ -107,6 +118,14 @@ class RayCasting:
             proj_height = SCREEN_DIST / (dist + 0.0001)
             
             wall_char = self.game.map.world_map.get((x_map, y_map), '1')
+            
+            # обрабатываем анимацию дверей
+            for door in self.game.map.doors:
+                if int(door.x) == x_map and int(door.y) == y_map:
+                    wall_char = 'D'
+                    door_frame = door.get_texture_offset()
+                    break
+            
             color = WALL_COLORS.get(wall_char, (200, 200, 200))
             
             # Затенения от положения стены
