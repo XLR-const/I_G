@@ -13,7 +13,7 @@ from level_manager import LevelManager
 
 class Game:
     def __init__(self):
-        pygame.init()
+        #pygame.init()
         pygame.mouse.set_visible(False)
         #pygame.event.set_grab(True)
         #self.screen = pygame.display.set_mode((WIDTH, HEIGHT))
@@ -195,7 +195,7 @@ class Game:
         self.weapon.draw()
         self.renderer.draw_interface()
         self.renderer.draw_crosshair()
-        self.renderer.draw_line_of_cells()
+        #self.renderer.draw_line_of_cells()
         
         
         pygame.display.flip()

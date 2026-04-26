@@ -1,13 +1,17 @@
 import math
+import pygame
 # Game setting
-WIDTH = 1920
-HEIGHT = 1080
+pygame.init()
+info = pygame.display.Info()
+WIDTH = info.current_w
+HEIGHT = info.current_h
 RES = (WIDTH, HEIGHT)
 GRID_W = 32
 GRID_H = 18
 CELL_W, CELL_H = WIDTH // GRID_W, HEIGHT // GRID_H
 HALF_WIDTH = WIDTH // 2
 HALF_HEIGHT = HEIGHT // 2
+
 FPS = 300
 TILE = 100 # Коэффициент масштабирования
 
