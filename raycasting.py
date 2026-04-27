@@ -7,7 +7,9 @@ class RayCasting:
         self.game = game
         # Z-буфер для расстояний до стен каждого луча
         self.z_buffer = [float('inf')] * NUM_RAYS 
-        
+        self.textures = {}
+        self.texture_cache = {}
+        self.load_textures()
     
     def ray_cast_native(self):
         ox, oy = self.game.player.x, self.game.player.y
@@ -43,7 +45,48 @@ class RayCasting:
                                  (i * (WIDTH // NUM_RAYS), HALF_HEIGHT - proj_height // 2, 
                                 WIDTH // NUM_RAYS, proj_height))
     
-    # Внедрение алгоритма DDA            
+    def load_textures(self):
+        """Загрузка текстур из TEXTURES_PATH"""
+        try:
+            if USE_TEXTURES:
+                for name in TEXTURE_NAMES:
+                    try:
+                        path = TEXTURES_PATH + f"{name}.png"
+                        tex = pygame.image.load(path).convert_alpha()
+                        self.textures[name] = pygame.transform.scale(tex, (TEXTURE_SIZE, TEXTURE_SIZE))
+                    except:
+                        print(f"Ошибка загрузки {path}")
+                        self.textures[name] = None
+            else:
+                self.textures[name] = None
+        except Exception as e:
+            print(f"Ошибка загрузки текстур: {e}")
+            self.textures[name] = None
+    
+    def get_texture_slice(self, texture, tex_x, height):
+        """
+        Возвращает вертикальную полоску текстуры в пиксель
+        мастштабирования height
+        tex_x: номер пикселя в текстуре
+        height: высота полоски в пикселях
+        """
+        if texture is None or not USE_TEXTURES:
+            return None
+        
+        # Создание уникального ключа для кэша
+        cache_key = (id(texture), tex_x, height)
+        if cache_key in self.texture_cache:
+            return self.texture_cache[cache_key]
+        # Нарезаем текстуру
+        slice_surface = texture.subsurface((tex_x, 0, 1, TEXTURE_SIZE))
+        # Масштабируем
+        scaled = pygame.transform.scale(slice_surface, (SCALE, height))
+        # Кэшируем
+        self.texture_cache[cache_key] = scaled
+        
+        return scaled
+        
+    # Внедрение алгоритма DDA raycast            
     def ray_cast(self):
         #print(f"ray_cast: player at ({ox}, {oy}), map size: {len(self.game.map.world_map)}")
         ox, oy = self.game.player.x, self.game.player.y
@@ -147,8 +190,35 @@ class RayCasting:
             if h > HEIGHT * 2: # даем запас, но не бесконечность
                 h = HEIGHT * 2
                 y = int(HALF_HEIGHT - h // 2)
-
-            pygame.draw.rect(self.game.screen, color, (x, y, w, h))
+                
+            # РАБОТА С ТЕКСТУРКАМИ    
+            texture = self.textures.get(wall_char)
+            if texture is not None:
+                # Точка попадания луча в стену
+                if side == 0:  # Вертикальная стена
+                    hit_x = ox + (side_dist_x - delta_dist_x) * cos_a
+                    hit_y = oy + (side_dist_x - delta_dist_x) * sin_a
+                    # Для вертикальной стены используем координату Y
+                    tex_x = hit_y % 1.0
+                else:  # Горизонтальная стена
+                    hit_x = ox + (side_dist_y - delta_dist_y) * cos_a
+                    hit_y = oy + (side_dist_y - delta_dist_y) * sin_a
+                    # Для горизонтальной стены используем координату X
+                    tex_x = hit_x % 1.0
+                tex_x = int(tex_x * TEXTURE_SIZE)
+                
+                # Получаем полоску из кэша
+                texture_slice = self.get_texture_slice(texture, tex_x, h)
+                if texture_slice is not None:
+                    self.game.screen.blit(texture_slice, (x, y))
+                    if side == 1:
+                        dark_surface = pygame.Surface((w, h))
+                        dark_surface.set_alpha(80)
+                        dark_surface.fill((0, 0, 0))
+                        self.game.screen.blit(dark_surface, (x, y))
+                        
+            else:
+                pygame.draw.rect(self.game.screen, color, (x, y, w, h))
             #pygame.draw.line(self.game.screen, color, (x, y), (x, y + h), w)
             # Сбрасываем координаты сетки для следующего луча!
             x_map, y_map = int(ox), int(oy)

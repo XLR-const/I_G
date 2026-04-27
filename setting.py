@@ -31,7 +31,7 @@ MOUSE_BORDER_RIGHT = WIDTH - 100
 # Raycasting
 FOV = math.pi / 3 # 60 degrees
 HALF_FOV = FOV / 2
-NUM_RAYS = WIDTH
+NUM_RAYS = WIDTH // 2
 SCALE = math.ceil(WIDTH // NUM_RAYS)
 HALF_NUM_RAYS = NUM_RAYS // 2
 DELTA_ANGLE = FOV / NUM_RAYS # шаг угла меж лучами
@@ -51,6 +51,13 @@ WALL_COLORS = {
     'S': (160, 160, 160),  # пастельно-каменный
     'M': (170, 170, 190),  # пастельно-металлик
 }
+
+# Текстуры
+TEXTURE_SIZE = 128
+TEXTURES_PATH = "resources/textures/"
+USE_TEXTURES = True
+TEXTURE_NAMES = ['W', 'R', 'B', 'G', 'Y', 'P', 'O', 'C', 'S', 'M', "D"]
+
 
 # ========== КОНВЕРТЕР КООРДИНАТ СЕТКИ ==========
 def grid_to_pixel(col, row, mod='topleft'):

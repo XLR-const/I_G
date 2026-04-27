@@ -73,7 +73,10 @@ class Game:
         if not level_data:
             self.game_over()
             return
-        # партикли
+        # Очистка кэша тектур
+        if hasattr(self, 'renderer'):
+            self.raycasting.texture_cache.clear()
+        # партикли 
         self.particles = []
         
         # карта
@@ -183,7 +186,6 @@ class Game:
         self.renderer.draw_background()
         self.raycasting.ray_cast()
         self.renderer.draw_fps()
-        #self.map.draw()
         #self.player.draw()
         self.npcs.sort(key=lambda npc: math.hypot(npc.x - self.player.x, npc.y - self.player.y), reverse=True)
         for npc in self.npcs:
@@ -209,6 +211,10 @@ class Game:
                 if event.button == 1:
                     if not self.weapon.reloading and not self.weapon.is_continuous:
                         self.weapon.fire()
+            # Альтернативгая стрельба
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_SPACE:
+                    self.weapon.fire()
                         
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_1: 
