@@ -59,10 +59,6 @@ class Map:
                 door = Door(self.game, x + 0.5, y + 0.5)
                 self.doors.append(door)
 
-    def draw(self): 
-        for pos in self.world_map:
-            pygame.draw.rect(self.game.screen, 'gray', 
-                             (pos[0] * TILE, pos[1] * TILE, TILE, TILE), 2)
     
     def is_wall(self, x, y):
         # Проверяем стены
