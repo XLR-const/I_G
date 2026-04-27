@@ -76,7 +76,7 @@ class Game:
         # Очистка кэша тектур
         if hasattr(self, 'renderer'):
             self.raycasting.texture_cache.clear()
-        # партикли
+        # партикли 
         self.particles = []
         
         # карта
