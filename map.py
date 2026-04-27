@@ -19,7 +19,7 @@ class Map:
 
     def parse_map(self, doors_data=None):
         """MANUAL:
-        1 - wall
+        1 - basic wall(may WRS...)
         2 - solder
         3 - kamikaze
         4 - jaga

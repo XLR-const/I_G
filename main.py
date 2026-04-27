@@ -73,6 +73,9 @@ class Game:
         if not level_data:
             self.game_over()
             return
+        # Очистка кэша тектур
+        if hasattr(self, 'renderer'):
+            self.raycasting.texture_cache.clear()
         # партикли
         self.particles = []
         
