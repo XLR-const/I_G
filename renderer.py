@@ -4,7 +4,7 @@ from setting import *
 class Renderer:
     def __init__(self, game):
         self.game = game
-    
+
     def draw_background(self):
         # Потолок (темно-серый)
         pygame.draw.rect(self.game.screen, WALL_COLORS['C'], (0, 0, WIDTH, HALF_HEIGHT))
