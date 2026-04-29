@@ -11,7 +11,7 @@ GRID_H = 18
 CELL_W, CELL_H = WIDTH // GRID_W, HEIGHT // GRID_H
 HALF_WIDTH = WIDTH // 2
 HALF_HEIGHT = HEIGHT // 2
-
+MASTER_VOLUME = 0.5
 FPS = 300
 TILE = 100 # Коэффициент масштабирования
 

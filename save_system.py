@@ -1,7 +1,7 @@
 import os
 
 class SaveSystem:
-    SAVE_FILE = 'save.sav'
+    SAVE_FILE = 'resources/save.sav'
     
     @staticmethod
     def save(level_num, total_kills, level_time):

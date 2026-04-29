@@ -182,7 +182,7 @@ class Game:
         self.player.hp = 100
         self.level_start_time = pygame.time.get_ticks()
         self.load_level(self.current_level)            
-            
+                    
     def update(self):
         self.player.update()
         self.check_exit()
