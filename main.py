@@ -11,6 +11,7 @@ from npc import NPC, Solder, Jaggernaut, Kamikaze, Boss, Lightning
 from pathfinding import PathFinder
 from level_manager import LevelManager
 from ui_manager import UIManager
+from save_system import SaveSystem
 
 class Game:
     def __init__(self):
@@ -21,6 +22,7 @@ class Game:
         self.clock = pygame.time.Clock() 
         self.delta_time = 1
         self.font = pygame.font.SysFont('Arial', 30, bold=True)
+        self.save_system = SaveSystem()
         self.total_kills = 0
         
         self.ui_manager = UIManager(self)
@@ -150,7 +152,9 @@ class Game:
     
         
     def next_level(self):
+        """Срабатывает когда игрок в координатах выхода"""
         self.level_time = (pygame.time.get_ticks() - self.level_start_time) // 1000
+        self.save_system.save(self.current_level, self.total_kills, self.level_time)
         self.ui_manager.current_state = self.ui_manager.states['LEVEL_END']
         # migrate in handle self.load_level(self.current_level)
         
@@ -169,7 +173,15 @@ class Game:
     def game_over(self):
         pygame.quit()
 
-            
+    def reset_game(self):
+        """Полный сброс игры (NEW GAME)"""
+        self.save_system.delete()
+        self.total_kills = 0
+        self.level_time = 0
+        self.current_level = 1
+        self.player.hp = 100
+        self.level_start_time = pygame.time.get_ticks()
+        self.load_level(self.current_level)            
             
     def update(self):
         self.player.update()

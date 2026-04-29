@@ -2,6 +2,7 @@ import pygame
 from setting import *
 import sys
 import random
+from save_system import SaveSystem
 
 class UIManager:
     def __init__(self, game):
@@ -75,7 +76,19 @@ class UIManager:
             elif event.key == pygame.K_RETURN:
                 # 0 situation
                 if self.selected_option == 0:
+                    self.game.reset_game()
                     self.current_state = self.states['BRIEFING']
+                elif self.selected_option == 1:
+                    saved = SaveSystem.load()
+                    if saved:
+                        self.game.current_level = saved['current_level']
+                        self.game.total_kills = saved['total_kills']
+                        self.game.load_level(self.game.current_level)
+                        self.current_state = self.states['BRIEFING']
+                    else:
+                        self.game.reset_game()
+                        # Load level and tick уже в reset_game
+                        self.current_state = self.states['BRIEFING']
                 # 3 situation
                 elif self.selected_option == 3:
                     pygame.quit()
@@ -122,9 +135,12 @@ class UIManager:
     def _handle_level_end_event(self, event):
         """Обработка конца уровня"""
         if event.type == pygame.KEYDOWN:
-            if hasattr(self, 'briefing_start'):
-                delattr(self, 'briefing_start')
+            '''if hasattr(self, 'briefing_start'):
+                delattr(self, 'briefing_start')'''
             self.game.current_level += 1
+            SaveSystem.save(self.game.current_level,
+                            self.game.total_kills,
+                            self._get_level_time())
             self.game.load_level(self.game.current_level)
             self.current_state = self.states['BRIEFING']
             return True
@@ -240,7 +256,7 @@ class UIManager:
                     
     # ===BRIEFING===
     def _update_briefing(self):
-        if not hasattr(self, 'briefing_start'):
+        '''if not hasattr(self, 'briefing_start'):
             self.briefing_start = pygame.time.get_ticks()
         
         elapsed = pygame.time.get_ticks() - self.briefing_start
@@ -248,7 +264,8 @@ class UIManager:
         if elapsed > 5000:
             print("Авто-переход в игру")  # ← отладка
             self._start_level()
-            delattr(self, 'briefing_start')
+            delattr(self, 'briefing_start')'''
+        pass
     
     def _start_level(self):
         self.current_state = self.states['PLAYING']
