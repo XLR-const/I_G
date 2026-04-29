@@ -10,6 +10,8 @@ from weapon import Particle
 from npc import NPC, Solder, Jaggernaut, Kamikaze, Boss, Lightning
 from pathfinding import PathFinder
 from level_manager import LevelManager
+from ui_manager import UIManager
+from save_system import SaveSystem
 
 class Game:
     def __init__(self):
@@ -20,8 +22,10 @@ class Game:
         self.clock = pygame.time.Clock() 
         self.delta_time = 1
         self.font = pygame.font.SysFont('Arial', 30, bold=True)
+        self.save_system = SaveSystem()
+        self.total_kills = 0
         
-
+        self.ui_manager = UIManager(self)
         self.level_manager = LevelManager(self)
         self.current_level = 1
         self.load_level(self.current_level)
@@ -79,6 +83,11 @@ class Game:
         # партикли 
         self.particles = []
         
+        # Статы
+        self.total_kills = 0
+        #self.level_time = 0
+        #self.level_start_time = pygame.time.get_ticks()
+        
         # карта
         self.map = Map(self, level_data['map_data'], level_data['doors'])
         self.exit_pos = self.map.get_exit_pos()
@@ -105,6 +114,7 @@ class Game:
         # игрок
         if hasattr(self, 'player'):
             self.player.x, self.player.y = level_data['player_start']
+            self.player.hp = 100
         else:
             self.player = Player(self)
             self.player.x, self.player.y = level_data['player_start']
@@ -142,8 +152,11 @@ class Game:
     
         
     def next_level(self):
-        self.current_level += 1
-        self.load_level(self.current_level)
+        """Срабатывает когда игрок в координатах выхода"""
+        self.level_time = (pygame.time.get_ticks() - self.level_start_time) // 1000
+        self.save_system.save(self.current_level, self.total_kills, self.level_time)
+        self.ui_manager.current_state = self.ui_manager.states['LEVEL_END']
+        # migrate in handle self.load_level(self.current_level)
         
     def check_exit(self):
         if not hasattr(self, 'exit_pos') or self.exit_pos is None:
@@ -154,13 +167,22 @@ class Game:
         exit_cell = (int(self.exit_pos[0]), int(self.exit_pos[1]))
         
         if player_cell == exit_cell:
+            self.ui_manager.current_state = self.ui_manager.states['LEVEL_END']
             self.next_level()
             
     def game_over(self):
         pygame.quit()
 
-            
-            
+    def reset_game(self):
+        """Полный сброс игры (NEW GAME)"""
+        self.save_system.delete()
+        self.total_kills = 0
+        self.level_time = 0
+        self.current_level = 1
+        self.player.hp = 100
+        self.level_start_time = pygame.time.get_ticks()
+        self.load_level(self.current_level)            
+                    
     def update(self):
         self.player.update()
         self.check_exit()
@@ -203,47 +225,67 @@ class Game:
 
     def check_events(self):
         for event in pygame.event.get():
-            if event.type == pygame.QUIT or (event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE):
+            if event.type == pygame.QUIT:
                 pygame.quit()
                 sys.exit()
-            if event.type == pygame.MOUSEBUTTONDOWN:
-                # Теперь проверяем КНОПКУ (1 - левая) и статус перезарядки
-                if event.button == 1:
-                    if not self.weapon.reloading and not self.weapon.is_continuous:
+            
+            handled = self.ui_manager.handle_event(event)
+            # Если UI не обработал событие и мы в игре
+            if not handled and self.ui_manager.current_state == self.ui_manager.states['PLAYING']:
+                # Обработка игровых событий
+                if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+                    self.ui_manager.current_state = self.ui_manager.states['PAUSE']
+                    self.ui_manager.selected_option = 0
+            
+                if event.type == pygame.MOUSEBUTTONDOWN:
+                    # Теперь проверяем КНОПКУ (1 - левая) и статус перезарядки
+                    if event.button == 1:
+                        if not self.weapon.reloading and not self.weapon.is_continuous:
+                            self.weapon.fire()
+                # Альтернативгая стрельба
+                if event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_SPACE:
                         self.weapon.fire()
-            # Альтернативгая стрельба
-            if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_SPACE:
-                    self.weapon.fire()
-                        
-            if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_1: 
-                    self.current_weapon_index = 0
-                if event.key == pygame.K_2: 
-                    self.current_weapon_index = 1
-                if event.key == pygame.K_3: 
-                    self.current_weapon_index = 2
-                if event.key == pygame.K_4: 
-                    self.current_weapon_index = 3
-                # Обновляем ссылку на активное оружие
-                if self.current_weapon_index < len(self.inventory):
-                    self.weapon = self.inventory[self.current_weapon_index]
-                else:
-                    self.current_weapon_index = 0
+                            
+                if event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_1: 
+                        self.current_weapon_index = 0
+                    if event.key == pygame.K_2: 
+                        self.current_weapon_index = 1
+                    if event.key == pygame.K_3: 
+                        self.current_weapon_index = 2
+                    if event.key == pygame.K_4: 
+                        self.current_weapon_index = 3
+                    # Обновляем ссылку на активное оружие
+                    if self.current_weapon_index < len(self.inventory):
+                        self.weapon = self.inventory[self.current_weapon_index]
+                    else:
+                        self.current_weapon_index = 0
 
-            if event.type == pygame.MOUSEBUTTONDOWN:
-                if event.button == 4: # Колесо вверх
-                    self.current_weapon_index = (self.current_weapon_index + 1) % len(self.inventory)
-                if event.button == 5: # Колесо вниз
-                    self.current_weapon_index = (self.current_weapon_index - 1) % len(self.inventory)
-                self.weapon = self.inventory[self.current_weapon_index]
+                if event.type == pygame.MOUSEBUTTONDOWN:
+                    if event.button == 4: # Колесо вверх
+                        self.current_weapon_index = (self.current_weapon_index + 1) % len(self.inventory)
+                    if event.button == 5: # Колесо вниз
+                        self.current_weapon_index = (self.current_weapon_index - 1) % len(self.inventory)
+                    self.weapon = self.inventory[self.current_weapon_index]
 
 
     def run(self):
         while True:
             self.check_events()
-            self.update()
-            self.draw()
+            # Обновление UI
+            self.ui_manager.update()
+            
+            # Если в игре - обновляем игровую логику
+            if self.ui_manager.current_state == self.ui_manager.states['PLAYING']:
+                self.update()
+                self.draw()
+            else:
+                # только UI
+                self.ui_manager.draw(self.screen)
+                pygame.display.flip()
+            
+            self.delta_time = self.clock.tick(FPS)
 
 
 game = Game()

@@ -8,6 +8,8 @@ class Player:
         self.x, self.y = PLAYER_POS
         self.angle = PLAYER_ANGLE
         self.hp = 100
+        self.death_sound = pg.mixer.Sound('resources/player/death.wav')
+        self.death_sound.set_volume(0.5)
         # Сразу ставим мышь в центр при создании игрока
         pg.mouse.set_pos([WIDTH // 2, HEIGHT // 2])
 
@@ -90,6 +92,10 @@ class Player:
         self.movement()
         # Ограничиваем угол поворота от 0 до 2*PI
         self.angle %= math.tau
+        
+        if self.hp <= 0:
+            self.death_sound.play()
+            self.game.ui_manager.current_state = self.game.ui_manager.states['DEAD']
 
     def draw(self):
         # Временная отрисовка луча взгляда для 2D режима

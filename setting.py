@@ -11,7 +11,7 @@ GRID_H = 18
 CELL_W, CELL_H = WIDTH // GRID_W, HEIGHT // GRID_H
 HALF_WIDTH = WIDTH // 2
 HALF_HEIGHT = HEIGHT // 2
-
+MASTER_VOLUME = 0.5
 FPS = 300
 TILE = 100 # Коэффициент масштабирования
 
@@ -59,7 +59,7 @@ USE_TEXTURES = True
 TEXTURE_NAMES = ['W', 'R', 'B', 'G', 'Y', 'P', 'O', 'C', 'S', 'M', "D"]
 
 
-# ========== КОНВЕРТЕР КООРДИНАТ СЕТКИ ==========
+# === КОНВЕРТЕР КООРДИНАТ СЕТКИ ===
 def grid_to_pixel(col, row, mod='topleft'):
     """
     Преобразует координаты сетки (32×18) в пиксельные координаты экрана.

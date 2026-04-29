@@ -25,7 +25,7 @@ class NPC:
         self.last_shot = 0
         self.shoot_range = 5.0 # дистанция аттаки
         self.shoot_flash = 0
-        self.shoot_sound = pygame.mixer.Sound('resources/pistol_shot.wav')
+        self.shoot_sound = pygame.mixer.Sound('resources/player/pistol_shot.wav')
         self.shoot_sound.set_volume(0.2)
         
         # patrol
@@ -69,6 +69,7 @@ class NPC:
             return
         
         self.alive = False
+        self.game.total_kills += 1
         self.dead_x = self.x
         self.dead_y = self.y
         
