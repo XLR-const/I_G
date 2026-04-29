@@ -8,7 +8,7 @@ class Weapon:
         self.game = game
         self.name = name
         
-        path = f'resources/{self.name}_shot.wav'
+        path = f'resources/player/{self.name}_shot.wav'
         self.sound = pg.mixer.Sound(path)
         self.sound.set_volume(0.2)
         self.damage = damage
@@ -20,7 +20,7 @@ class Weapon:
         self.is_continuous = is_continuous
         self.scale_x = CELL_W / 60
         self.scale_y = CELL_H / 60
-        self.sound_empty_ammo = pg.mixer.Sound('resources/empty.wav')
+        self.sound_empty_ammo = pg.mixer.Sound('resources/player/empty.wav')
         self.sound_empty_ammo.set_volume(0.2)
 
     def fire(self):
