@@ -2,6 +2,7 @@ from string import ascii_letters
 import pygame
 from setting import *
 from door import Door
+from npc import Tree
 
 class Map:    
     def __init__(self, game, map_data=None, doors_data=None):
@@ -13,6 +14,8 @@ class Map:
         
         if self.text_map:
             self.parse_map(doors_data)
+        if self.game.current_level == 2:
+            Tree.init_spawn_points(self.game)
         
         self.width = len(self.text_map[0]) if self.text_map else 0
         self.height = len(self.text_map) if self.text_map else 0

@@ -1,7 +1,7 @@
 import pygame
 import math
 from setting import *
-from random import uniform
+from random import uniform, shuffle
 from weapon import Particle
 
 
@@ -743,14 +743,106 @@ class Boss(NPC):
         self.sprite_ratio = self.sprite_width / self.sprite_height
 
 class Tree(NPC):
-    def __init__(self, game, pos):
+    # Классовые переменные
+    _spawn_points = []
+    _spawn_index = 0
+    _spawn_timer = 0
+    _spawn_delay = 300  # мс между спавном
+    _max_active_trees = 100
+    _level_start_time = 0
+    _level_duration = 60000  # 60 секунд в миллисекундах
+    _spawning_active = True
+    
+    @classmethod
+    def init_spawn_points(cls, game):
+        """Инициализация пула точек спавна из карты"""
+        cls._game_ref = game
+        cls._spawn_points = []
+        cls._spawn_index = 0
+        cls._level_start_time = pygame.time.get_ticks()
+        cls._spawning_active = True
+        
+        if hasattr(game, 'map') and hasattr(game.map, 'text_map'):
+            for j, row in enumerate(game.map.text_map):
+                for i, char in enumerate(row):
+                    if char == '/':
+                        cls._spawn_points.append((i, j))
+            shuffle(cls._spawn_points)
+        
+        print(f"Загружено {len(cls._spawn_points)} точек спавна деревьев")
+        print(f"Спавн включён на {cls._level_duration // 1000} секунд")
+    
+    @classmethod
+    def update_spawn(cls, game):
+        """Динамический спавн деревьев"""
+        # Проверка времени уровня
+        current_time = pygame.time.get_ticks()
+        elapsed = current_time - cls._level_start_time
+        
+        # Если прошло больше 60 секунд - выключаем спавн
+        if elapsed >= cls._level_duration:
+            if cls._spawning_active:
+                cls._spawning_active = False
+                print("Время вышло! Спавн деревьев остановлен")
+            return
+        
+        if not cls._spawn_points:
+            return
+        
+        # Подсчитываем активные деревья
+        active_trees = 0
+        for npc in game.npcs:
+            if isinstance(npc, Tree) and npc.alive:
+                active_trees += 1
+        
+        if active_trees >= cls._max_active_trees:
+            return
+        
+        cls._spawn_timer += game.delta_time
+        if cls._spawn_timer >= cls._spawn_delay:
+            cls._spawn_timer = 0
+            tree = Tree(game)
+            if tree.alive:
+                game.npcs.append(tree)
+    
+    @classmethod
+    def is_spawning_active(cls):
+        """Возвращает True, если спавн ещё активен"""
+        current_time = pygame.time.get_ticks()
+        elapsed = current_time - cls._level_start_time
+        return elapsed < cls._level_duration
+    
+    def __init__(self, game, pos=None):
+        if pos is None:
+            if not Tree._spawn_points:
+                super().__init__(game, (0, 0))
+                self.alive = False
+                return
+            
+            # Получаем следующую точку спавна (бесконечно)
+            x_cell, y_cell = Tree._spawn_points[Tree._spawn_index % len(Tree._spawn_points)]
+            Tree._spawn_index += 1
+            
+            # Случайное смещение внутри клетки
+            offset_x = uniform(-0.4, 0.4)
+            offset_y = uniform(-0.4, 0.4)
+            pos = (x_cell + 0.5 + offset_x, y_cell + 0.5 + offset_y)
+        
         super().__init__(game, pos)
-        self.hp = 100
+        
+        # Характеристики дерева
+        self.hp = 50
         self.speed = 1.5
         self.damage = 25
-        self.radius = 0.6
+        self.radius = 0.35
         self.size = 0.7
-        self.state = "CHASE"
+        self.alive = True
+        self.hurt_flash = 0
+        self.state = "IDLE"
+        
+        # Отключаем A*
+        self.path = []
+        self.last_path_update = pygame.time.get_ticks()
         
         # Загрузка текстуры
         try:
@@ -767,9 +859,8 @@ class Tree(NPC):
         if not self.alive:
             return
         
-        # Движение строго вниз (увеличиваем Y)
-        move_y = self.speed * self.game.delta_time / 1000
-        self.y += move_y
+        # Движение строго вниз
+        self.y += self.speed * self.game.delta_time / 1000
         
         # Проверка столкновения с игроком
         dx = abs(self.x - self.game.player.x)
@@ -781,29 +872,30 @@ class Tree(NPC):
             return
         
         # Если дерево ушло за пределы карты - удаляем
-        if self.y > self.game.map.height + 2:
+        if self.y > self.game.map.height + 5:
             self.alive = False
             return
         
-        # Обновление вспышки
         if self.hurt_flash > 0:
             self.hurt_flash -= 1
     
     def get_damage(self, damage):
         if not self.alive:
             return
+        
         self.hp -= damage
         self.hurt_flash = 8
+        
         if self.hp <= 0:
             self.alive = False
-            for _ in range(20):
+            for _ in range(25):
                 self.game.particles.append(Particle(
                     self.game,
                     (self.x, self.y),
                     (80, 160, 40),
                     uniform(0.005, 0.02)
                 ))
-
+    
     def draw(self):
         if not self.alive:
             return
@@ -826,7 +918,7 @@ class Tree(NPC):
         if dist_flat < 0.1:
             return
         
-        proj_height = int(SCREEN_DIST / dist_flat)
+        proj_height = int(SCREEN_DIST / dist_flat * 1.8)
         proj_width = int(proj_height * self.sprite_ratio)
         
         center_x = (HALF_NUM_RAYS + delta / DELTA_ANGLE) * SCALE
@@ -841,3 +933,4 @@ class Tree(NPC):
             flash.set_alpha(100)
             flash.fill((255, 0, 0))
             self.game.screen.blit(flash, (x, y))
+

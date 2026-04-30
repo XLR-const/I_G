@@ -99,6 +99,11 @@ class Game:
         
         # карта
         self.map = Map(self, level_data['map_data'], level_data['doors'])
+        if level_num == 2:
+            Tree.init_spawn_points(self)
+            for _ in range(10):
+                tree = Tree(self)
+                self.npcs.append(tree)
         self.exit_pos = self.map.get_exit_pos()
         background = level_data.get('background', {})
         self.renderer.set_background(background)
@@ -171,7 +176,12 @@ class Game:
         # Проверяем расстояние до выхода (можно по клеткам)
         player_cell = (int(self.player.x), int(self.player.y))
         exit_cell = (int(self.exit_pos[0]), int(self.exit_pos[1]))
-        
+        if self.current_level == 2:
+            Tree.update_spawn(self)
+            
+            # Проверка завершения уровня
+            if not Tree.is_spawning_active() and not any(isinstance(npc, Tree) for npc in self.npcs):
+                self.next_level()
         if player_cell == exit_cell:
             self.ui_manager.current_state = self.ui_manager.states['LEVEL_END']
             self.next_level()
@@ -192,6 +202,15 @@ class Game:
     def update(self):
         self.player.update()
         self.check_exit()
+        
+        if self.current_level == 2:
+            Tree._spawn_timer += self.delta_time
+            if Tree._spawn_timer >= Tree._spawn_delay:
+                Tree._spawn_timer = 0
+                tree = Tree(self)
+                if tree.alive:
+                    self.npcs.append(tree)
+        
         # Проверка зажатой ЛКМ для автоматического оружия
         mouse_buttons = pygame.mouse.get_pressed()
         if mouse_buttons[0]: # 0 - это левая кнопка
