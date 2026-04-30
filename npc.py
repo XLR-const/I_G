@@ -754,7 +754,7 @@ class Tree(NPC):
         
         # Загрузка текстуры
         try:
-            self.image = pygame.image.load('resources/textures/walls/W.png').convert_alpha()
+            self.image = pygame.image.load('resources/textures/Tree.png').convert_alpha()
             self.image = pygame.transform.scale(self.image, (60, 100))
         except:
             self.image = pygame.Surface((60, 100))
@@ -767,21 +767,25 @@ class Tree(NPC):
         if not self.alive:
             return
         
-        dx = self.game.player.x - self.x
-        dy = self.game.player.y - self.y
-        dist = math.hypot(dx, dy)
+        # Движение строго вниз (увеличиваем Y)
+        move_y = self.speed * self.game.delta_time / 1000
+        self.y += move_y
         
-        # Движение к игроку
-        if dist > 0.01 and dist < 15:
-            move_x = (dx / dist) * self.speed * self.game.delta_time / 1000
-            move_y = (dy / dist) * self.speed * self.game.delta_time / 1000
-            self.try_move(move_x, move_y)
+        # Проверка столкновения с игроком
+        dx = abs(self.x - self.game.player.x)
+        dy = abs(self.y - self.game.player.y)
         
-        # Урон при столкновении
-        if dist < self.radius + 0.4:
+        if dx < self.radius + 0.4 and dy < self.radius + 0.4:
             self.game.player.take_damage(self.damage)
             self.alive = False
+            return
         
+        # Если дерево ушло за пределы карты - удаляем
+        if self.y > self.game.map.height + 2:
+            self.alive = False
+            return
+        
+        # Обновление вспышки
         if self.hurt_flash > 0:
             self.hurt_flash -= 1
     
@@ -799,3 +803,41 @@ class Tree(NPC):
                     (80, 160, 40),
                     uniform(0.005, 0.02)
                 ))
+
+    def draw(self):
+        if not self.alive:
+            return
+        
+        dx = self.x - self.game.player.x
+        dy = self.y - self.game.player.y
+        dist = math.hypot(dx, dy)
+        
+        if dist < 0.1:
+            return
+        
+        theta = math.atan2(dy, dx)
+        delta = theta - self.game.player.angle
+        delta = (delta + math.pi) % math.tau - math.pi
+        
+        if abs(delta) > HALF_FOV:
+            return
+        
+        dist_flat = dist * math.cos(delta)
+        if dist_flat < 0.1:
+            return
+        
+        proj_height = int(SCREEN_DIST / dist_flat)
+        proj_width = int(proj_height * self.sprite_ratio)
+        
+        center_x = (HALF_NUM_RAYS + delta / DELTA_ANGLE) * SCALE
+        x = int(center_x - proj_width // 2)
+        y = int(HALF_HEIGHT - proj_height // 2)
+        
+        img = pygame.transform.scale(self.image, (proj_width, proj_height))
+        self.game.screen.blit(img, (x, y))
+        
+        if self.hurt_flash > 0:
+            flash = pygame.Surface((proj_width, proj_height))
+            flash.set_alpha(100)
+            flash.fill((255, 0, 0))
+            self.game.screen.blit(flash, (x, y))

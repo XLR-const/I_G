@@ -73,6 +73,11 @@ class Game:
           
     def load_level(self, level_num):
         '''Вся инициализация здесь'''
+        # Raycasting + render
+        if not hasattr(self, 'raycasting'):
+            self.raycasting = RayCasting(self)
+            self.renderer = Renderer(self)
+            self.pathfinder = PathFinder(self)
         level_data = self.level_manager.load_level(level_num)
         if not level_data:
             self.game_over()
@@ -80,6 +85,10 @@ class Game:
         # Очистка кэша тектур
         if hasattr(self, 'renderer'):
             self.raycasting.texture_cache.clear()
+        
+        if level_num == 2:
+            self.player.angle = math.pi * 1.5
+        
         # партикли 
         self.particles = []
         
@@ -91,6 +100,8 @@ class Game:
         # карта
         self.map = Map(self, level_data['map_data'], level_data['doors'])
         self.exit_pos = self.map.get_exit_pos()
+        background = level_data.get('background', {})
+        self.renderer.set_background(background)
         
         # NPC
         self.npcs = []
@@ -141,13 +152,6 @@ class Game:
                 gun.ammo = starting_ammo[gun.name]
             else:
                 gun.ammo = 0
-        
-        
-        # Raycasting + render
-        if not hasattr(self, 'raycasting'):
-            self.raycasting = RayCasting(self)
-            self.renderer = Renderer(self)
-            self.pathfinder = PathFinder(self)
             
         # Close
         #self.exit_pos = level_data.get('exit', (-1, -1))

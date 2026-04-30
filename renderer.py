@@ -4,12 +4,76 @@ from setting import *
 class Renderer:
     def __init__(self, game):
         self.game = game
+        
+    def set_background(self, background_data):
+        """Устанавливает фон для текущего уровня из JSON"""
+        # Потолок
+        ceiling_texture_path = background_data.get('ceiling_texture')
+        if ceiling_texture_path:
+            try:
+                self.ceiling_texture = pygame.image.load(ceiling_texture_path).convert()
+                self.ceiling_texture = pygame.transform.scale(self.ceiling_texture, (WIDTH, HALF_HEIGHT))
+            except:
+                self.ceiling_texture = None
+        else:
+            self.ceiling_texture = None
+        
+        # Пол
+        floor_texture_path = background_data.get('floor_texture')
+        if floor_texture_path:
+            try:
+                self.floor_texture = pygame.image.load(floor_texture_path).convert()
+                self.floor_texture = pygame.transform.scale(self.floor_texture, (WIDTH, HALF_HEIGHT))
+            except:
+                self.floor_texture = None
+        else:
+            self.floor_texture = None
+        
+        # Цвета (если текстуры нет)
+        self.ceiling_color = background_data.get('ceiling_color', WALL_COLORS.get('C', (150, 200, 200)))
+        self.floor_color = background_data.get('floor_color', (40, 40, 40))
+
+    def load_level_textures(self):
+        """Загружает текстуры для текущего уровня"""
+        level_num = self.game.current_level
+        textures = self.level_textures.get(level_num, self.level_textures[1])
+        
+        # Загрузка текстуры потолка
+        if textures['ceiling']:
+            try:
+                self.ceiling_texture = pygame.image.load(textures['ceiling']).convert()
+                self.ceiling_texture = pygame.transform.scale(self.ceiling_texture, (WIDTH, HALF_HEIGHT))
+            except:
+                self.ceiling_texture = None
+        else:
+            self.ceiling_texture = None
+        
+        # Загрузка текстуры пола
+        if textures['floor']:
+            try:
+                self.floor_texture = pygame.image.load(textures['floor']).convert()
+                self.floor_texture = pygame.transform.scale(self.floor_texture, (WIDTH, HALF_HEIGHT))
+            except:
+                self.floor_texture = None
+        else:
+            self.floor_texture = None
+        
+        # Сохраняем цвета
+        self.ceiling_color = textures['ceiling_color']
+        self.floor_color = textures['floor_color']
     
     def draw_background(self):
-        # Потолок (темно-серый)
-        pygame.draw.rect(self.game.screen, WALL_COLORS['C'], (0, 0, WIDTH, HALF_HEIGHT))
-        # Пол (чуть светлее)
-        pygame.draw.rect(self.game.screen, (40, 40, 40), (0, HALF_HEIGHT, WIDTH, HEIGHT))
+        # Потолок
+        if self.ceiling_texture:
+            self.game.screen.blit(self.ceiling_texture, (0, 0))
+        else:
+            pygame.draw.rect(self.game.screen, self.ceiling_color, (0, 0, WIDTH, HALF_HEIGHT))
+        
+        # Пол
+        if self.floor_texture:
+            self.game.screen.blit(self.floor_texture, (0, HALF_HEIGHT))
+        else:
+            pygame.draw.rect(self.game.screen, self.floor_color, (0, HALF_HEIGHT, WIDTH, HEIGHT))
 
     def draw_fps(self):
         x, y = grid_to_pixel(0, 0)

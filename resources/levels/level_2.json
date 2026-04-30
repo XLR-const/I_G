@@ -19,10 +19,16 @@
     ["1", "_", "_", "_", "_", "_", "_", "_", "_", "_", "_", "_", "_", "_", "_", "_", "_", "1"],
     ["1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1"]
   ],
-  "player_start": [8.5, 8.5],
+  "player_start": [8.5, 16.5],
   "inventory": ["Shotgun"],
   "starting_ammo": {
     "Shotgun": 20
+  },
+    "background": {
+    "ceiling_texture": "resources/textures/ceiling.png",
+    "floor_texture": "resources/textures/forest_floor.png",
+    "ceiling_color": null,
+    "floor_color": null
   },
   "doors": [],
   "exit": [16, 14]

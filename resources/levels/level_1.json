@@ -26,5 +26,11 @@
     "Shotgun": 10,
     "Machine Gun": 50,
     "Plasma Gun": 20
+  },
+    "background": {
+    "ceiling_texture": null,
+    "floor_texture": null,
+    "ceiling_color": [150, 200, 200],
+    "floor_color": [40, 40, 40]
   }
 }
