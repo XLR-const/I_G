@@ -40,6 +40,8 @@ class Map:
                     self.npc_positions.append((i, j, 'Jaggernaut'))
                 if char == '5':
                     self.npc_positions.append((i, j, 'Lightning'))
+                if char == '/':
+                    self.npc_positions.append((i, j, 'Tree'))
 
                 if char == 'E':
                     self.exit_pos = (i + 0.5, j + 0.5)

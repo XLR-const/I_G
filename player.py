@@ -8,11 +8,33 @@ class Player:
         self.x, self.y = PLAYER_POS
         self.angle = PLAYER_ANGLE
         self.hp = 100
+        self.last_damage_time = 0
+        self.regen_delay = 10000  # 10 секунды
+        self.regen_speed = 10    # 10 HP в секунду
         self.death_sound = pg.mixer.Sound('resources/player/death.wav')
         self.death_sound.set_volume(0.5)
         # Сразу ставим мышь в центр при создании игрока
         pg.mouse.set_pos([WIDTH // 2, HEIGHT // 2])
 
+    def update_regen(self):
+        """Регенерация HP"""
+        current_time = pygame.time.get_ticks()
+        
+        if current_time - self.last_damage_time > self.regen_delay:
+            if self.hp < 100:
+                self.hp += self.regen_speed * self.game.delta_time / 1000
+                if self.hp > 100:
+                    self.hp = 100
+
+    def take_damage(self, damage):
+        """Получение урона игроком"""
+        self.hp -= damage
+        self.last_damage_time = pygame.time.get_ticks()  # ← сброс таймера регена
+        
+        if self.hp <= 0:
+            self.hp = 0
+            self.game.ui_manager.current_state = self.game.ui_manager.states['DEAD']
+    
     def movement(self):
         # Расчет векторов движения
         sin_a = math.sin(self.angle)

@@ -741,3 +741,61 @@ class Boss(NPC):
         self.image = pygame.image.load(self.image_path).convert_alpha()
         self.sprite_width, self.sprite_height = self.image.get_size()
         self.sprite_ratio = self.sprite_width / self.sprite_height
+
+class Tree(NPC):
+    def __init__(self, game, pos):
+        super().__init__(game, pos)
+        self.hp = 100
+        self.speed = 1.5
+        self.damage = 25
+        self.radius = 0.6
+        self.size = 0.7
+        self.state = "CHASE"
+        
+        # Загрузка текстуры
+        try:
+            self.image = pygame.image.load('resources/textures/walls/W.png').convert_alpha()
+            self.image = pygame.transform.scale(self.image, (60, 100))
+        except:
+            self.image = pygame.Surface((60, 100))
+            self.image.fill((80, 160, 40))
+        
+        self.sprite_width, self.sprite_height = self.image.get_size()
+        self.sprite_ratio = self.sprite_width / self.sprite_height
+    
+    def update(self):
+        if not self.alive:
+            return
+        
+        dx = self.game.player.x - self.x
+        dy = self.game.player.y - self.y
+        dist = math.hypot(dx, dy)
+        
+        # Движение к игроку
+        if dist > 0.01 and dist < 15:
+            move_x = (dx / dist) * self.speed * self.game.delta_time / 1000
+            move_y = (dy / dist) * self.speed * self.game.delta_time / 1000
+            self.try_move(move_x, move_y)
+        
+        # Урон при столкновении
+        if dist < self.radius + 0.4:
+            self.game.player.take_damage(self.damage)
+            self.alive = False
+        
+        if self.hurt_flash > 0:
+            self.hurt_flash -= 1
+    
+    def get_damage(self, damage):
+        if not self.alive:
+            return
+        self.hp -= damage
+        self.hurt_flash = 8
+        if self.hp <= 0:
+            self.alive = False
+            for _ in range(20):
+                self.game.particles.append(Particle(
+                    self.game,
+                    (self.x, self.y),
+                    (80, 160, 40),
+                    uniform(0.005, 0.02)
+                ))

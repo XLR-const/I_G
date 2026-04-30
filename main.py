@@ -7,7 +7,7 @@ from raycasting import RayCasting
 from renderer import Renderer
 from weapon import Weapon, Pistol, Shotgun, MachineGun, PlasmaGun
 from weapon import Particle
-from npc import NPC, Solder, Jaggernaut, Kamikaze, Boss, Lightning
+from npc import NPC, Solder, Jaggernaut, Kamikaze, Boss, Lightning, Tree
 from pathfinding import PathFinder
 from level_manager import LevelManager
 from ui_manager import UIManager
@@ -106,6 +106,8 @@ class Game:
                 self.npcs.append(Boss(self, pos=(x, y)))
             elif npc_type == 'Lightning':
                 self.npcs.append(Lightning(self, pos=(x, y)))
+            elif npc_type == 'Tree':
+                self.npcs.append(Tree(self, pos=(x, y)))
         
         for npc in self.npcs:
             npc.generate_waypoints_auto(4)
@@ -201,6 +203,7 @@ class Game:
         for npc in self.npcs:
             npc.update()
         self.delta_time = self.clock.tick(FPS)
+        self.player.update_regen()
         pygame.display.set_caption(f'FPS: {self.clock.get_fps() :.1f}')
 
     def draw(self):

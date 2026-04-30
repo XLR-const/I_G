@@ -25,6 +25,8 @@ class Renderer:
     
     def draw_compass(self):
         goal = self.game.map.exit_pos
+        if goal is None:
+            return
         player = (self.game.player.x, self.game.player.y)
         d_x, d_y = goal[0] - player[0], goal[1] - player[1]
         angle_to_goal = math.degrees(atan2(d_y, d_x))
