@@ -232,4 +232,3 @@ class Renderer:
         pygame.draw.line(self.game.screen, COLOR_CENTER, (center_x, center_y - CELL_H * 0.5), (center_x, center_y + CELL_H * 0.5), thickness)
         pygame.draw.line(self.game.screen, COLOR_CENTER, (center_x - CELL_W * 0.5, center_y), (center_x + CELL_W * 0.5, center_y), thickness)
         
-

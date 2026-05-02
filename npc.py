@@ -832,7 +832,7 @@ class Tree(NPC):
         
         # Характеристики дерева
         self.hp = 50
-        self.speed = 1.5
+        self.speed = 4
         self.damage = 25
         self.radius = 0.35
         self.size = 0.7

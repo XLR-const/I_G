@@ -146,16 +146,15 @@ class RayCasting:
                         break
 
             # 4. Считаем финальную дистанцию до стены
-            if side == 0: # Вертикаль
+            if side == 0:
                 dist = side_dist_x - delta_dist_x
             else:
                 dist = side_dist_y - delta_dist_y
 
             self.z_buffer[i] = dist
-            
-            # 5. Убираем "эффект рыбьего глаза" (фикс дисторсии)
+
+            # 5. Убираем эффект рыбьего глаза
             dist *= math.cos(self.game.player.angle - ray_angle)
-            
 
             # 6. Проекция
             proj_height = SCREEN_DIST / (dist + 0.0001)
@@ -174,10 +173,17 @@ class RayCasting:
             # Затенения от положения стены
             if side == 1:
                 color = (color[0] * 0.7, color[1] * 0.7, color[2] * 0.7)
-            # Затенения от дистанции    
-            color = (int(color[0] / (1 + dist * dist * 0.01)),
-            int(color[1] / (1 + dist * dist * 0.01)),
-            int(color[2] / (1 + dist * dist * 0.01)))
+            
+            # Затенения от дистанции с учетом леса  
+            if self.game.current_level == 2:
+                dark_factor = 1 / (1 + dist * dist * 0.0005)
+                color = (int(color[0] * dark_factor),
+                        int(color[1] * dark_factor),
+                        int(color[2] * dark_factor))
+            else:
+                color = (int(color[0] / (1 + dist * dist * 0.01)),
+                    int(color[1] / (1 + dist * dist * 0.01)),
+                    int(color[2] / (1 + dist * dist * 0.01)))
 
             # Фикс прорисовки стен - зубчики
             # Рассчитываем параметры один раз
@@ -185,7 +191,6 @@ class RayCasting:
             h = int(proj_height)
             x = int(i * SCALE)
             y = int(HALF_HEIGHT - h // 2)
-
             # Ограничиваем высоту, чтобы не было "зубьев" при взгляде в упор
             if h > HEIGHT * 2: # даем запас, но не бесконечность
                 h = HEIGHT * 2
@@ -205,6 +210,10 @@ class RayCasting:
                     hit_y = oy + (side_dist_y - delta_dist_y) * sin_a
                     # Для горизонтальной стены используем координату X
                     tex_x = hit_x % 1.0
+                if self.game.current_level == 2:
+                    speed = 3
+                    time_offset = (pygame.time.get_ticks() * speed / 1000) % 1.0
+                    tex_x = (tex_x - time_offset) % 1.0
                 tex_x = int(tex_x * TEXTURE_SIZE)
                 
                 # Получаем полоску из кэша

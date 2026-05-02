@@ -56,7 +56,7 @@ WALL_COLORS = {
 TEXTURE_SIZE = 128
 TEXTURES_PATH = "resources/textures/"
 USE_TEXTURES = True
-TEXTURE_NAMES = ['W', 'R', 'B', 'G', 'Y', 'P', 'O', 'C', 'S', 'M', "D"]
+TEXTURE_NAMES = ['W', 'R', 'B', 'G', 'Y', 'P', 'O', 'C', 'S', 'M', "D", "^"]
 
 
 # === КОНВЕРТЕР КООРДИНАТ СЕТКИ ===

@@ -31,7 +31,7 @@ class Map:
         self.exit_pos = None
         for j, row in enumerate(self.text_map):
             for i, char in enumerate(row):
-                if char == '1' or char in ascii_letters and char not in "ED":
+                if char == '1' or char in ascii_letters + '^' and char not in "ED":
                     self.world_map[(i, j)] = char # Сохраняем координаты стен
                 
                 # NPC
