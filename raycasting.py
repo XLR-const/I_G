@@ -210,8 +210,8 @@ class RayCasting:
                     hit_y = oy + (side_dist_y - delta_dist_y) * sin_a
                     # Для горизонтальной стены используем координату X
                     tex_x = hit_x % 1.0
-                if self.game.current_level == 2:
-                    speed = 3
+                if self.game.current_level == 2 and side == 0:
+                    speed = 2
                     time_offset = (pygame.time.get_ticks() * speed / 1000) % 1.0
                     tex_x = (tex_x - time_offset) % 1.0
                 tex_x = int(tex_x * TEXTURE_SIZE)

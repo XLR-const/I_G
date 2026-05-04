@@ -26,7 +26,8 @@ class Map:
         2 - solder
         3 - kamikaze
         4 - jaga
-        5 - lightning"""
+        5 - lightning
+        ~ - fog"""
         self.npc_positions = []
         self.exit_pos = None
         for j, row in enumerate(self.text_map):
@@ -45,6 +46,8 @@ class Map:
                     self.npc_positions.append((i, j, 'Lightning'))
                 if char == '/':
                     self.npc_positions.append((i, j, 'Tree'))
+                if char == '~':
+                    self.npc_positions.append((i, j, 'Fog'))
 
                 if char == 'E':
                     self.exit_pos = (i + 0.5, j + 0.5)

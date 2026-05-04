@@ -232,3 +232,9 @@ class Renderer:
         pygame.draw.line(self.game.screen, COLOR_CENTER, (center_x, center_y - CELL_H * 0.5), (center_x, center_y + CELL_H * 0.5), thickness)
         pygame.draw.line(self.game.screen, COLOR_CENTER, (center_x - CELL_W * 0.5, center_y), (center_x + CELL_W * 0.5, center_y), thickness)
         
+    def draw_fog_filter(self):
+        """Накладывает лёгкий туман на весь экран"""
+        if self.game.current_level == 2:
+            fog = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
+            fog.fill((180, 190, 170, 40))  # лёгкая дымка
+            self.game.screen.blit(fog, (0, 0))

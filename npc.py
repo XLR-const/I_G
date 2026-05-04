@@ -1,7 +1,7 @@
 import pygame
 import math
 from setting import *
-from random import uniform, shuffle
+from random import uniform, shuffle, randint
 from weapon import Particle
 
 
@@ -933,4 +933,53 @@ class Tree(NPC):
             flash.set_alpha(100)
             flash.fill((255, 0, 0))
             self.game.screen.blit(flash, (x, y))
+
+class Fog(NPC):
+    def __init__(self, game, pos):
+        super().__init__(game, pos)
+        self.alive = True
+        self.size = 2.0
+        self.radius = 0  # без коллизии
+        self.state = "IDLE"
+        self.speed = 0
+        
+        # Загрузка спрайта тумана
+        try:
+            self.image = pygame.image.load('resources/textures/fog.png').convert_alpha()
+            # Масштабируем до нужного размера
+            self.image = pygame.transform.scale(self.image, (300, 300))
+            
+            # Настраиваем прозрачность (второй способ)
+            # Создаём копию с альфа-каналом
+            temp = pygame.Surface(self.image.get_size(), pygame.SRCALPHA)
+            temp.blit(self.image, (0, 0))
+            # Устанавливаем общую прозрачность (30-100 - легкий туман, 150-200 - густой)
+            temp.set_alpha(180)
+            self.image = temp
+            
+        except:
+            # Если файла нет — создаём заглушку
+            self.image = pygame.Surface((300, 300), pygame.SRCALPHA)
+            self.image.fill((180, 190, 170, 80))  # цвет тумана с прозрачностью
+            # Добавляем лёгкую текстуру
+            for _ in range(30):
+                x = randint(0, 300)
+                y = randint(0, 300)
+                alpha = randint(20, 50)
+                pygame.draw.circle(self.image, (200, 210, 190, alpha), (x, y),randint(10, 30))
+        
+        self.sprite_width, self.sprite_height = self.image.get_size()
+        self.sprite_ratio = self.sprite_width / self.sprite_height
+    
+    def update(self):
+        pass  # туман не двигается
+    
+    def get_damage(self, damage):
+        pass  # неуязвим
+    
+    def draw(self):
+        if not self.alive:
+            return
+        # Стандартная отрисовка NPC
+        super().draw()
 

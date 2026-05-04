@@ -7,7 +7,7 @@ from raycasting import RayCasting
 from renderer import Renderer
 from weapon import Weapon, Pistol, Shotgun, MachineGun, PlasmaGun
 from weapon import Particle
-from npc import NPC, Solder, Jaggernaut, Kamikaze, Boss, Lightning, Tree
+from npc import NPC, Solder, Jaggernaut, Kamikaze, Boss, Lightning, Tree, Fog
 from pathfinding import PathFinder
 from level_manager import LevelManager
 from ui_manager import UIManager
@@ -100,6 +100,8 @@ class Game:
         # карта
         self.map = Map(self, level_data['map_data'], level_data['doors'])
         if level_num == 2:
+            self.start_time = pygame.time.get_ticks()
+            self.level_duration = 10000  # 1 минута
             Tree.init_spawn_points(self)
             for _ in range(10):
                 tree = Tree(self)
@@ -124,6 +126,8 @@ class Game:
                 self.npcs.append(Lightning(self, pos=(x, y)))
             elif npc_type == 'Tree':
                 self.npcs.append(Tree(self, pos=(x, y)))
+            elif npc_type == 'Fog':
+                self.npcs.append(Fog(self, pos=(x, y)))
         
         for npc in self.npcs:
             npc.generate_waypoints_auto(4)
@@ -204,6 +208,10 @@ class Game:
         self.check_exit()
         
         if self.current_level == 2:
+            current_time = pygame.time.get_ticks()
+            if current_time - self.level_start_time >= self.level_duration:
+                self.next_level()
+                return
             Tree._spawn_timer += self.delta_time
             if Tree._spawn_timer >= Tree._spawn_delay:
                 Tree._spawn_timer = 0
@@ -242,6 +250,7 @@ class Game:
         for p in self.particles:
             p.draw()
         self.weapon.draw()
+        self.renderer.draw_fog_filter()
         self.renderer.draw_interface()
         self.renderer.draw_crosshair()
         #self.renderer.draw_line_of_cells()
