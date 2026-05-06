@@ -73,6 +73,9 @@ class Game:
           
     def load_level(self, level_num):
         '''Вся инициализация здесь'''
+        # Заглушка - скип 2 лвл
+        if self.current_level == 2:
+            self.current_level += 1
         # Raycasting + render
         if not hasattr(self, 'raycasting'):
             self.raycasting = RayCasting(self)
@@ -101,7 +104,7 @@ class Game:
         self.map = Map(self, level_data['map_data'], level_data['doors'])
         if level_num == 2:
             self.start_time = pygame.time.get_ticks()
-            self.level_duration = 10000  # 1 минута
+            self.level_duration = 20000000  # 1 минута
             Tree.init_spawn_points(self)
             for _ in range(10):
                 tree = Tree(self)

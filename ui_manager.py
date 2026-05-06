@@ -41,6 +41,11 @@ class UIManager:
             self.backgrounds['dead'] = pygame.transform.scale(dead_bg, (setting.WIDTH, setting.HEIGHT))
         except Exception:
             self.backgrounds['dead'] = None
+        # Загрузка звуков
+        self.swap_sound = pygame.mixer.Sound('resources/ui_sounds/swap.wav')
+        self.swap_sound.set_volume(0.1)
+        self.enter_sound = pygame.mixer.Sound('resources/ui_sounds/enter.wav')
+        self.enter_sound.set_volume(0.1)
     
     def handle_event(self, event):
         """Ретранслятор событий для UI"""
@@ -71,11 +76,14 @@ class UIManager:
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_DOWN:
                 self.selected_option = (self.selected_option + 1) % options_len
+                self.swap_sound.play()
                 return True
             if event.key == pygame.K_UP:
                 self.selected_option = (self.selected_option - 1) % options_len
+                self.swap_sound.play()
                 return True
             if event.key == pygame.K_RETURN:
+                self.enter_sound.play()
                 # 0: NEW GAME
                 if self.selected_option == 0:
                     self.game.reset_game()
@@ -119,11 +127,14 @@ class UIManager:
                 return True
             if event.key == pygame.K_UP:
                 self.selected_option = (self.selected_option - 1) % options_len
+                self.swap_sound.play()
                 return True
             if event.key == pygame.K_DOWN:
                 self.selected_option = (self.selected_option + 1) % options_len
+                self.swap_sound.play()
                 return True
             if event.key == pygame.K_RETURN:
+                self.enter_sound.play()
                 if self.selected_option == 0:      # RESUME
                     self.current_state = self.states['PLAYING']
                 elif self.selected_option == 1:    # RESTART LEVEL
@@ -176,9 +187,11 @@ class UIManager:
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_UP:
                 self.selected_option = (self.selected_option - 1) % options_len
+                self.swap_sound.play()
                 return True
             if event.key == pygame.K_DOWN:
                 self.selected_option = (self.selected_option + 1) % options_len
+                self.swap_sound.play()
                 return True
             if event.key == pygame.K_LEFT:
                 print("Сработала левая стрелка")
@@ -199,6 +212,7 @@ class UIManager:
                     setting.MASTER_VOLUME = new_val
                 return True
             if event.key in (pygame.K_RETURN, pygame.K_ESCAPE):
+                self.enter_sound.play()
                 if self.selected_option == 2:   # back
                     self.current_state = self.states['MENU']
                 return True

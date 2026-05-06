@@ -4,6 +4,8 @@ from setting import *
 class Renderer:
     def __init__(self, game):
         self.game = game
+        # Индексы смещения для текстур пола
+        self.floor_offset_y = 0
         
     def set_background(self, background_data):
         """Устанавливает фон для текущего уровня из JSON"""
@@ -70,7 +72,30 @@ class Renderer:
             pygame.draw.rect(self.game.screen, self.ceiling_color, (0, 0, WIDTH, HALF_HEIGHT))
         
         # Пол
-        if self.floor_texture:
+        if self.floor_texture and self.game.current_level == 2:
+            # Прокрутка текстуры (движение на игрока)
+            speed = 150
+            self.floor_offset_y = getattr(self, 'floor_offset_y', 0)
+            self.floor_offset_y -= speed * self.game.delta_time / 1000
+            
+            tex_w = self.floor_texture.get_width()
+            tex_h = self.floor_texture.get_height()
+            
+            # Рисуем текстуру, начиная строго от HALF_HEIGHT
+            # Вычисляем, сколько нужно отрезать сверху
+            crop_y = int(self.floor_offset_y % tex_h)
+            
+            # Первая часть текстуры (обрезанная сверху)
+            if crop_y < tex_h:
+                cropped = self.floor_texture.subsurface((0, crop_y, tex_w, tex_h - crop_y))
+                self.game.screen.blit(cropped, (0, HALF_HEIGHT))
+            
+            # Остальные полные копии вниз
+            y = HALF_HEIGHT + (tex_h - crop_y)
+            while y < HEIGHT:
+                self.game.screen.blit(self.floor_texture, (0, y))
+                y += tex_h
+        elif self.floor_texture:
             self.game.screen.blit(self.floor_texture, (0, HALF_HEIGHT))
         else:
             pygame.draw.rect(self.game.screen, self.floor_color, (0, HALF_HEIGHT, WIDTH, HEIGHT))
