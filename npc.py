@@ -6,10 +6,11 @@ from weapon import Particle
 
 
 class NPC:
-    def __init__(self, game, pos=(8.5, 7.5)):
+    def __init__(self, game, name, pos=(8.5, 7.5)):
         self.game = game
         self.x, self.y = pos[0] + 0.5, pos[1] + 0.5
         self.alive = True
+        self.name = name
         
         # движение
         self.speed = 0.3
@@ -40,11 +41,35 @@ class NPC:
         self.color = (245, 100, 0)
         
         # СПРАЙТЫ
-        self.image = pygame.image.load('resources/npc/solder.png').convert_alpha()
-        self.sprite_width, self.sprite_height = self.image.get_size()
-        self.sprite_ratio = self.sprite_width / self.sprite_height
+        self.image = None
+        self.sprite_width, self.sprite_height = None, None
+        self.sprite_ratio = None
         self.dead_sprite_path = 'resources/npc/dead.png'
         self.dead_sprite = None
+        # Предзагрузка всех спрайтов
+        self.sprites = {
+            'IDLE': None,
+            'CHASE': None,
+            'ATTACK': None,
+            'HURT': None,
+            'MOVE': None,
+            'DEAD': None,
+            'PATROL': None,
+        }
+        
+        # Загружаем спрайты для всех состояний
+        for state in self.sprites.keys():
+            try:
+                path = self.get_sprite_path(state)
+                print(f"Пытаюсь загрузить: {path}")
+                self.sprites[state] = pygame.image.load(path).convert_alpha()
+            except:
+                # Заглушка
+                self.sprites[state] = pygame.Surface((50, 80))
+                self.sprites[state].fill((250, 100, 100))
+        
+        # Текущий спрайт
+        self.image = self.sprites['IDLE']
         self.dead_x = 0
         self.dead_y = 0
         
@@ -53,50 +78,22 @@ class NPC:
         self.last_path_update = 0
         self.current_target_index = 0
     
-    def load_dead_sprite(self):
-        try:
-            original = pygame.image.load(self.dead_sprite_path).convert_alpha()
-            new_width = original.get_width() // 1
-            new_height = original.get_height() // 1
-            self.dead_sprite = pygame.transform.scale(original, (new_width, new_height))
-            
-        except:
-            self.dead_sprite = None
-            
-    def die(self):
-        """Смерть NPC — превращаем в труп без логики"""
-        if not self.alive:
-            return
-        
-        self.alive = False
-        self.game.total_kills += 1
-        self.dead_x = self.x
-        self.dead_y = self.y
-        
-        # Загружаем спрайт трупа
-        self.load_dead_sprite()
-        
-        # Меняем спрайт на труп
-        if self.dead_sprite is not None:
-            self.image = self.dead_sprite
+    def get_sprite_path(self, state):
+        """Возвращает путь к спрайту для конкретного состояния"""
+        base = f"resources/npc/{self.name}/{self.name}"
+        if state == "CHASE":
+            return base + "_shoot.png"
+        elif state == "IDLE":
+            return base + "_idle.png"
+        elif state == "MOVE":
+            return base + "_move.png"
+        elif state == "ATTACK":
+            return base + "_shoot.png"
+        elif state == "HURT":
+            return base + "_move.png"
         else:
-            # Заглушка — серый квадрат
-            dead_img = pygame.Surface((int(100 * self.radius), int(100 * self.radius)))
-            dead_img.fill((250, 80, 80))
-            self.image = dead_img
+            return base + "_idle.png"
         
-     
-        self.sprite_width, self.sprite_height = self.image.get_size()
-        self.sprite_ratio = self.sprite_width / self.sprite_height
-        
-        # Частицы крови
-        for _ in range(20):
-            self.game.particles.append(Particle(
-                self.game,
-                (self.x + uniform(-0.2, 0.2), self.y + uniform(-0.2, 0.2)),
-                (150, 0, 0),
-                uniform(0.002, 0.006)
-            ))
     
     def get_damage(self, damage):
         if not self.alive:
@@ -119,8 +116,7 @@ class NPC:
                 p_x = self.x + (dx / dist) * 0.1 + uniform(-0.1, 0.1)
                 p_y = self.y + (dy / dist) * 0.1 + uniform(-0.1, 0.1)
                 self.game.particles.append(Particle(self.game, (p_x, p_y), (200, 0, 0), uniform(0.002, 0.005)))
-        if self.hp <= 0:
-            self.die()
+        
     
     def update(self):
         if not self.alive:
@@ -357,6 +353,21 @@ class NPC:
         в зависимости от его состояния 
         и положения игрока на карте"""
         
+        # ПРОВЕРКА НА СМЕРТЬ
+        if self.hp <= 0:
+            if self.state != "DEAD":
+                self.state = "DEAD"
+                self.game.total_kills += 1
+                for _ in range(20):
+                    self.game.particles.append(Particle(
+                        self.game,
+                        (self.x + uniform(-0.2, 0.2), self.y + uniform(-0.2, 0.2)),
+                        (150, 0, 0),
+                        uniform(0.002, 0.006)
+                    ))
+                self.alive = False
+            return
+        
         distance_to_player = math.hypot(self.x - self.game.player.x, self.y - self.game.player.y)
         can_see = self.has_line_of_sight()
         #can_see = False
@@ -380,9 +391,17 @@ class NPC:
                 self.state = "ATTACK"
             else:
                 self.state = "CHASE"
-                
+        
+        # Смена спрайта
+        self.image = self.sprites[self.state]
+        self.sprite_width, self.sprite_height = self.image.get_size()
+        self.sprite_ratio = self.sprite_width / self.sprite_height
+        
         # ДЕЙСТВИЯ ПО ПЕРЕХОДАМ
-        if self.state == "IDLE":
+        if self.state == "DEAD":
+            self.alive = False
+
+        elif self.state == "IDLE":
             if self.state_timer and pygame.time.get_ticks() > self.state_timer:
                 if self.waypoints:
                     self.state = "PATROL"
@@ -612,22 +631,26 @@ class NPC:
 
 class Solder(NPC):
     def __init__(self, game, pos=(8.5, 7.5)):
-        super().__init__(game, pos)
+        self.name = "solder"
+        super().__init__(game, "solder", pos)
+        
         self.speed = 0.3
         self.hp = 100
         self.damage = 15
         self.shoot_range = 4
         self.shoot_delay = 600
-        self.image_path = 'resources/npc/solder.png'
-        self.image = pygame.image.load(self.image_path).convert_alpha()
-        self.sprite_width, self.sprite_height = self.image.get_size()
-        self.sprite_ratio = self.sprite_width / self.sprite_height
+        #self.image_path = 'resources/npc/solder.png'
+        #self.image = pygame.image.load(self.image_path).convert_alpha()
+        #self.sprite_width, self.sprite_height = self.image.get_size()
+        #self.sprite_ratio = self.sprite_width / self.sprite_height
         self.shoot_sound = pygame.mixer.Sound('resources/npc/npc_rifle.wav')
         self.shoot_sound.set_volume(0.2)
 
 class Jaggernaut(NPC):
     def __init__(self, game, pos=(8.5, 7.5)):
-        super().__init__(game, pos)
+        self.name = "jaggernaut"
+        super().__init__(game, "jaggernaut", pos)
+        
         self.speed = 0.1
         self.hp = 300
         self.damage = 8
@@ -635,31 +658,35 @@ class Jaggernaut(NPC):
         self.shoot_range = 5.0
         self.radius = 0.5
         self.color = (100, 100, 200)
-        self.image_path = 'resources/npc/jaggernaut.png'
-        self.image = pygame.image.load(self.image_path).convert_alpha()
-        self.sprite_width, self.sprite_height = self.image.get_size()
-        self.sprite_ratio = self.sprite_width / self.sprite_height
+        #self.image_path = 'resources/npc/jaggernaut.png'
+        #self.image = pygame.image.load(self.image_path).convert_alpha()
+        #self.sprite_width, self.sprite_height = self.image.get_size()
+        #self.sprite_ratio = self.sprite_width / self.sprite_height
         self.shoot_sound = pygame.mixer.Sound('resources/npc/npc_machine_gun.wav')
         self.shoot_sound.set_volume(0.2)
         
 class Lightning(NPC):
     def __init__(self, game, pos=(8.5, 7.5)):
-        super().__init__(game, pos)
+        self.name = "lightning"
+        super().__init__(game, "lightning", pos)
+        
         self.speed = 0.05
         self.hp = 30
         self.damage = 10
         self.shoot_range = 4
         self.shoot_delay = 600
-        self.image_path = 'resources/npc/lightning.png'
-        self.image = pygame.image.load(self.image_path).convert_alpha()
-        self.sprite_width, self.sprite_height = self.image.get_size()
-        self.sprite_ratio = self.sprite_width / self.sprite_height
+        #self.image_path = 'resources/npc/lightning.png'
+        #self.image = pygame.image.load(self.image_path).convert_alpha()
+        #self.sprite_width, self.sprite_height = self.image.get_size()
+        #self.sprite_ratio = self.sprite_width / self.sprite_height
         self.shoot_sound = pygame.mixer.Sound('resources/npc/npc_pistol.wav')
         self.shoot_sound.set_volume(0.2)
         
 class Kamikaze(NPC):
     def __init__(self, game, pos=(8.5, 7.5)):
-        super().__init__(game, pos)
+        self.name = "kamikaze"
+        super().__init__(game, "kamikaze", pos)
+        
         self.speed = 1.3
         self.hp = 40
         self.damage = 40
@@ -667,10 +694,10 @@ class Kamikaze(NPC):
         self.shoot_delay = 0
         self.radius = 0.4
         self.color = (200, 50, 50)
-        self.image_path = 'resources/npc/kamikaze.png'
-        self.image = pygame.image.load(self.image_path).convert_alpha()
-        self.sprite_width, self.sprite_height = self.image.get_size()
-        self.sprite_ratio = self.sprite_width / self.sprite_height
+        #self.image_path = 'resources/npc/kamikaze.png'
+        #self.image = pygame.image.load(self.image_path).convert_alpha()
+        #self.sprite_width, self.sprite_height = self.image.get_size()
+        #self.sprite_ratio = self.sprite_width / self.sprite_height
         self.exploded = False
         self.shoot_sound = pygame.mixer.Sound('resources/npc/npc_explosive.wav')
         self.shoot_sound.set_volume(0.2)
@@ -729,7 +756,9 @@ class Kamikaze(NPC):
 class Boss(NPC):
     """Босс — очень сильный, много здоровья, большой урон"""
     def __init__(self, game, pos=(8.5, 7.5)):
-        super().__init__(game, pos)
+        self.name = "boss"
+        super().__init__(game, "boss", pos)
+        
         self.speed = 0.05
         self.hp = 1000
         self.damage = 30
