@@ -206,68 +206,89 @@ class Pistol(Weapon):
         
 class Shotgun(Weapon):
     def __init__(self, game):
-        super().__init__(game, "Shotgun", 50, 800)    
+        super().__init__(game, "Shotgun", 50, 800)
+        self.sprite_path = f"resources/weapons/{self.name}.png"
+        try:
+            self.sprite = pygame.image.load(self.sprite_path).convert_alpha()
+            self.pos = (17, 12)
+            self.pos = grid_to_pixel(self.pos[0], self.pos[1])
+        except:
+            self.sprite = None
+                 
     def draw(self):
         self.update_animation()
+        try:
+            center_x = (GRID_W // 2) * CELL_W
+            bottom_y = HEIGHT + int(80 * self.scale_y) + self.recoil * 2.0
+            recoil_offset = 3.5 * self.recoil
+            sprite_rect = self.sprite.get_rect(midbottom=(center_x, bottom_y + recoil_offset))
+            self.game.screen.blit(self.sprite, sprite_rect)
+            # Вспышка
+            if self.reloading and self.elapsed < 50:
+                flash_y = bottom_y - self.s(410) + recoil_offset
+                pygame.draw.circle(self.game.screen, (255, 140, 0), 
+                            (center_x, flash_y), self.s(120))
+                pygame.draw.circle(self.game.screen, (255, 255, 180), 
+                            (center_x, flash_y), self.s(50))
+        except:
+            # Центр экрана = начало 16-й клетки (индекс 16)
+            center_x = (GRID_W // 2) * CELL_W
+            # Для дробовика смещение вниз: оригинал HEIGHT + 80
+            # 80 пикселей = 80 / 60 = 1.33 клетки
+            bottom_y = HEIGHT + int(80 * self.scale_y) + self.recoil * 2.0
+            
+            # 1. ДЕРЕВЯННОЕ ЦЕВЬЕ (нижняя часть)
+            WOOD_COLOR = (100, 50, 20)
+            pg.draw.polygon(self.game.screen, WOOD_COLOR, [
+                (center_x - self.s(220), bottom_y),
+                (center_x + self.s(220), bottom_y),
+                (center_x + self.s(170), bottom_y - self.s(180)),
+                (center_x - self.s(170), bottom_y - self.s(180))
+            ])
+            
+            # Тень на дереве для объема
+            pg.draw.polygon(self.game.screen, (70, 35, 15), [
+                (center_x - self.s(170), bottom_y - self.s(180)),
+                (center_x + self.s(170), bottom_y - self.s(180)),
+                (center_x + self.s(150), bottom_y - self.s(210)),
+                (center_x - self.s(150), bottom_y - self.s(210))
+            ])
+            
+            # 2. СОПРИКАСАЮЩИЕСЯ СТВОЛЫ (Металл)
+            # Левый ствол (вплотную к центру)
+            pg.draw.polygon(self.game.screen, (50, 50, 50), [
+                (center_x - self.s(90), bottom_y - self.s(200)),
+                (center_x, bottom_y - self.s(200)),
+                (center_x, bottom_y - self.s(400)),
+                (center_x - self.s(75), bottom_y - self.s(400))
+            ])
+            
+            # Правый ствол (вплотную к центру)
+            pg.draw.polygon(self.game.screen, (60, 60, 60), [
+                (center_x, bottom_y - self.s(200)),
+                (center_x + self.s(90), bottom_y - self.s(200)),
+                (center_x + self.s(75), bottom_y - self.s(400)),
+                (center_x, bottom_y - self.s(400))
+            ])
+            
+            # Разделительная линия между стволами для четкости
+            pg.draw.line(self.game.screen, (20, 20, 20), 
+                        (center_x, bottom_y - self.s(200)), 
+                        (center_x, bottom_y - self.s(400)), 2)
+            
+            # 3. ДУЛЬНЫЕ СРЕЗЫ
+            pg.draw.circle(self.game.screen, (10, 10, 10), 
+                        (center_x - self.s(42), bottom_y - self.s(395)), self.s(28))
+            pg.draw.circle(self.game.screen, (10, 10, 10), 
+                        (center_x + self.s(42), bottom_y - self.s(395)), self.s(28))
         
-        # Центр экрана = начало 16-й клетки (индекс 16)
-        center_x = (GRID_W // 2) * CELL_W
-        # Для дробовика смещение вниз: оригинал HEIGHT + 80
-        # 80 пикселей = 80 / 60 = 1.33 клетки
-        bottom_y = HEIGHT + int(80 * self.scale_y) + self.recoil * 2.0
-        
-        # 1. ДЕРЕВЯННОЕ ЦЕВЬЕ (нижняя часть)
-        WOOD_COLOR = (100, 50, 20)
-        pg.draw.polygon(self.game.screen, WOOD_COLOR, [
-            (center_x - self.s(220), bottom_y),
-            (center_x + self.s(220), bottom_y),
-            (center_x + self.s(170), bottom_y - self.s(180)),
-            (center_x - self.s(170), bottom_y - self.s(180))
-        ])
-        
-        # Тень на дереве для объема
-        pg.draw.polygon(self.game.screen, (70, 35, 15), [
-            (center_x - self.s(170), bottom_y - self.s(180)),
-            (center_x + self.s(170), bottom_y - self.s(180)),
-            (center_x + self.s(150), bottom_y - self.s(210)),
-            (center_x - self.s(150), bottom_y - self.s(210))
-        ])
-        
-        # 2. СОПРИКАСАЮЩИЕСЯ СТВОЛЫ (Металл)
-        # Левый ствол (вплотную к центру)
-        pg.draw.polygon(self.game.screen, (50, 50, 50), [
-            (center_x - self.s(90), bottom_y - self.s(200)),
-            (center_x, bottom_y - self.s(200)),
-            (center_x, bottom_y - self.s(400)),
-            (center_x - self.s(75), bottom_y - self.s(400))
-        ])
-        
-        # Правый ствол (вплотную к центру)
-        pg.draw.polygon(self.game.screen, (60, 60, 60), [
-            (center_x, bottom_y - self.s(200)),
-            (center_x + self.s(90), bottom_y - self.s(200)),
-            (center_x + self.s(75), bottom_y - self.s(400)),
-            (center_x, bottom_y - self.s(400))
-        ])
-        
-        # Разделительная линия между стволами для четкости
-        pg.draw.line(self.game.screen, (20, 20, 20), 
-                    (center_x, bottom_y - self.s(200)), 
-                    (center_x, bottom_y - self.s(400)), 2)
-        
-        # 3. ДУЛЬНЫЕ СРЕЗЫ
-        pg.draw.circle(self.game.screen, (10, 10, 10), 
-                      (center_x - self.s(42), bottom_y - self.s(395)), self.s(28))
-        pg.draw.circle(self.game.screen, (10, 10, 10), 
-                      (center_x + self.s(42), bottom_y - self.s(395)), self.s(28))
-        
-        # 4. МОЩНАЯ ВСПЫШКА
-        if self.reloading and self.elapsed < 50:
-            flash_y = bottom_y - self.s(410)
-            pg.draw.circle(self.game.screen, (255, 140, 0), 
-                          (center_x, flash_y), self.s(120))
-            pg.draw.circle(self.game.screen, (255, 255, 180), 
-                          (center_x, flash_y), self.s(50))
+            # 4. МОЩНАЯ ВСПЫШКА
+            if self.reloading and self.elapsed < 50:
+                flash_y = bottom_y - self.s(410)
+                pg.draw.circle(self.game.screen, (255, 140, 0), 
+                            (center_x, flash_y), self.s(120))
+                pg.draw.circle(self.game.screen, (255, 255, 180), 
+                            (center_x, flash_y), self.s(50))
         
 
 

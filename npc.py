@@ -61,7 +61,7 @@ class NPC:
         for state in self.sprites.keys():
             try:
                 path = self.get_sprite_path(state)
-                print(f"Пытаюсь загрузить: {path}")
+                #print(f"Пытаюсь загрузить: {path}")
                 self.sprites[state] = pygame.image.load(path).convert_alpha()
             except:
                 # Заглушка
