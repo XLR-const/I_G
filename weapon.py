@@ -161,9 +161,13 @@ class Pistol(Weapon):
             self.game.screen.blit(self.sprite, sprite_rect)
             
             if self.reloading and self.elapsed < 50:
-                flash_y = bottom_y - self.s(410) + recoil_offset
-                pygame.draw.circle(self.game.screen, (255, 255, 100), (center_x, flash_y), self.s(50))
-                pygame.draw.circle(self.game.screen, (255, 255, 255), (center_x, flash_y), self.s(20))
+                flash_col = 16
+                flash_row = 12
+                flash_x, flash_y = grid_to_pixel(flash_col, flash_row)
+                flash_y += recoil_offset
+                
+                pygame.draw.circle(self.game.screen, (255, 255, 100), (flash_x, flash_y), self.s(50))
+                pygame.draw.circle(self.game.screen, (255, 255, 255), (flash_x, flash_y), self.s(20))
         except:
             center_x = (GRID_W // 2) * CELL_W
             bottom_y = HEIGHT + int(80 * self.scale_y) + self.recoil * 2.0
@@ -206,11 +210,13 @@ class Shotgun(Weapon):
             self.game.screen.blit(self.sprite, sprite_rect)
             # Вспышка
             if self.reloading and self.elapsed < 50:
-                flash_y = bottom_y - self.s(410) + recoil_offset
-                pygame.draw.circle(self.game.screen, (255, 140, 0), 
-                            (center_x, flash_y), self.s(120))
-                pygame.draw.circle(self.game.screen, (255, 255, 180), 
-                            (center_x, flash_y), self.s(50))
+                flash_col = 16
+                flash_row = 12
+                flash_x, flash_y = grid_to_pixel(flash_col, flash_row)
+                flash_y += recoil_offset
+                
+                pygame.draw.circle(self.game.screen, (255, 140, 0), (flash_x, flash_y), self.s(120))
+                pygame.draw.circle(self.game.screen, (255, 255, 180), (flash_x, flash_y), self.s(50))
         except:
             # Центр экрана = начало 16-й клетки (индекс 16)
             center_x = (GRID_W // 2) * CELL_W
@@ -278,7 +284,11 @@ class MachineGun(Weapon):
         super().__init__(game, "Machine Gun", 10, 90, True)
         self.sprite_path = f"resources/weapons/{self.name}.png"
         try:
-            self.sprite = pygame.image.load(self.sprite_path).convert_alpha()
+            original = pygame.image.load(self.sprite_path).convert_alpha()
+            scale_factor = 4
+            new_width = int(original.get_width() * scale_factor)
+            new_height = int(original.get_height() * scale_factor)
+            self.sprite = pygame.transform.scale(original, (new_width, new_height))
             self.pos = grid_to_pixel(17, 12)
         except:
             self.sprite = None
@@ -286,16 +296,20 @@ class MachineGun(Weapon):
     def draw(self):
         self.update_animation()
         try:
-            center_x = (GRID_W // 2) * CELL_W
-            bottom_y = HEIGHT + int(80 * self.scale_y) + self.recoil * 2.0
+            center_x = (GRID_W // 2) * CELL_W + CELL_W 
+            bottom_y = HEIGHT + int(80 * self.scale_y) + self.recoil * 2.0 - CELL_H * 1
             recoil_offset = 1.5 * self.recoil
             sprite_rect = self.sprite.get_rect(midbottom=(center_x, bottom_y - recoil_offset))
             self.game.screen.blit(self.sprite, sprite_rect)
             
             if self.reloading and self.elapsed < 40:
-                flash_y = bottom_y - self.s(440) + recoil_offset
-                pg.draw.circle(self.game.screen, (255, 200, 50), (center_x, flash_y), self.s(80))
-                pg.draw.circle(self.game.screen, (255, 255, 255), (center_x, flash_y), self.s(30))
+                flash_col = 17
+                flash_row = 12
+                flash_x, flash_y = grid_to_pixel(flash_col, flash_row)
+                flash_y += recoil_offset
+                
+                pygame.draw.circle(self.game.screen, (255, 200, 50), (flash_x, flash_y), self.s(80))
+                pygame.draw.circle(self.game.screen, (255, 255, 255), (flash_x, flash_y), self.s(30))
         except:
             center_x = (GRID_W // 2) * CELL_W
             bottom_y = HEIGHT + int(120 * self.scale_y) + self.recoil
@@ -333,7 +347,7 @@ class PlasmaGun(Weapon):
         try:
             original = pygame.image.load(self.sprite_path).convert_alpha()
             # Увеличиваем плазмаган (было 0.5, стало 0.7)
-            scale_factor = 1.3
+            scale_factor = 4
             new_width = int(original.get_width() * scale_factor)
             new_height = int(original.get_height() * scale_factor)
             self.sprite = pygame.transform.scale(original, (new_width, new_height))
@@ -344,20 +358,27 @@ class PlasmaGun(Weapon):
     def draw(self):
         self.update_animation()
         try:
-            center_x = (GRID_W // 2) * CELL_W + CELL_W * 2
+            center_x = (GRID_W // 2) * CELL_W + CELL_W * 5
             # Смещение по вертикали (подбери под свой спрайт)
-            offset_y = -50  # отрицательное значение — поднимаем вверх
-            bottom_y = HEIGHT + offset_y + self.recoil * 2.0
-            recoil_offset = 3.5 * self.recoil
+            offset_y = -40 
+            bottom_y = HEIGHT + offset_y + self.recoil * 2.0 - CELL_H * 1
+            recoil_offset = 2.5 * self.recoil
             
             # Используем center вместо midbottom
             sprite_rect = self.sprite.get_rect(center=(center_x, bottom_y + recoil_offset))
             self.game.screen.blit(self.sprite, sprite_rect)
             
             if self.reloading and self.elapsed < 100:
-                flash_y = bottom_y - self.s(370) + recoil_offset
-                pygame.draw.circle(self.game.screen, (200, 0, 255), (center_x, flash_y), self.s(70))
-                pygame.draw.circle(self.game.screen, (255, 100, 255), (center_x, flash_y), self.s(30))
+                # Позиция вспышки через cell (col, row)
+                flash_col = 18
+                flash_row = 13
+                flash_x, flash_y = grid_to_pixel(flash_col, flash_row)
+                
+                # Добавляем смещение отдачи
+                flash_y += recoil_offset
+                
+                pygame.draw.circle(self.game.screen, (200, 0, 255), (flash_x, flash_y), self.s(70))
+                pygame.draw.circle(self.game.screen, (255, 100, 255), (flash_x, flash_y), self.s(30))
         except:
             pass
 
