@@ -62,7 +62,7 @@ class Player:
         # Коллизия: проверяем новую позицию по каждой оси отдельно для "скольжения"
         # 0.2 — это небольшой радиус игрока, чтобы не прилипать вплотную к стене
         # Радиус игрока + радиус NPC
-        collision_dist = 0.6 
+        collision_dist = 0.6
         
         scale = 0.2
         can_move_x = (int(self.x + dx + (scale if dx > 0 else -scale)), int(self.y)) not in self.game.map.world_map

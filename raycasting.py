@@ -151,13 +151,21 @@ class RayCasting:
             else:
                 dist = side_dist_y - delta_dist_y
 
+            if dist < 0.2:
+                dist = 0.2
+                
             self.z_buffer[i] = dist
 
             # 5. Убираем эффект рыбьего глаза
             dist *= math.cos(self.game.player.angle - ray_angle)
 
+            if dist < 0.2:
+                dist = 0.2
+            
             # 6. Проекция
             proj_height = SCREEN_DIST / (dist + 0.0001)
+            if proj_height > HEIGHT * 3:
+                proj_height = HEIGHT * 3
             
             wall_char = self.game.map.world_map.get((x_map, y_map), '1')
             
@@ -195,7 +203,6 @@ class RayCasting:
             if h > HEIGHT * 2: # даем запас, но не бесконечность
                 h = HEIGHT * 2
                 y = int(HALF_HEIGHT - h // 2)
-                
             # РАБОТА С ТЕКСТУРКАМИ    
             texture = self.textures.get(wall_char)
             if texture is not None:
@@ -215,7 +222,7 @@ class RayCasting:
                     time_offset = (pygame.time.get_ticks() * speed / 1000) % 1.0
                     tex_x = (tex_x - time_offset) % 1.0
                 tex_x = int(tex_x * TEXTURE_SIZE)
-                
+                tex_x = max(0, min(tex_x, TEXTURE_SIZE - 1))
                 # Получаем полоску из кэша
                 texture_slice = self.get_texture_slice(texture, tex_x, h)
                 if texture_slice is not None:

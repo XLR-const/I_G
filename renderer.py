@@ -120,8 +120,8 @@ class Renderer:
         compass_w = compass_width * CELL_W
         compass_h = int(compass_height * CELL_H * 0.6)  # 60% высоты клетки
         # Рамка компаса
-        pygame.draw.rect(self.game.screen, (30, 80, 30), 
-                        (compass_x, compass_y, compass_w, compass_h))
+        #pygame.draw.rect(self.game.screen, (30, 80, 30), 
+        #                (compass_x, compass_y, compass_w, compass_h))
         pygame.draw.rect(self.game.screen, (100, 100, 100), 
                         (compass_x, compass_y, compass_w, compass_h), 2)
         # Центр компаса (положение игрока)
