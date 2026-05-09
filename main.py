@@ -256,7 +256,7 @@ class Game:
         self.renderer.draw_fog_filter()
         self.renderer.draw_interface()
         self.renderer.draw_crosshair()
-        self.renderer.draw_line_of_cells()
+        #self.renderer.draw_line_of_cells()
         
         
         pygame.display.flip()

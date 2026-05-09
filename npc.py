@@ -26,13 +26,13 @@ class NPC:
         self.last_shot = 0
         self.shoot_range = 5.0 # дистанция аттаки
         self.shoot_flash = 0
-        self.shoot_sound = pygame.mixer.Sound('resources/player/pistol_shot.wav')
+        self.shoot_sound = pygame.mixer.Sound('resources/weapons/pistol_shot.wav')
         self.shoot_sound.set_volume(0.2)
         
         # patrol
         self.waypoints = []
         self.current_waypoint = 0
-        self.idle_duration = 1500 # время бездействия
+        self.idle_duration = 500 # время бездействия
         self.flocking_enabled = True
         
         self.hurt_flash = 0
@@ -309,7 +309,7 @@ class NPC:
             if self.game.map.is_wall(check_x, check_y):
                 return True
             
-            for other in self.game.npcs:
+            #for other in self.game.npcs:
                 if other is not self and other.alive:
                     dist = math.hypot(x - other.x, y - other.y)
                     if dist < self.radius + other.radius:
@@ -370,27 +370,33 @@ class NPC:
         
         distance_to_player = math.hypot(self.x - self.game.player.x, self.y - self.game.player.y)
         can_see = self.has_line_of_sight()
-        #can_see = False
+        can_see = False
         # ЕСЛИ ПОЛУЧИЛ УРОН
         if self.state == "HURT":
             if pygame.time.get_ticks() > self.state_timer:
                 if can_see:
                     self.state = "CHASE"
                 else:
-                    self.state = "IDLE"
+                    self.state = "PATROL" if self.waypoints else "IDLE"
         
         # ПРАВИЛА ПЕРЕХОДОВ ИЗ СОСТОЯНИЙ
-        if not can_see:
-            # либо патруль либо холд
-            if self.state in ("ATTACK", "CHASE"):
-                self.state = "IDLE"
-                self.state_timer = pygame.time.get_ticks() + self.idle_duration
-        else:
-            # преследование или атака
+        if can_see:
+            # Игрок виден → преследование или атака
             if distance_to_player <= self.shoot_range:
-                self.state = "ATTACK"
+                if self.state != "ATTACK":
+                    self.state = "ATTACK"
             else:
-                self.state = "CHASE"
+                if self.state != "CHASE":
+                    self.state = "CHASE"
+        else:
+            # Игрок не виден → патруль или ожидание
+            if self.state in ("ATTACK", "CHASE"):
+                if self.waypoints:
+                    self.state = "PATROL"
+                    self.current_waypoint = 0
+                else:
+                    self.state = "IDLE"
+                    self.state_timer = pygame.time.get_ticks() + self.idle_duration
         
         # Смена спрайта
         self.image = self.sprites[self.state]
@@ -418,8 +424,8 @@ class NPC:
             
             if dist < 0.2:
                 self.current_waypoint = (self.current_waypoint + 1) % len(self.waypoints)
-                self.state = "IDLE"
-                self.state_timer = pygame.time.get_ticks() + 500
+                #self.state = "IDLE"
+                #self.state_timer = pygame.time.get_ticks() + 500
             else:
                 if dist > 0.01:
                     move_x = (dx / dist) * self.speed * dt
