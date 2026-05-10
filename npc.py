@@ -66,32 +66,42 @@ class NPC:
         self.current_target_index = 0
     
     def load_all_sprites(self):
-        """Загружает все спрайты NPC"""
+        """Загружает все спрайты NPC с масштабированием"""
         base = f"resources/npc/{self.name}/{self.name}"
         directions = ["right", "left", "front", "back"]
+        scale_factor = 0.1  # уменьшаем в 2 раза
         
-        # 1. Idle спрайты (4 направления)
+        # 1. Idle спрайты
         for direction in directions:
             key = f"IDLE_{direction}"
             path = f"{base}_idle_{direction}.png"
             try:
-                self.sprites[key] = pygame.image.load(path).convert_alpha()
+                original = pygame.image.load(path).convert_alpha()
+                new_width = int(original.get_width() * scale_factor)
+                new_height = int(original.get_height() * scale_factor)
+                self.sprites[key] = pygame.transform.scale(original, (new_width, new_height))
             except:
                 self.sprites[key] = pygame.Surface((50, 80))
                 self.sprites[key].fill((150, 150, 150))
         
-        # 2. Move спрайты (для PATROL и CHASE) - 4 направления
+        # 2. Move спрайты
         for direction in directions:
             key = f"MOVE_{direction}"
             path = f"{base}_move_{direction}.png"
             try:
-                self.sprites[key] = pygame.image.load(path).convert_alpha()
+                original = pygame.image.load(path).convert_alpha()
+                new_width = int(original.get_width() * scale_factor)
+                new_height = int(original.get_height() * scale_factor)
+                self.sprites[key] = pygame.transform.scale(original, (new_width, new_height))
             except:
                 self.sprites[key] = self.sprites.get(f"IDLE_{direction}", pygame.Surface((50, 80)))
         
-        # 3. Shoot спрайт (один, без направления)
+        # 3. Shoot спрайт
         try:
-            self.sprites["ATTACK"] = pygame.image.load(f"{base}_shoot.png").convert_alpha()
+            original = pygame.image.load(f"{base}_shoot.png").convert_alpha()
+            new_width = int(original.get_width() * scale_factor)
+            new_height = int(original.get_height() * scale_factor)
+            self.sprites["ATTACK"] = pygame.transform.scale(original, (new_width, new_height))
         except:
             self.sprites["ATTACK"] = pygame.Surface((50, 80))
             self.sprites["ATTACK"].fill((255, 200, 0))
@@ -396,7 +406,7 @@ class NPC:
         
         distance_to_player = math.hypot(self.x - self.game.player.x, self.y - self.game.player.y)
         can_see = self.has_line_of_sight()
-        can_see = False
+        #can_see = False
         # ЕСЛИ ПОЛУЧИЛ УРОН
         if self.state == "HURT":
             if pygame.time.get_ticks() > self.state_timer:
@@ -776,6 +786,7 @@ class Kamikaze(NPC):
             
             # Взрыв при приближении
             if distance_to_player <= self.shoot_range:
+                self.state = "SHOOT"
                 self.shoot()
                 self.alive = False
                 
