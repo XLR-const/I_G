@@ -74,11 +74,11 @@ class UIManager:
         options_len = 4
         
         if event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_DOWN:
+            if event.key in (pygame.K_DOWN, pygame.K_s):
                 self.selected_option = (self.selected_option + 1) % options_len
                 self.swap_sound.play()
                 return True
-            if event.key == pygame.K_UP:
+            if event.key in (pygame.K_UP, pygame.K_w):
                 self.selected_option = (self.selected_option - 1) % options_len
                 self.swap_sound.play()
                 return True
@@ -125,11 +125,11 @@ class UIManager:
             if event.key == pygame.K_ESCAPE:
                 self.current_state = self.states['PLAYING']
                 return True
-            if event.key == pygame.K_UP:
+            if event.key in (pygame.K_UP, pygame.K_w):
                 self.selected_option = (self.selected_option - 1) % options_len
                 self.swap_sound.play()
                 return True
-            if event.key == pygame.K_DOWN:
+            if event.key in (pygame.K_DOWN, pygame.K_s):
                 self.selected_option = (self.selected_option + 1) % options_len
                 self.swap_sound.play()
                 return True
