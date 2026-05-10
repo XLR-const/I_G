@@ -47,52 +47,55 @@ class NPC:
         self.dead_sprite_path = 'resources/npc/dead.png'
         self.dead_sprite = None
         # Предзагрузка всех спрайтов
-        self.sprites = {
-            'IDLE': None,
-            'CHASE': None,
-            'ATTACK': None,
-            'HURT': None,
-            'MOVE': None,
-            'DEAD': None,
-            'PATROL': None,
-        }
+        self.sprites = {}
+        self.move_direction = "front"  # направление по умолчанию
+        self.last_x = self.x
+        self.last_y = self.y
         
-        # Загружаем спрайты для всех состояний
-        for state in self.sprites.keys():
-            try:
-                path = self.get_sprite_path(state)
-                #print(f"Пытаюсь загрузить: {path}")
-                self.sprites[state] = pygame.image.load(path).convert_alpha()
-            except:
-                # Заглушка
-                self.sprites[state] = pygame.Surface((50, 80))
-                self.sprites[state].fill((250, 100, 100))
+        # Загружаем все спрайты
+        self.load_all_sprites()
         
-        # Текущий спрайт
-        self.image = self.sprites['IDLE']
-        self.dead_x = 0
-        self.dead_y = 0
+        # Начальный спрайт
+        self.image = self.sprites.get("IDLE_front")
+        self.sprite_width, self.sprite_height = self.image.get_size()
+        self.sprite_ratio = self.sprite_width / self.sprite_height
         
         # A* параметры
         self.path = []
         self.last_path_update = 0
         self.current_target_index = 0
     
-    def get_sprite_path(self, state):
-        """Возвращает путь к спрайту для конкретного состояния"""
+    def load_all_sprites(self):
+        """Загружает все спрайты NPC"""
         base = f"resources/npc/{self.name}/{self.name}"
-        if state == "CHASE":
-            return base + "_shoot.png"
-        elif state == "IDLE":
-            return base + "_idle.png"
-        elif state == "MOVE":
-            return base + "_move.png"
-        elif state == "ATTACK":
-            return base + "_shoot.png"
-        elif state == "HURT":
-            return base + "_move.png"
-        else:
-            return base + "_idle.png"
+        directions = ["right", "left", "front", "back"]
+        
+        # 1. Idle спрайты (4 направления)
+        for direction in directions:
+            key = f"IDLE_{direction}"
+            path = f"{base}_idle_{direction}.png"
+            try:
+                self.sprites[key] = pygame.image.load(path).convert_alpha()
+            except:
+                self.sprites[key] = pygame.Surface((50, 80))
+                self.sprites[key].fill((150, 150, 150))
+        
+        # 2. Move спрайты (для PATROL и CHASE) - 4 направления
+        for direction in directions:
+            key = f"MOVE_{direction}"
+            path = f"{base}_move_{direction}.png"
+            try:
+                self.sprites[key] = pygame.image.load(path).convert_alpha()
+            except:
+                self.sprites[key] = self.sprites.get(f"IDLE_{direction}", pygame.Surface((50, 80)))
+        
+        # 3. Shoot спрайт (один, без направления)
+        try:
+            self.sprites["ATTACK"] = pygame.image.load(f"{base}_shoot.png").convert_alpha()
+        except:
+            self.sprites["ATTACK"] = pygame.Surface((50, 80))
+            self.sprites["ATTACK"].fill((255, 200, 0))
+
         
     
     def get_damage(self, damage):
@@ -120,8 +123,6 @@ class NPC:
     
     def update(self):
         if not self.alive:
-            self.x = self.dead_x
-            self.y = self.dead_y
             return
         
         dt = self.game.delta_time
@@ -134,14 +135,39 @@ class NPC:
             self.shoot_flash -= 1
         
         self.update_state(dt)
+        
+        # === ОБНОВЛЕНИЕ НАПРАВЛЕНИЯ ДВИЖЕНИЯ ===
+        dx = self.x - self.last_x
+        dy = self.y - self.last_y
+        
+        if dx != 0 or dy != 0:
+            if abs(dx) > abs(dy):
+                self.move_direction = "right" if dx < 0 else "left"
+            else:
+                self.move_direction = "front" if dy < 0 else "back"
+        
+        self.last_x, self.last_y = self.x, self.y
+        
+        # === ОБНОВЛЕНИЕ СПРАЙТА ПО СОСТОЯНИЮ И НАПРАВЛЕНИЮ ===
+        if self.state == "ATTACK":
+            self.image = self.sprites.get("ATTACK", self.sprites.get("IDLE_front"))
+        elif self.state in ("PATROL", "CHASE"):
+            key = f"MOVE_{self.move_direction}"
+            self.image = self.sprites.get(key, self.sprites.get("IDLE_front"))
+        else:
+            # IDLE, HURT и т.д.
+            key = f"IDLE_{self.move_direction}"
+            self.image = self.sprites.get(key, self.sprites.get("IDLE_front"))
+        
+        self.sprite_width, self.sprite_height = self.image.get_size()
+        self.sprite_ratio = self.sprite_width / self.sprite_height
     
     def check_hit(self):
         pass
     
     def draw(self):
         if not self.alive:
-            draw_x = self.dead_x
-            draw_y = self.dead_y
+            return
         else:
             draw_x = self.x
             draw_y = self.y
@@ -370,7 +396,7 @@ class NPC:
         
         distance_to_player = math.hypot(self.x - self.game.player.x, self.y - self.game.player.y)
         can_see = self.has_line_of_sight()
-        #can_see = False
+        can_see = False
         # ЕСЛИ ПОЛУЧИЛ УРОН
         if self.state == "HURT":
             if pygame.time.get_ticks() > self.state_timer:
@@ -397,11 +423,6 @@ class NPC:
                 else:
                     self.state = "IDLE"
                     self.state_timer = pygame.time.get_ticks() + self.idle_duration
-        
-        # Смена спрайта
-        self.image = self.sprites[self.state]
-        self.sprite_width, self.sprite_height = self.image.get_size()
-        self.sprite_ratio = self.sprite_width / self.sprite_height
         
         # ДЕЙСТВИЯ ПО ПЕРЕХОДАМ
         if self.state == "DEAD":
