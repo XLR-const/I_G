@@ -1,5 +1,5 @@
 import pygame
-import setting  # noqa
+import setting
 import sys
 import random
 from save_system import SaveSystem
@@ -26,6 +26,8 @@ class UIManager:
         self.current_state = self.states['BOOT']
         self.selected_option = 0
         
+        self.briefing_images = {}
+        self.music_start = True
         self.load_assets()
     
     def load_assets(self):
@@ -41,6 +43,18 @@ class UIManager:
             self.backgrounds['dead'] = pygame.transform.scale(dead_bg, (setting.WIDTH, setting.HEIGHT))
         except Exception:
             self.backgrounds['dead'] = None
+        
+        # Загрузка картинок для брифингов
+        for i in range(1, 7):
+            path = f"resources/briefings/level_{i}.png"
+            try:
+                img = pygame.image.load(path).convert()
+                img = pygame.transform.scale(img, (setting.WIDTH, setting.HEIGHT))
+                self.briefing_images[i] = img
+                print(f"Загружен брифинг для уровня {i}")
+            except:
+                pass
+        
         # Загрузка звуков
         self.swap_sound = pygame.mixer.Sound('resources/ui_sounds/swap.wav')
         self.swap_sound.set_volume(0.1)
@@ -239,6 +253,7 @@ class UIManager:
             self._update_cutscene()
         elif self.current_state == self.states['OPTIONS']:
             self._update_options()
+                
     
     def draw(self, screen):
         """Ретранслятор отрисовки по отдельным экранам"""
@@ -294,14 +309,14 @@ class UIManager:
             screen.fill((20, 40, 20))
         
         # Title
-        title = self.font_tile.render("Ilyusha Grate", True, (255, 200, 0))
+        title = self.font_tile.render("Ilyusha Grate", True, (255, 250, 0))
         title_rect = title.get_rect(center=(setting.WIDTH // 2, int(setting.CELL_H * 2)))
         screen.blit(title, title_rect)
         
         options = ['НОВАЯ ИГРА', 'ЗАГРУЗИТЬ ИГРУ', 'НАСТРОЙКИ', 'ВЫХОД']
         for i, opt in enumerate(options):
             y = setting.HEIGHT // 2 + i * 60
-            color = (255, 255, 255) if i == self.selected_option else (150, 150, 150)
+            color = (255, 255, 255) if i == self.selected_option else (0, 250, 250)
             text = self.font_normal.render(opt, True, color)
             text_rect = text.get_rect(center=(setting.WIDTH // 2, y))
             screen.blit(text, text_rect)
@@ -328,29 +343,44 @@ class UIManager:
     def _draw_briefing(self, screen):
         screen.fill((0, 0, 0))
         level_num = self.game.current_level
-        lines = [
-            f"МИССИЯ {level_num}",
-            "",
-            "ЗАДАЧИ:",
-            "- Eliminate all enemy forces",
-            "- Find the exit",
-            "",
-            "Intel suggests heavy resistance in this sector",
-            "Proceed with caution, soldier.",
-            "",
-            "Press any key to continue..."
-        ]
-        
-        for i, line in enumerate(lines):
-            y = int(setting.CELL_H * 2) + i * int(setting.CELL_H * 0.6)
-            color = (200, 200, 200)
-            if 'ЗАДАЧИ' in line or i == 0:
-                color = (255, 200, 0)
-            font = self.font_tile if line.startswith('МИССИЯ') else self.font_normal
-            text = font.render(line, True, color)
-            screen.blit(text, (int(setting.CELL_W) * 2, y))
-        
-        self.__draw_minimap(screen, int(setting.CELL_W * 12), int(setting.CELL_H * 2))
+        if level_num in self.briefing_images:
+            screen.blit(self.briefing_images[level_num], (0, 0))
+            
+            # Подсказка внизу экрана (полупрозрачная)
+            font = pygame.font.Font(None, 36)
+            text = font.render("Press any key to continue...", True, (255, 255, 255))
+            text_rect = text.get_rect(center=(setting.WIDTH // 2, setting.HEIGHT - setting.CELL_H))
+            
+            # Полупрозрачный фон для текста
+            bg = pygame.Surface((text.get_width() + 20, text.get_height() + 10))
+            bg.set_alpha(128)
+            bg.fill((0, 0, 0))
+            screen.blit(bg, (text_rect.x - 10, text_rect.y - 5))
+            screen.blit(text, text_rect)
+        else:
+            lines = [
+                f"МИССИЯ {level_num}",
+                "",
+                "ЗАДАЧИ:",
+                "- Eliminate all enemy forces",
+                "- Find the exit",
+                "",
+                "Intel suggests heavy resistance in this sector",
+                "Proceed with caution, soldier.",
+                "",
+                "Press any key to continue..."
+            ]
+            
+            for i, line in enumerate(lines):
+                y = int(setting.CELL_H * 2) + i * int(setting.CELL_H * 0.6)
+                color = (200, 200, 200)
+                if 'ЗАДАЧИ' in line or i == 0:
+                    color = (255, 200, 0)
+                font = self.font_tile if line.startswith('МИССИЯ') else self.font_normal
+                text = font.render(line, True, color)
+                screen.blit(text, (int(setting.CELL_W) * 2, y))
+            
+            self.__draw_minimap(screen, int(setting.CELL_W * 12), int(setting.CELL_H * 2))
     
     def __draw_minimap(self, screen, x, y):
         try:

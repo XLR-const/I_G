@@ -25,11 +25,12 @@ class Game:
         self.save_system = SaveSystem()
         self.total_kills = 0
         
+        pygame.mixer.init(frequency=22050, size=-16, channels=2, buffer=512)
         self.ui_manager = UIManager(self)
         self.level_manager = LevelManager(self)
         self.current_level = 1
         self.load_level(self.current_level)
-        
+
         
     """
     def new_game(self):
@@ -205,7 +206,52 @@ class Game:
         self.player.hp = 100
         self.level_start_time = pygame.time.get_ticks()
         self.load_level(self.current_level)            
+    
+    def play_music(self):
+        """Управление музыкой в зависимости от текущего состояния"""
+        current_state = self.ui_manager.current_state
+        # Музыка для главного меню
+        if current_state == self.ui_manager.states['MENU']:
+            if not hasattr(self, 'current_music') or self.current_music != 'menu':
+                try:
+                    pygame.mixer.music.load('resources/ui_sounds/main_menu_song.wav')
+                    pygame.mixer.music.set_volume(0.4)
+                    pygame.mixer.music.play(-1)
+                    self.current_music = 'menu'
+                    print("Музыка меню запущена")  # отладка
+                except Exception as e:
+                    print(f"error download: main_menu_song - {e}")
+        
+        # Музыка для уровня 1
+        elif current_state == self.ui_manager.states['PLAYING'] and self.current_level == 1:
+            if not hasattr(self, 'current_music') or self.current_music != 'level1':
+                try:
+                    pygame.mixer.music.load('resources/level_music/level_1.wav')
+                    pygame.mixer.music.set_volume(0.5)
+                    pygame.mixer.music.play(-1)
+                    self.current_music = 'level1'
+                    print("Музыка уровня 1 запущена")  # отладка
+                except Exception as e:
+                    print(f"error download: level music - {e}")
                     
+        elif current_state == self.ui_manager.states['BRIEFING']:
+            if not hasattr(self, 'current_music') or current_state != 'briefing':
+                try:
+                    pygame.mixer.music.load('resources/ui_sounds/briefing.wav')
+                    pygame.mixer.music.set_volume(0.5)
+                    pygame.mixer.music.play(-1)
+                    self.current_music = 'briefing'
+                except Exception as e:
+                    print(f"error download: level music - {e}")
+        
+        # Останавливаем музыку при смерти или конце уровня
+        elif current_state in (self.ui_manager.states['DEAD'], self.ui_manager.states['LEVEL_END']):
+            if pygame.mixer.music.get_busy():
+                pygame.mixer.music.stop()
+                if hasattr(self, 'current_music'):
+                    delattr(self, 'current_music')
+                print("Музыка остановлена")
+               
     def update(self):
         self.player.update()
         self.check_exit()
@@ -239,6 +285,7 @@ class Game:
         self.delta_time = self.clock.tick(FPS)
         self.player.update_regen()
         pygame.display.set_caption(f'FPS: {self.clock.get_fps() :.1f}')
+        
 
     def draw(self):
         #self.screen.fill('black') # Очистка экрана перед каждым кадром
@@ -313,6 +360,7 @@ class Game:
             self.check_events()
             # Обновление UI
             self.ui_manager.update()
+            self.play_music()
             
             # Если в игре - обновляем игровую логику
             if self.ui_manager.current_state == self.ui_manager.states['PLAYING']:
