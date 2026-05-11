@@ -12,6 +12,7 @@ from pathfinding import PathFinder
 from level_manager import LevelManager
 from ui_manager import UIManager
 from save_system import SaveSystem
+from console import DevConsole
 
 class Game:
     def __init__(self):
@@ -24,6 +25,8 @@ class Game:
         self.font = pygame.font.SysFont('Arial', 30, bold=True)
         self.save_system = SaveSystem()
         self.total_kills = 0
+        
+        self.console = DevConsole(self)
         
         pygame.mixer.init(frequency=22050, size=-16, channels=2, buffer=512)
         self.ui_manager = UIManager(self)
@@ -304,7 +307,7 @@ class Game:
         self.renderer.draw_interface()
         self.renderer.draw_crosshair()
         #self.renderer.draw_line_of_cells()
-        
+        self.console.draw(self.screen)
         
         pygame.display.flip()
 
@@ -353,6 +356,12 @@ class Game:
                     if event.button == 5: # Колесо вниз
                         self.current_weapon_index = (self.current_weapon_index - 1) % len(self.inventory)
                     self.weapon = self.inventory[self.current_weapon_index]
+                    
+                if self.console.active:
+                    self.console.handle_event(event)
+                    return
+                if event.type == pygame.KEYDOWN and event.key == pygame.K_BACKQUOTE:
+                    self.console.toggle()
 
 
     def run(self):
