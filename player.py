@@ -13,6 +13,8 @@ class Player:
         self.regen_speed = 10    # 10 HP в секунду
         self.death_sound = pg.mixer.Sound('resources/player/death.wav')
         self.death_sound.set_volume(0.5)
+        self.player_damage_sound = pg.mixer.Sound('resources/player/player_damage.wav')
+        self.player_damage_sound.set_volume(0.5)
         # Сразу ставим мышь в центр при создании игрока
         pg.mouse.set_pos([WIDTH // 2, HEIGHT // 2])
 
@@ -28,6 +30,7 @@ class Player:
 
     def take_damage(self, damage):
         """Получение урона игроком"""
+        self.player_damage_sound.play()
         self.hp -= damage
         self.last_damage_time = pygame.time.get_ticks()  # ← сброс таймера регена
         
