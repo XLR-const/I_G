@@ -77,78 +77,77 @@ class Game:
           
     def load_level(self, level_num):
         '''Вся инициализация здесь'''
-        # Заглушка - скип 2 лвл
-        if self.current_level == 2:
+        import time
+        start_total = time.time()
+        
+        print(f"\n{'='*60}")
+        print(f"ЗАГРУЗКА УРОВНЯ {level_num}")
+        print(f"{'='*60}")
+        
+        # ========== 1. ПРОВЕРКА СКИПА 2 УРОВНЯ ==========
+        if level_num == 2:
+            print("[1] Пропускаем 2 уровень (лесной)")
             self.current_level += 1
-        # Raycasting + render
+            return self.load_level(self.current_level)
+        
+        # ========== 2. СОЗДАНИЕ РЕЙКАСТИНГА (1 РАЗ) ==========
         if not hasattr(self, 'raycasting'):
+            print("[2] Создание рейкастинга...")
             self.raycasting = RayCasting(self)
             self.renderer = Renderer(self)
             self.pathfinder = PathFinder(self)
+            print("    Готово")
+        
+        # ========== 3. ЗАГРУЗКА JSON ==========
+        t1 = time.time()
+        print("[3] Загрузка JSON...")
         level_data = self.level_manager.load_level(level_num)
         if not level_data:
+            print("    ОШИБКА: JSON не загружен")
             self.game_over()
             return
-        # Очистка кэша тектур
-        if hasattr(self, 'renderer'):
+        print(f"    Загружено за {time.time()-t1:.2f}с")
+        
+        # ========== 4. ОЧИСТКА КЭША ==========
+        if hasattr(self, 'raycasting'):
             self.raycasting.texture_cache.clear()
+            print("[4] Кэш текстур очищен")
         
-        if level_num == 2:
-            self.player.angle = math.pi * 1.5
-        
-        # партикли 
+        # ========== 5. ПАРТИКЛЫ И СТАТЫ ==========
         self.particles = []
-        
-        # Статы
         self.total_kills = 0
-        #self.level_time = 0
-        #self.level_start_time = pygame.time.get_ticks()
+        print("[5] Партиклы и статы сброшены")
         
-        # карта
-        self.map = Map(self, level_data['map_data'], level_data['doors'])
-        if level_num == 2:
-            self.start_time = pygame.time.get_ticks()
-            self.level_duration = 20000000  # 1 минута
-            Tree.init_spawn_points(self)
-            for _ in range(10):
-                tree = Tree(self)
-                self.npcs.append(tree)
-        self.exit_pos = self.map.get_exit_pos()
+        # ========== 6. КАРТА ==========
+        t6 = time.time()
+        print("[6] Создание карты...")
+        self.map = Map(self, level_data['map_data'], level_data.get('doors', []))
+        print(f"    Карта: {self.map.width}x{self.map.height}, стен: {len(self.map.world_map)}")
+        print(f"    Загружено за {time.time()-t6:.2f}с")
+        
+        # ========== 7. ФОН ==========
         background = level_data.get('background', {})
         self.renderer.set_background(background)
+        print("[7] Фон установлен")
         
-        # NPC
-        self.npcs = []
-        for npc_x, npc_y, npc_type in self.map.npc_positions:
-            x, y = npc_x + 0.5, npc_y + 0.5
-            if npc_type == 'Solder':
-                self.npcs.append(Solder(self, pos=(x, y)))
-            elif npc_type == 'Kamikaze':
-                self.npcs.append(Kamikaze(self, pos=(x, y)))
-            elif npc_type == 'Jaggernaut':
-                self.npcs.append(Jaggernaut(self, pos=(x, y)))
-            elif npc_type == 'Boss':
-                self.npcs.append(Boss(self, pos=(x, y)))
-            elif npc_type == 'Lightning':
-                self.npcs.append(Lightning(self, pos=(x, y)))
-            elif npc_type == 'Tree':
-                self.npcs.append(Tree(self, pos=(x, y)))
-            elif npc_type == 'Fog':
-                self.npcs.append(Fog(self, pos=(x, y)))
+        # ========== 8. ВЫХОД ==========
+        self.exit_pos = self.map.get_exit_pos()
+        print(f"[8] Выход: {self.exit_pos}")
         
-        for npc in self.npcs:
-            npc.generate_waypoints_auto(4)
-            npc.state = "PATROL"
-        
-        # игрок
+        # ========== 9. ИГРОК ==========
+        t9 = time.time()
+        print("[9] Создание игрока...")
         if hasattr(self, 'player'):
             self.player.x, self.player.y = level_data['player_start']
             self.player.hp = 100
         else:
             self.player = Player(self)
             self.player.x, self.player.y = level_data['player_start']
-            
-        # оружие
+        print(f"    Игрок на ({self.player.x}, {self.player.y}) за {time.time()-t9:.2f}с")
+        
+        # ========== 10. ОРУЖИЕ ==========
+        t10 = time.time()
+        print("[10] Создание оружия...")
         self.inventory = []
         for weapon_name in level_data.get('inventory', ['Pistol']):
             if weapon_name == 'Pistol':
@@ -161,13 +160,83 @@ class Game:
                 self.inventory.append(PlasmaGun(self))
         self.current_weapon_index = 0
         self.weapon = self.inventory[0]
-        # fill ammo
+        
         starting_ammo = level_data.get('starting_ammo', {})
         for gun in self.inventory:
-            if gun.name in starting_ammo:
-                gun.ammo = starting_ammo[gun.name]
-            else:
-                gun.ammo = 0
+            gun.ammo = starting_ammo.get(gun.name, 0)
+        print(f"    Оружие: {[w.name for w in self.inventory]} за {time.time()-t10:.2f}с")
+        
+        # ========== 11. NPC (С ЗАЩИТОЙ ОТ ВИСНУТА) ==========
+        t11 = time.time()
+        npc_positions = list(self.map.npc_positions)
+        print(f"[11] Создание NPC: {len(npc_positions)} шт.")
+        
+        self.npcs = []
+        for i, (npc_x, npc_y, npc_type) in enumerate(npc_positions):
+            x, y = npc_x + 0.5, npc_y + 0.5
+            print(f"    {i+1}/{len(npc_positions)}: {npc_type} на ({x:.1f}, {y:.1f})...", end=" ", flush=True)
+            
+            try:
+                if npc_type == 'Solder':
+                    self.npcs.append(Solder(self, pos=(x, y)))
+                elif npc_type == 'Kamikaze':
+                    self.npcs.append(Kamikaze(self, pos=(x, y)))
+                elif npc_type == 'Jaggernaut':
+                    self.npcs.append(Jaggernaut(self, pos=(x, y)))
+                elif npc_type == 'Boss':
+                    self.npcs.append(Boss(self, pos=(x, y)))
+                elif npc_type == 'Lightning':
+                    self.npcs.append(Lightning(self, pos=(x, y)))
+                elif npc_type == 'Tree':
+                    self.npcs.append(Tree(self, pos=(x, y)))
+                elif npc_type == 'Fog':
+                    self.npcs.append(Fog(self, pos=(x, y)))
+                else:
+                    print(f"НЕИЗВЕСТНЫЙ ТИП!")
+                    continue
+                print("OK")
+            except Exception as e:
+                print(f"ОШИБКА: {e}")
+                import traceback
+                traceback.print_exc()
+                # Не прерываем загрузку, просто пропускаем этого NPC
+                continue
+        
+        print(f"    Создано NPC: {len(self.npcs)} за {time.time()-t11:.2f}с")
+        
+        # ========== 12. ПАТРУЛЬНЫЕ ТОЧКИ (С ЗАЩИТОЙ) ==========
+        t12 = time.time()
+        print("[12] Генерация патрульных точек...")
+        for i, npc in enumerate(self.npcs):
+            print(f"    {i+1}/{len(self.npcs)}: {npc.name}...", end=" ", flush=True)
+            try:
+                npc.generate_waypoints_auto(4)
+                npc.state = "PATROL"
+                print("OK")
+            except Exception as e:
+                print(f"ОШИБКА: {e}")
+                npc.waypoints = []
+                npc.state = "IDLE"
+        print(f"    Готово за {time.time()-t12:.2f}с")
+        
+        # ========== 13. ЛЕСНОЙ УРОВЕНЬ (ОСОБЫЙ СЛУЧАЙ) ==========
+        if level_num == 2:
+            print("[13] Настройка лесного уровня...")
+            self.start_time = pygame.time.get_ticks()
+            self.level_duration = 20000
+            Tree.init_spawn_points(self)
+            for _ in range(10):
+                tree = Tree(self)
+                self.npcs.append(tree)
+            print("    Готово")
+        
+        # ========== 14. ПОВОРОТ ИГРОКА ==========
+        if level_num == 2:
+            self.player.angle = math.pi * 1.5
+        
+        print(f"\n{'='*60}")
+        print(f"УРОВЕНЬ {level_num} ЗАГРУЖЕН за {time.time()-start_total:.2f}с")
+        print(f"{'='*60}\n")
             
         # Close
         #self.exit_pos = level_data.get('exit', (-1, -1))

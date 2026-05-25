@@ -1,68 +1,59 @@
+# pathfinding.py
+
 import math
 from setting import *
 
 class PathFinder:
     def __init__(self, game):
         self.game = game
-     
-    def a_star(self, start, goal):
+    
+    def a_star(self, start, goal, max_distance=5):
         """
+        Итеративная версия A* поиска пути
         start = (x, y) - координаты НПС
-        goal = (x, y) - координаты цели то есть игрока
+        goal = (x, y) - координаты цели (игрок)
         """
-        max_iterations = 500
-        iterations = 0
         
-        #==ШАГ 0 подготовка
+        # Шаг 0: подготовка
         start_cell = (int(start[0]), int(start[1]))
         goal_cell = (int(goal[0]), int(goal[1]))
         
+        
+        manhattan_dist = abs(start_cell[0] - goal_cell[0]) + abs(start_cell[1] - goal_cell[1])
+        if manhattan_dist > max_distance:
+            return []  # не ищем путь далеко
         if start_cell == goal_cell:
             return [start_cell]
         
         if self.game.map.is_wall(goal_cell[0], goal_cell[1]):
             return []
         
-        #==ШАГ 1 список открытых и закрытых клеток
-        open_set = [] # клетки которые нужно проверить
-        closed_set = set() # клетки которые уже проверены
-        """Клетка это:
-        {
-            'pos': (x, y),
-            'g': сколько шагов инт от старта,
-            'parent': откуда пришли}"""
+        # Шаг 1: открытые и закрытые клетки
+        open_set = {}  # словарь {pos: node} для быстрого поиска
+        closed_set = set()
+        
         start_node = {
             'pos': start_cell,
             'g': 0,
+            'f': self.heuristic(start_cell, goal_cell),
             'parent': None
         }
         
-        open_set.append(start_node)
-        # вспомагательный словарь
-        open_dict = {start_cell: start_node}
+        open_set[start_cell] = start_node
         
-        #==ШАГ 2 основной цикл
-        """f = g + h 
-        где h - расстояние до клетки от текущей
-        по манхетеннской формуле"""
+        # Основной цикл
+        max_iterations = 1000  # защита от бесконечного цикла
+        iterations = 0
+        
         while open_set and iterations < max_iterations:
             iterations += 1
-            # Находим лучшую клетку
-            best_node = None
-            best_f = float('inf')
             
-            for node in open_set:
-                h = abs(node['pos'][0] - goal_cell[0]) + abs(node['pos'][1] - goal_cell[1])
-                f = node['g'] + h
-                
-                if f < best_f:
-                    best_f = f
-                    best_node = node
-            current = best_node
+            # Находим узел с минимальным f
+            current = min(open_set.values(), key=lambda node: node['f'])
             
-            # Проверка
+            # Проверка достижения цели
             if current['pos'] == goal_cell:
-                # восстанавливаем путь
+                # Восстанавливаем путь
                 path = []
                 node = current
                 while node is not None:
@@ -70,58 +61,56 @@ class PathFinder:
                     node = node['parent']
                 path.reverse()
                 return path
-            # Не дошли пока
-            open_set.remove(current)
-            del open_dict[current['pos']]
+            
+            # Удаляем current из open_set
+            del open_set[current['pos']]
             closed_set.add(current['pos'])
             
-            # работаем с соседями
+            # Соседи
             neighbors = [
                 (current['pos'][0] + 1, current['pos'][1]),  # право
                 (current['pos'][0] - 1, current['pos'][1]),  # лево
                 (current['pos'][0], current['pos'][1] + 1),  # низ
-                (current['pos'][0], current['pos'][1] - 1)  # верх
+                (current['pos'][0], current['pos'][1] - 1)   # верх
             ]
             
             for neighbor in neighbors:
-                if neighbor in closed_set:
+                # Проверка границ
+                if not (0 <= neighbor[0] < self.game.map.width and 
+                        0 <= neighbor[1] < self.game.map.height):
                     continue
                 
-                # Если стена
+                # Проверка стены
                 if self.game.map.is_wall(neighbor[0], neighbor[1]):
                     continue
                 
-                # Контроль границ
-                width = self.game.map.width
-                height = self.game.map.height
-                if not (0 <= neighbor[0] < width and 0 <= neighbor[1] < height):
+                # Проверка закрытого множества
+                if neighbor in closed_set:
                     continue
                 
+                # Расчёт g
                 new_g = current['g'] + 1
                 
-                if neighbor in open_dict:
-                    neighbor_node = open_dict[neighbor]
-                    # если путь короче
+                # Если сосед уже в open_set
+                if neighbor in open_set:
+                    neighbor_node = open_set[neighbor]
                     if new_g < neighbor_node['g']:
                         neighbor_node['g'] = new_g
+                        neighbor_node['f'] = new_g + self.heuristic(neighbor, goal_cell)
                         neighbor_node['parent'] = current
-                        
                 else:
-                    # новый узел - сосед
+                    # Создаём новый узел
                     new_node = {
                         'pos': neighbor,
                         'g': new_g,
+                        'f': new_g + self.heuristic(neighbor, goal_cell),
                         'parent': current
                     }
-                    
-                    open_set.append(new_node)
-                    open_dict[neighbor] = new_node
-        # если ниче не нашли то увы че
+                    open_set[neighbor] = new_node
+        
+        # Не нашли путь
         return []
-     
-    
-    
     
     def heuristic(self, a, b):
+        """Манхэттенская дистанция"""
         return abs(a[0] - b[0]) + abs(a[1] - b[1])
-    

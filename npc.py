@@ -138,7 +138,6 @@ class NPC:
     def update(self):
         if not self.alive:
             return
-        
         # Проверка дистанции до игрока
         dx = self.game.player.x - self.x
         dy = self.game.player.y - self.y
@@ -578,11 +577,15 @@ class NPC:
                         # Добавляем точку с центром в клетке
                         waypoints.append((check_x + 0.5, check_y + 0.5))
                         break  # нашли точку в этом направлении
-        # Если точек меньше 2, добавляем случайные вокруг
-        while len(waypoints) < num_points:
+        # ЗАЩИТА ОТ БЕСКОНЕЧНОГО ЦИКЛА
+        max_attempts = 100
+        attempts = 0
+        
+        while len(waypoints) < num_points and attempts < max_attempts:
+            attempts += 1
             rand_x = self.x + uniform(-3, 3)
             rand_y = self.y + uniform(-3, 3)
-            if 1 < rand_x < 9 and 1 < rand_y < 17:
+            if 1 < rand_x < self.game.map.width - 1 and 1 < rand_y < self.game.map.height - 1:
                 if not self.game.map.is_wall(int(rand_x), int(rand_y)):
                     waypoints.append((rand_x, rand_y))
         
