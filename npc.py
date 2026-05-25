@@ -28,13 +28,8 @@ class NPC:
         self.last_shot = 0
         self.shoot_range = 5.0 # дистанция аттаки
         self.shoot_flash = 0
-        try:
-            self.shoot_sound = pygame.mixer.Sound('resources/weapons/pistol_shot.wav')
-            self.shoot_sound.set_volume(0.2)
-            self.sound_damage = pygame.mixer.Sound('resources/npc/sound_damage.wav')
-            self.sound_damage.set_volume(0.2)
-        except:
-            pass
+        self.shoot_sound = pygame.mixer.Sound('resources/weapons/pistol_shot.wav')
+        self.shoot_sound.set_volume(0.2)
         
         # patrol
         self.waypoints = []
@@ -121,7 +116,6 @@ class NPC:
         if not self.alive:
             return
         else:
-            #self.sound_damage.play()
             self.hp -= damage
             self.hurt_flash = 8
             self.state = "HURT"
