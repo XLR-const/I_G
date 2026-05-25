@@ -11,6 +11,8 @@ class NPC:
         self.x, self.y = pos[0] + 0.5, pos[1] + 0.5
         self.alive = True
         self.name = name
+        self.active = True
+        self.activation_distance = 15
         
         # движение
         self.speed = 0.3
@@ -26,10 +28,13 @@ class NPC:
         self.last_shot = 0
         self.shoot_range = 5.0 # дистанция аттаки
         self.shoot_flash = 0
-        self.shoot_sound = pygame.mixer.Sound('resources/weapons/pistol_shot.wav')
-        self.shoot_sound.set_volume(0.2)
-        self.sound_damage = pygame.mixer.Sound('resources/npc/sound_damage.wav')
-        self.sound_damage.set_volume(0.2)
+        try:
+            self.shoot_sound = pygame.mixer.Sound('resources/weapons/pistol_shot.wav')
+            self.shoot_sound.set_volume(0.2)
+            self.sound_damage = pygame.mixer.Sound('resources/npc/sound_damage.wav')
+            self.sound_damage.set_volume(0.2)
+        except:
+            pass
         
         # patrol
         self.waypoints = []
@@ -62,6 +67,8 @@ class NPC:
         self.sprite_width, self.sprite_height = self.image.get_size()
         self.sprite_ratio = self.sprite_width / self.sprite_height
         
+        self._last_los_check = 0
+        self._cached_los = True
         # A* параметры
         self.path = []
         self.last_path_update = 0
@@ -114,7 +121,7 @@ class NPC:
         if not self.alive:
             return
         else:
-            self.sound_damage.play()
+            #self.sound_damage.play()
             self.hp -= damage
             self.hurt_flash = 8
             self.state = "HURT"
@@ -136,6 +143,14 @@ class NPC:
     
     def update(self):
         if not self.alive:
+            return
+        
+        # Проверка дистанции до игрока
+        dx = self.game.player.x - self.x
+        dy = self.game.player.y - self.y
+        dist = math.hypot(dx, dy)
+        
+        if dist > self.activation_distance:
             return
         
         dt = self.game.delta_time
@@ -185,8 +200,11 @@ class NPC:
             draw_x = self.x
             draw_y = self.y
         
-        dx = draw_x - self.game.player.x
-        dy = draw_y - self.game.player.y
+        # Не рисуем далёких NPC
+        dx = self.x - self.game.player.x
+        dy = self.y - self.game.player.y
+        if math.hypot(dx, dy) > self.activation_distance + 5:
+            return
             
         """
         # ===== ВИЗУАЛЬНАЯ ОТЛАДКА =====
@@ -311,27 +329,38 @@ class NPC:
     # AI: проверка видимости ray и line of sight
     # Algos Ray Casting LOS
     def has_line_of_sight(self):
+        # КЭШ
+        now = pygame.time.get_ticks()
+        if hasattr(self, '_last_los_check') and now - self._last_los_check < 150:
+            return self._cached_los
+        self._last_los_check = now
         
-        dx = self.game.player.x - self.x
-        dy = self.game.player.y - self.y
-        distance = math.hypot(dx, dy)
+        # Бресенхем линия (обходим только целые клетки)
+        x1, y1 = int(self.x), int(self.y)
+        x2, y2 = int(self.game.player.x), int(self.game.player.y)
         
-        if distance > 20:
-            return False
+        # Цифровой дифференциальный анализатор (DDA) для линии
+        dx = abs(x2 - x1)
+        dy = abs(y2 - y1)
+        sx = 1 if x1 < x2 else -1
+        sy = 1 if y1 < y2 else -1
+        err = dx - dy
         
-        # разделяем луч в проверке на отрезки
-        steps = int(distance * 20)# 20 точек луча на клетку карты
-        for step in range(steps):
-            t = step / steps # Коэф пропорции до конца луча
-            # Проверяем клетку на карте
-            check_x = int(self.x + dx * t)
-            check_y = int(self.y + dy * t)
-            if self.game.map.is_wall(check_x, check_y):
+        x, y = x1, y1
+        while (x, y) != (x2, y2):
+            if self.game.map.is_wall(x, y):
+                self._cached_los = False
                 return False
-            for door in self.game.map.doors:
-                if int(door.x) == int(check_x) and int(door.y) == int(check_y):
-                    if door.is_wall():  # если дверь закрыта
-                        return False
+            
+            e2 = 2 * err
+            if e2 > -dy:
+                err -= dy
+                x += sx
+            if e2 < dx:
+                err += dx
+                y += sy
+        
+        self._cached_los = True
         return True
     
     # Sliding Collision
@@ -408,7 +437,14 @@ class NPC:
             return
         
         distance_to_player = math.hypot(self.x - self.game.player.x, self.y - self.game.player.y)
-        can_see = self.has_line_of_sight()
+        if not hasattr(self, 'last_los_check'):
+            self.last_los_check = 0
+            self.cached_can_see = True
+        current_time = pygame.time.get_ticks()
+        if current_time - self.last_los_check >= 300:
+            self.last_los_heck = current_time
+            self.cached_can_see = self.has_line_of_sight()
+        can_see = self.cached_can_see
         # ЕСЛИ ПОЛУЧИЛ УРОН
         if self.state == "HURT":
             if pygame.time.get_ticks() > self.state_timer:

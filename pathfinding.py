@@ -10,6 +10,8 @@ class PathFinder:
         start = (x, y) - координаты НПС
         goal = (x, y) - координаты цели то есть игрока
         """
+        max_iterations = 500
+        iterations = 0
         
         #==ШАГ 0 подготовка
         start_cell = (int(start[0]), int(start[1]))
@@ -43,7 +45,8 @@ class PathFinder:
         """f = g + h 
         где h - расстояние до клетки от текущей
         по манхетеннской формуле"""
-        while open_set:
+        while open_set and iterations < max_iterations:
+            iterations += 1
             # Находим лучшую клетку
             best_node = None
             best_f = float('inf')

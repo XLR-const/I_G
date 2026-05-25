@@ -30,9 +30,10 @@ class Player:
 
     def take_damage(self, damage):
         """Получение урона игроком"""
+
         self.player_damage_sound.play()
         self.hp -= damage
-        self.last_damage_time = pygame.time.get_ticks()  # ← сброс таймера регена
+        self.last_damage_time = pygame.time.get_ticks()  # сброс таймера регена
         
         if self.hp <= 0:
             self.hp = 0

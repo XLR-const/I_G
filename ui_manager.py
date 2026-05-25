@@ -460,7 +460,7 @@ class UIManager:
         else:
             screen.fill((40, 0, 0))
         
-        title = self.font_tile.render("ПОГИБ ЗА ЧЕСТЬ", True, (255, 0, 0))
+        title = self.font_tile.render("ПОГИБ В БОЮ", True, (255, 0, 0))
         title_rect = title.get_rect(center=(setting.WIDTH // 2, int(setting.CELL_H * 2)))
         screen.blit(title, title_rect)
         
