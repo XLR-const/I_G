@@ -7,7 +7,7 @@ from save_system import SaveSystem
 class UIManager:
     def __init__(self, game):
         self.game = game
-        self.font_tile = pygame.font.Font(None, int(setting.CELL_H * 1.5))
+        self.font_tile = pygame.font.Font(None, int(setting.CELL_H * 2))
         self.font_normal = pygame.font.Font(None, int(setting.CELL_H * 0.6))
         self.font_small = pygame.font.Font(None, int(setting.CELL_H * 0.4))
         
