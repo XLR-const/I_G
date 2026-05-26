@@ -285,7 +285,7 @@ class UIManager:
     
     def _draw_boot(self, screen):
         screen.fill((0, 0, 0))
-        text = self.font_tile.render("Loading...", True, (255, 255, 255))
+        text = self.font_tile.render("Загрузка...", True, (255, 255, 255))
         text_rect = text.get_rect(center=(setting.WIDTH // 2, setting.HEIGHT // 2))
         screen.blit(text, text_rect)
         
@@ -411,11 +411,11 @@ class UIManager:
         dark.fill((0, 0, 0))
         screen.blit(dark, (0, 0))
         
-        title = self.font_tile.render("PAUSED", True, (255, 200, 0))
+        title = self.font_tile.render("ПАУЗА", True, (255, 200, 0))
         title_rect = title.get_rect(center=(setting.WIDTH // 2, int(setting.CELL_H * 3)))
         screen.blit(title, title_rect)
         
-        options = ['RESUME', 'RESTART LEVEL', 'MAIN MENU', 'QUIT']
+        options = ['ПРОДОЛЖИТЬ', 'ПЕРЕЗАПУСТИТЬ УРОВЕНЬ', 'ГЛАВНОЕ МЕНЮ', 'ВЫХОД']
         for i, opt in enumerate(options):
             y = setting.HEIGHT // 2 + i * 60
             color = (255, 255, 255) if i == self.selected_option else (150, 150, 150)
@@ -431,15 +431,15 @@ class UIManager:
     
     def _draw_level_end(self, screen):
         screen.fill((0, 0, 0))
-        title = self.font_tile.render("MISSION COMPLETE", True, (0, 255, 0))
+        title = self.font_tile.render("МИССИЯ ПРОЙДЕНА", True, (0, 255, 0))
         title_rect = title.get_rect(center=(setting.WIDTH // 2, int(setting.CELL_H * 3)))
         screen.blit(title, title_rect)
         
         stats = [
-            f"ENEMIES KILLED: {self._get_kills_count()}",
-            f"TIME: {self._get_level_time()}",
+            f"УБИТО НЕГОДЯЕВ: {self._get_kills_count()}",
+            f"ВРЕМЯ: {self._get_level_time()}",
             "",
-            "PRESS ANY KEY TO CONTINUE"
+            "НАЖМИТЕ ЛЮБУЮ КЛАВИШУ ДЛЯ ПРОДОЛЖЕНИЯ..."
         ]
         for i, stat in enumerate(stats):
             y = setting.HEIGHT // 2 + i * 40
@@ -478,8 +478,8 @@ class UIManager:
         tip_rect = tip_text.get_rect(center=(setting.WIDTH // 2, setting.HEIGHT - 100))
         screen.blit(tip_text, tip_rect)
         
-        restart = self.font_normal.render("PRESS R TO RESTART", True, (255, 255, 255))
-        menu = self.font_normal.render("PRESS M FOR MAIN MENU", True, (255, 255, 255))
+        restart = self.font_normal.render("нажми R для перезапуска", True, (255, 255, 255))
+        menu = self.font_normal.render("нажми M для главного меню", True, (255, 255, 255))
         r_rect = restart.get_rect(center=(setting.WIDTH // 2, setting.HEIGHT - 200))
         m_rect = menu.get_rect(center=(setting.WIDTH // 2, setting.HEIGHT - 150))
         screen.blit(restart, r_rect)
