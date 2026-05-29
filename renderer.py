@@ -215,6 +215,8 @@ class Renderer:
         health_bar_width = 6 * CELL_W
         health_bar_height = 1 * CELL_H
         health_bar_width_progressive = (hp / 100) * health_bar_width
+        if health_bar_width_progressive > 6 * CELL_W:
+            health_bar_width_progressive = 6 * CELL_W
         weapon_name_pos = grid_to_pixel(25, 15)
         weapon_ammo_pos = grid_to_pixel(25, 16)
         

@@ -78,6 +78,18 @@ class DevConsole:
                 self.lines.append(f"Патроны установлены на {ammo}")
             except:
                 self.lines.append("Ошибка: ammo <число>")
+
+        elif command.startswith("godmod"):
+            try:
+                status = command[7:]
+                if status == "1":
+                    self.game.player.hp = 10**7
+                    self.lines.append("Godmode активирован")
+                elif status == "0":
+                    self.game.player.hp = 100
+                    self.lines.append("Godmode деактивирован")
+            except:
+                self.lines.append("Ошибка: godmod <0/1>")
         
         elif command == "clear":
             self.lines.clear()
