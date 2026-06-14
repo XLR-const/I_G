@@ -28,6 +28,11 @@ class LevelManager:
         exit_pos = tuple(level_data.get('exit', (-1, -1)))
         inventory = level_data.get('inventory', [])
         starting_ammo = level_data.get('starting_ammo', 0)
+        background = level_data.get('background', {})
+        if 'ceiling_color' in background and background['ceiling_color'] is not None:
+            background['ceiling_color'] = tuple(background['ceiling_color'])
+        if 'floor_color' in background and background['floor_color'] is not None:
+            background['floor_color'] = tuple(background['floor_color'])
         
         return {
             'map_data': map_data,
@@ -36,7 +41,8 @@ class LevelManager:
             'doors': doors,
             'exit': exit_pos,
             'inventory': inventory,
-            'starting_ammo': starting_ammo
+            'starting_ammo': starting_ammo,
+            'background': background
         }
         
     def save_level(self, level_num, map_data, player_start, npcs, doors, exit_pos):

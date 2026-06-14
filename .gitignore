@@ -1,0 +1,17 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# IDE
+.idea/
+.vscode/
+
+# Игровые файлы
+tore .
+*.sav
+config.json
+
+# Временные файлы
+*.tmp
+*.log

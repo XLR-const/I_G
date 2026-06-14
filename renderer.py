@@ -4,12 +4,91 @@ from setting import *
 class Renderer:
     def __init__(self, game):
         self.game = game
+        # Индексы смещения для текстур пола
+        self.floor_offset_y = 0
+        
+        # Загрузка иконок состояния хп
+        try:
+            self.nice_hp = pygame.image.load('resources/player/nice_hp.png').convert_alpha()
+            self.bad_hp = pygame.image.load('resources/player/bad_hp.png').convert_alpha()
+            self.average_hp = pygame.image.load('resources/player/average_hp.png').convert_alpha()
+            self.nice_hp = pygame.transform.scale(self.nice_hp, (CELL_W*2, CELL_H*2))
+            self.bad_hp = pygame.transform.scale(self.bad_hp, (CELL_W*2, CELL_H*2))
+            self.average_hp = pygame.transform.scale(self.average_hp, (CELL_W*2, CELL_H*2))
+            # Poss - позиции иконок состояния хп
+            self.poss = tuple(grid_to_pixel(col, row) for col, row in ((1, 14), (3, 14), (5, 14)))
+        except:
+            self.poss = tuple(grid_to_pixel(col, row) for col, row in ((1, 14), (3, 14), (5, 14)))
+        
+    def set_background(self, background_data):
+        """Устанавливает фон для текущего уровня из JSON"""
+        # Потолок
+        ceiling_texture_path = background_data.get('ceiling_texture')
+        if ceiling_texture_path:
+            try:
+                self.ceiling_texture = pygame.image.load(ceiling_texture_path).convert()
+                self.ceiling_texture = pygame.transform.scale(self.ceiling_texture, (WIDTH, HALF_HEIGHT))
+            except:
+                self.ceiling_texture = None
+        else:
+            self.ceiling_texture = None
+        
+        # Пол
+        floor_texture_path = background_data.get('floor_texture')
+        if floor_texture_path:
+            try:
+                self.floor_texture = pygame.image.load(floor_texture_path).convert()
+                self.floor_texture = pygame.transform.scale(self.floor_texture, (WIDTH, HALF_HEIGHT))
+            except:
+                self.floor_texture = None
+        else:
+            self.floor_texture = None
+        
+        # Цвета (если текстуры нет)
+        self.ceiling_color = background_data.get('ceiling_color', WALL_COLORS.get('C', (150, 200, 200)))
+        self.floor_color = background_data.get('floor_color', (40, 40, 40))
+
+    def load_level_textures(self):
+        """Загружает текстуры floor ceil для текущего уровня"""
+        level_num = self.game.current_level
+        textures = self.level_textures.get(level_num, self.level_textures[1])
+        
+        # Загрузка текстуры потолка
+        if textures['ceiling']:
+            try:
+                self.ceiling_texture = pygame.image.load(textures['ceiling']).convert()
+                self.ceiling_texture = pygame.transform.scale(self.ceiling_texture, (WIDTH, HALF_HEIGHT))
+            except:
+                self.ceiling_texture = None
+        else:
+            self.ceiling_texture = None
+        
+        # Загрузка текстуры пола
+        if textures['floor']:
+            try:
+                self.floor_texture = pygame.image.load(textures['floor']).convert()
+                self.floor_texture = pygame.transform.scale(self.floor_texture, (WIDTH, HALF_HEIGHT))
+            except:
+                self.floor_texture = None
+        else:
+            self.floor_texture = None
+        
+        # Сохраняем цвета
+        self.ceiling_color = textures['ceiling_color']
+        self.floor_color = textures['floor_color']
     
     def draw_background(self):
-        # Потолок (темно-серый)
-        pygame.draw.rect(self.game.screen, WALL_COLORS['C'], (0, 0, WIDTH, HALF_HEIGHT))
-        # Пол (чуть светлее)
-        pygame.draw.rect(self.game.screen, (40, 40, 40), (0, HALF_HEIGHT, WIDTH, HEIGHT))
+        # Потолок
+        if self.ceiling_texture:
+            self.game.screen.blit(self.ceiling_texture, (0, 0))
+        else:
+            pygame.draw.rect(self.game.screen, self.ceiling_color, (0, 0, WIDTH, HALF_HEIGHT))
+        
+        # Пол
+        if self.floor_texture:
+            self.game.screen.blit(self.floor_texture, (0, HALF_HEIGHT))
+        else:
+            pygame.draw.rect(self.game.screen, self.floor_color, (0, HALF_HEIGHT, WIDTH, HEIGHT))
 
     def draw_fps(self):
         x, y = grid_to_pixel(0, 0)
@@ -25,6 +104,8 @@ class Renderer:
     
     def draw_compass(self):
         goal = self.game.map.exit_pos
+        if goal is None:
+            return
         player = (self.game.player.x, self.game.player.y)
         d_x, d_y = goal[0] - player[0], goal[1] - player[1]
         angle_to_goal = math.degrees(atan2(d_y, d_x))
@@ -39,8 +120,8 @@ class Renderer:
         compass_w = compass_width * CELL_W
         compass_h = int(compass_height * CELL_H * 0.6)  # 60% высоты клетки
         # Рамка компаса
-        pygame.draw.rect(self.game.screen, (30, 80, 30), 
-                        (compass_x, compass_y, compass_w, compass_h))
+        #pygame.draw.rect(self.game.screen, (30, 80, 30), 
+        #                (compass_x, compass_y, compass_w, compass_h))
         pygame.draw.rect(self.game.screen, (100, 100, 100), 
                         (compass_x, compass_y, compass_w, compass_h), 2)
         # Центр компаса (положение игрока)
@@ -108,6 +189,24 @@ class Renderer:
                             (center_x + offset, center_y - 10),
                             (center_x + offset, center_y + 10), 2)
 
+    def draw_health_sprite(self):
+        hp = self.game.player.hp
+        current_state = 0
+        if hp >= 80:
+            current_state = self.nice_hp
+            pos = self.poss[-1]
+        elif 50 <= hp < 80:
+            current_state = self.average_hp
+            pos = self.poss[-2]
+        elif hp < 50:
+            current_state = self.bad_hp
+            pos = self.poss[-3]
+        try:
+            self.game.screen.blit(current_state, pos)
+        except:
+            pass
+            
+        
     def draw_interface(self):
         hp = self.game.player.hp
         current_weapon = self.game.weapon.name
@@ -116,6 +215,8 @@ class Renderer:
         health_bar_width = 6 * CELL_W
         health_bar_height = 1 * CELL_H
         health_bar_width_progressive = (hp / 100) * health_bar_width
+        if health_bar_width_progressive > 6 * CELL_W:
+            health_bar_width_progressive = 6 * CELL_W
         weapon_name_pos = grid_to_pixel(25, 15)
         weapon_ammo_pos = grid_to_pixel(25, 16)
         
@@ -130,6 +231,7 @@ class Renderer:
                          (health_bar_lpos[0], health_bar_lpos[1],  health_bar_width_progressive, health_bar_height))        
         self.game.screen.blit(text_weapon_surface, weapon_name_pos)
         self.game.screen.blit(text_ammo_surface, weapon_ammo_pos)
+        self.draw_health_sprite()
         self.draw_compass()
 
 
@@ -166,4 +268,9 @@ class Renderer:
         pygame.draw.line(self.game.screen, COLOR_CENTER, (center_x, center_y - CELL_H * 0.5), (center_x, center_y + CELL_H * 0.5), thickness)
         pygame.draw.line(self.game.screen, COLOR_CENTER, (center_x - CELL_W * 0.5, center_y), (center_x + CELL_W * 0.5, center_y), thickness)
         
-
+    def draw_fog_filter(self):
+        """Накладывает лёгкий туман на весь экран"""
+        if self.game.current_level == 2:
+            fog = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
+            fog.fill((180, 190, 170, 40))  # лёгкая дымка
+            self.game.screen.blit(fog, (0, 0))

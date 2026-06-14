@@ -1,15 +1,18 @@
 import pygame
 import math
 from setting import *
-from random import uniform
+from random import uniform, shuffle, randint
 from weapon import Particle
 
 
 class NPC:
-    def __init__(self, game, pos=(8.5, 7.5)):
+    def __init__(self, game, name, pos=(8.5, 7.5)):
         self.game = game
         self.x, self.y = pos[0] + 0.5, pos[1] + 0.5
         self.alive = True
+        self.name = name
+        self.active = True
+        self.activation_distance = 15
         
         # движение
         self.speed = 0.3
@@ -25,13 +28,13 @@ class NPC:
         self.last_shot = 0
         self.shoot_range = 5.0 # дистанция аттаки
         self.shoot_flash = 0
-        self.shoot_sound = pygame.mixer.Sound('resources/player/pistol_shot.wav')
+        self.shoot_sound = pygame.mixer.Sound('resources/weapons/pistol_shot.wav')
         self.shoot_sound.set_volume(0.2)
         
         # patrol
         self.waypoints = []
         self.current_waypoint = 0
-        self.idle_duration = 1500 # время бездействия
+        self.idle_duration = 500 # время бездействия
         self.flocking_enabled = True
         
         self.hurt_flash = 0
@@ -40,63 +43,74 @@ class NPC:
         self.color = (245, 100, 0)
         
         # СПРАЙТЫ
-        self.image = pygame.image.load('resources/npc/solder.png').convert_alpha()
-        self.sprite_width, self.sprite_height = self.image.get_size()
-        self.sprite_ratio = self.sprite_width / self.sprite_height
+        self.image = None
+        self.sprite_width, self.sprite_height = None, None
+        self.sprite_ratio = None
         self.dead_sprite_path = 'resources/npc/dead.png'
         self.dead_sprite = None
-        self.dead_x = 0
-        self.dead_y = 0
+        # Предзагрузка всех спрайтов
+        self.sprites = {}
+        self.move_direction = "front"  # направление по умолчанию
+        self.last_x = self.x
+        self.last_y = self.y
         
+        # Загружаем все спрайты
+        self.load_all_sprites()
+        
+        # Начальный спрайт
+        self.image = self.sprites.get("IDLE_front")
+        self.sprite_width, self.sprite_height = self.image.get_size()
+        self.sprite_ratio = self.sprite_width / self.sprite_height
+        
+        self._last_los_check = 0
+        self._cached_los = True
         # A* параметры
         self.path = []
         self.last_path_update = 0
         self.current_target_index = 0
     
-    def load_dead_sprite(self):
+    def load_all_sprites(self):
+        """Загружает все спрайты NPC с масштабированием"""
+        base = f"resources/npc/{self.name}/{self.name}"
+        directions = ["right", "left", "front", "back"]
+        scale_factor = 0.1  # уменьшаем в 2 раза
+        
+        # 1. Idle спрайты
+        for direction in directions:
+            key = f"IDLE_{direction}"
+            path = f"{base}_idle_{direction}.png"
+            try:
+                original = pygame.image.load(path).convert_alpha()
+                new_width = int(original.get_width() * scale_factor)
+                new_height = int(original.get_height() * scale_factor)
+                self.sprites[key] = pygame.transform.scale(original, (new_width, new_height))
+            except:
+                self.sprites[key] = pygame.Surface((50, 80))
+                self.sprites[key].fill((150, 150, 150))
+        
+        # 2. Move спрайты
+        for direction in directions:
+            key = f"MOVE_{direction}"
+            path = f"{base}_move_{direction}.png"
+            try:
+                original = pygame.image.load(path).convert_alpha()
+                new_width = int(original.get_width() * scale_factor)
+                new_height = int(original.get_height() * scale_factor)
+                self.sprites[key] = pygame.transform.scale(original, (new_width, new_height))
+            except:
+                self.sprites[key] = self.sprites.get(f"IDLE_{direction}", pygame.Surface((50, 80)))
+        
+        # 3. Shoot спрайт
         try:
-            original = pygame.image.load(self.dead_sprite_path).convert_alpha()
-            new_width = original.get_width() // 1
-            new_height = original.get_height() // 1
-            self.dead_sprite = pygame.transform.scale(original, (new_width, new_height))
-            
+            original = pygame.image.load(f"{base}_shoot.png").convert_alpha()
+            new_width = int(original.get_width() * scale_factor)
+            new_height = int(original.get_height() * scale_factor)
+            self.sprites["ATTACK"] = pygame.transform.scale(original, (new_width, new_height))
         except:
-            self.dead_sprite = None
-            
-    def die(self):
-        """Смерть NPC — превращаем в труп без логики"""
-        if not self.alive:
-            return
+            self.sprites["ATTACK"] = pygame.Surface((50, 80))
+            self.sprites["ATTACK"].fill((255, 200, 0))
+
         
-        self.alive = False
-        self.game.total_kills += 1
-        self.dead_x = self.x
-        self.dead_y = self.y
-        
-        # Загружаем спрайт трупа
-        self.load_dead_sprite()
-        
-        # Меняем спрайт на труп
-        if self.dead_sprite is not None:
-            self.image = self.dead_sprite
-        else:
-            # Заглушка — серый квадрат
-            dead_img = pygame.Surface((int(100 * self.radius), int(100 * self.radius)))
-            dead_img.fill((250, 80, 80))
-            self.image = dead_img
-        
-     
-        self.sprite_width, self.sprite_height = self.image.get_size()
-        self.sprite_ratio = self.sprite_width / self.sprite_height
-        
-        # Частицы крови
-        for _ in range(20):
-            self.game.particles.append(Particle(
-                self.game,
-                (self.x + uniform(-0.2, 0.2), self.y + uniform(-0.2, 0.2)),
-                (150, 0, 0),
-                uniform(0.002, 0.006)
-            ))
     
     def get_damage(self, damage):
         if not self.alive:
@@ -119,13 +133,17 @@ class NPC:
                 p_x = self.x + (dx / dist) * 0.1 + uniform(-0.1, 0.1)
                 p_y = self.y + (dy / dist) * 0.1 + uniform(-0.1, 0.1)
                 self.game.particles.append(Particle(self.game, (p_x, p_y), (200, 0, 0), uniform(0.002, 0.005)))
-        if self.hp <= 0:
-            self.die()
+        
     
     def update(self):
         if not self.alive:
-            self.x = self.dead_x
-            self.y = self.dead_y
+            return
+        # Проверка дистанции до игрока
+        dx = self.game.player.x - self.x
+        dy = self.game.player.y - self.y
+        dist = math.hypot(dx, dy)
+        
+        if dist > self.activation_distance:
             return
         
         dt = self.game.delta_time
@@ -138,20 +156,48 @@ class NPC:
             self.shoot_flash -= 1
         
         self.update_state(dt)
+        
+        # === ОБНОВЛЕНИЕ НАПРАВЛЕНИЯ ДВИЖЕНИЯ ===
+        dx = self.x - self.last_x
+        dy = self.y - self.last_y
+        
+        if dx != 0 or dy != 0:
+            if abs(dx) > abs(dy):
+                self.move_direction = "right" if dx < 0 else "left"
+            else:
+                self.move_direction = "front" if dy < 0 else "back"
+        
+        self.last_x, self.last_y = self.x, self.y
+        
+        # === ОБНОВЛЕНИЕ СПРАЙТА ПО СОСТОЯНИЮ И НАПРАВЛЕНИЮ ===
+        if self.state == "ATTACK":
+            self.image = self.sprites.get("ATTACK", self.sprites.get("IDLE_front"))
+        elif self.state in ("PATROL", "CHASE"):
+            key = f"MOVE_{self.move_direction}"
+            self.image = self.sprites.get(key, self.sprites.get("IDLE_front"))
+        else:
+            # IDLE, HURT и т.д.
+            key = f"IDLE_{self.move_direction}"
+            self.image = self.sprites.get(key, self.sprites.get("IDLE_front"))
+        
+        self.sprite_width, self.sprite_height = self.image.get_size()
+        self.sprite_ratio = self.sprite_width / self.sprite_height
     
     def check_hit(self):
         pass
     
     def draw(self):
         if not self.alive:
-            draw_x = self.dead_x
-            draw_y = self.dead_y
+            return
         else:
             draw_x = self.x
             draw_y = self.y
         
-        dx = draw_x - self.game.player.x
-        dy = draw_y - self.game.player.y
+        # Не рисуем далёких NPC
+        dx = self.x - self.game.player.x
+        dy = self.y - self.game.player.y
+        if math.hypot(dx, dy) > self.activation_distance + 5:
+            return
             
         """
         # ===== ВИЗУАЛЬНАЯ ОТЛАДКА =====
@@ -276,27 +322,38 @@ class NPC:
     # AI: проверка видимости ray и line of sight
     # Algos Ray Casting LOS
     def has_line_of_sight(self):
+        # КЭШ
+        now = pygame.time.get_ticks()
+        if hasattr(self, '_last_los_check') and now - self._last_los_check < 150:
+            return self._cached_los
+        self._last_los_check = now
         
-        dx = self.game.player.x - self.x
-        dy = self.game.player.y - self.y
-        distance = math.hypot(dx, dy)
+        # Бресенхем линия (обходим только целые клетки)
+        x1, y1 = int(self.x), int(self.y)
+        x2, y2 = int(self.game.player.x), int(self.game.player.y)
         
-        if distance > 20:
-            return False
+        # Цифровой дифференциальный анализатор (DDA) для линии
+        dx = abs(x2 - x1)
+        dy = abs(y2 - y1)
+        sx = 1 if x1 < x2 else -1
+        sy = 1 if y1 < y2 else -1
+        err = dx - dy
         
-        # разделяем луч в проверке на отрезки
-        steps = int(distance * 20)# 20 точек луча на клетку карты
-        for step in range(steps):
-            t = step / steps # Коэф пропорции до конца луча
-            # Проверяем клетку на карте
-            check_x = int(self.x + dx * t)
-            check_y = int(self.y + dy * t)
-            if self.game.map.is_wall(check_x, check_y):
+        x, y = x1, y1
+        while (x, y) != (x2, y2):
+            if self.game.map.is_wall(x, y):
+                self._cached_los = False
                 return False
-            for door in self.game.map.doors:
-                if int(door.x) == int(check_x) and int(door.y) == int(check_y):
-                    if door.is_wall():  # если дверь закрыта
-                        return False
+            
+            e2 = 2 * err
+            if e2 > -dy:
+                err -= dy
+                x += sx
+            if e2 < dx:
+                err += dx
+                y += sy
+        
+        self._cached_los = True
         return True
     
     # Sliding Collision
@@ -313,7 +370,7 @@ class NPC:
             if self.game.map.is_wall(check_x, check_y):
                 return True
             
-            for other in self.game.npcs:
+            #for other in self.game.npcs:
                 if other is not self and other.alive:
                     dist = math.hypot(x - other.x, y - other.y)
                     if dist < self.radius + other.radius:
@@ -357,32 +414,62 @@ class NPC:
         в зависимости от его состояния 
         и положения игрока на карте"""
         
+        # ПРОВЕРКА НА СМЕРТЬ
+        if self.hp <= 0:
+            if self.state != "DEAD":
+                self.state = "DEAD"
+                self.game.total_kills += 1
+                for _ in range(20):
+                    self.game.particles.append(Particle(
+                        self.game,
+                        (self.x + uniform(-0.2, 0.2), self.y + uniform(-0.2, 0.2)),
+                        (150, 0, 0),
+                        uniform(0.002, 0.006)
+                    ))
+                self.alive = False
+            return
+        
         distance_to_player = math.hypot(self.x - self.game.player.x, self.y - self.game.player.y)
-        can_see = self.has_line_of_sight()
-        #can_see = False
+        if not hasattr(self, 'last_los_check'):
+            self.last_los_check = 0
+            self.cached_can_see = True
+        current_time = pygame.time.get_ticks()
+        if current_time - self.last_los_check >= 300:
+            self.last_los_heck = current_time
+            self.cached_can_see = self.has_line_of_sight()
+        can_see = self.cached_can_see
         # ЕСЛИ ПОЛУЧИЛ УРОН
         if self.state == "HURT":
             if pygame.time.get_ticks() > self.state_timer:
                 if can_see:
                     self.state = "CHASE"
                 else:
-                    self.state = "IDLE"
+                    self.state = "PATROL" if self.waypoints else "IDLE"
         
         # ПРАВИЛА ПЕРЕХОДОВ ИЗ СОСТОЯНИЙ
-        if not can_see:
-            # либо патруль либо холд
-            if self.state in ("ATTACK", "CHASE"):
-                self.state = "IDLE"
-                self.state_timer = pygame.time.get_ticks() + self.idle_duration
-        else:
-            # преследование или атака
+        if can_see:
+            # Игрок виден → преследование или атака
             if distance_to_player <= self.shoot_range:
-                self.state = "ATTACK"
+                if self.state != "ATTACK":
+                    self.state = "ATTACK"
             else:
-                self.state = "CHASE"
-                
+                if self.state != "CHASE":
+                    self.state = "CHASE"
+        else:
+            # Игрок не виден → патруль или ожидание
+            if self.state in ("ATTACK", "CHASE"):
+                if self.waypoints:
+                    self.state = "PATROL"
+                    self.current_waypoint = 0
+                else:
+                    self.state = "IDLE"
+                    self.state_timer = pygame.time.get_ticks() + self.idle_duration
+        
         # ДЕЙСТВИЯ ПО ПЕРЕХОДАМ
-        if self.state == "IDLE":
+        if self.state == "DEAD":
+            self.alive = False
+
+        elif self.state == "IDLE":
             if self.state_timer and pygame.time.get_ticks() > self.state_timer:
                 if self.waypoints:
                     self.state = "PATROL"
@@ -399,8 +486,8 @@ class NPC:
             
             if dist < 0.2:
                 self.current_waypoint = (self.current_waypoint + 1) % len(self.waypoints)
-                self.state = "IDLE"
-                self.state_timer = pygame.time.get_ticks() + 500
+                #self.state = "IDLE"
+                #self.state_timer = pygame.time.get_ticks() + 500
             else:
                 if dist > 0.01:
                     move_x = (dx / dist) * self.speed * dt
@@ -490,11 +577,15 @@ class NPC:
                         # Добавляем точку с центром в клетке
                         waypoints.append((check_x + 0.5, check_y + 0.5))
                         break  # нашли точку в этом направлении
-        # Если точек меньше 2, добавляем случайные вокруг
-        while len(waypoints) < num_points:
+        # ЗАЩИТА ОТ БЕСКОНЕЧНОГО ЦИКЛА
+        max_attempts = 100
+        attempts = 0
+        
+        while len(waypoints) < num_points and attempts < max_attempts:
+            attempts += 1
             rand_x = self.x + uniform(-3, 3)
             rand_y = self.y + uniform(-3, 3)
-            if 1 < rand_x < 9 and 1 < rand_y < 17:
+            if 1 < rand_x < self.game.map.width - 1 and 1 < rand_y < self.game.map.height - 1:
                 if not self.game.map.is_wall(int(rand_x), int(rand_y)):
                     waypoints.append((rand_x, rand_y))
         
@@ -612,22 +703,26 @@ class NPC:
 
 class Solder(NPC):
     def __init__(self, game, pos=(8.5, 7.5)):
-        super().__init__(game, pos)
+        self.name = "solder"
+        super().__init__(game, "solder", pos)
+        
         self.speed = 0.3
         self.hp = 100
         self.damage = 15
         self.shoot_range = 4
         self.shoot_delay = 600
-        self.image_path = 'resources/npc/solder.png'
-        self.image = pygame.image.load(self.image_path).convert_alpha()
-        self.sprite_width, self.sprite_height = self.image.get_size()
-        self.sprite_ratio = self.sprite_width / self.sprite_height
+        #self.image_path = 'resources/npc/solder.png'
+        #self.image = pygame.image.load(self.image_path).convert_alpha()
+        #self.sprite_width, self.sprite_height = self.image.get_size()
+        #self.sprite_ratio = self.sprite_width / self.sprite_height
         self.shoot_sound = pygame.mixer.Sound('resources/npc/npc_rifle.wav')
         self.shoot_sound.set_volume(0.2)
 
 class Jaggernaut(NPC):
     def __init__(self, game, pos=(8.5, 7.5)):
-        super().__init__(game, pos)
+        self.name = "jaggernaut"
+        super().__init__(game, "jaggernaut", pos)
+        
         self.speed = 0.1
         self.hp = 300
         self.damage = 8
@@ -635,31 +730,35 @@ class Jaggernaut(NPC):
         self.shoot_range = 5.0
         self.radius = 0.5
         self.color = (100, 100, 200)
-        self.image_path = 'resources/npc/jaggernaut.png'
-        self.image = pygame.image.load(self.image_path).convert_alpha()
-        self.sprite_width, self.sprite_height = self.image.get_size()
-        self.sprite_ratio = self.sprite_width / self.sprite_height
+        #self.image_path = 'resources/npc/jaggernaut.png'
+        #self.image = pygame.image.load(self.image_path).convert_alpha()
+        #self.sprite_width, self.sprite_height = self.image.get_size()
+        #self.sprite_ratio = self.sprite_width / self.sprite_height
         self.shoot_sound = pygame.mixer.Sound('resources/npc/npc_machine_gun.wav')
         self.shoot_sound.set_volume(0.2)
         
 class Lightning(NPC):
     def __init__(self, game, pos=(8.5, 7.5)):
-        super().__init__(game, pos)
+        self.name = "lightning"
+        super().__init__(game, "lightning", pos)
+        
         self.speed = 0.05
         self.hp = 30
         self.damage = 10
         self.shoot_range = 4
         self.shoot_delay = 600
-        self.image_path = 'resources/npc/lightning.png'
-        self.image = pygame.image.load(self.image_path).convert_alpha()
-        self.sprite_width, self.sprite_height = self.image.get_size()
-        self.sprite_ratio = self.sprite_width / self.sprite_height
+        #self.image_path = 'resources/npc/lightning.png'
+        #self.image = pygame.image.load(self.image_path).convert_alpha()
+        #self.sprite_width, self.sprite_height = self.image.get_size()
+        #self.sprite_ratio = self.sprite_width / self.sprite_height
         self.shoot_sound = pygame.mixer.Sound('resources/npc/npc_pistol.wav')
         self.shoot_sound.set_volume(0.2)
         
 class Kamikaze(NPC):
     def __init__(self, game, pos=(8.5, 7.5)):
-        super().__init__(game, pos)
+        self.name = "kamikaze"
+        super().__init__(game, "kamikaze", pos)
+        
         self.speed = 1.3
         self.hp = 40
         self.damage = 40
@@ -667,10 +766,10 @@ class Kamikaze(NPC):
         self.shoot_delay = 0
         self.radius = 0.4
         self.color = (200, 50, 50)
-        self.image_path = 'resources/npc/kamikaze.png'
-        self.image = pygame.image.load(self.image_path).convert_alpha()
-        self.sprite_width, self.sprite_height = self.image.get_size()
-        self.sprite_ratio = self.sprite_width / self.sprite_height
+        #self.image_path = 'resources/npc/kamikaze.png'
+        #self.image = pygame.image.load(self.image_path).convert_alpha()
+        #self.sprite_width, self.sprite_height = self.image.get_size()
+        #self.sprite_ratio = self.sprite_width / self.sprite_height
         self.exploded = False
         self.shoot_sound = pygame.mixer.Sound('resources/npc/npc_explosive.wav')
         self.shoot_sound.set_volume(0.2)
@@ -722,6 +821,7 @@ class Kamikaze(NPC):
             
             # Взрыв при приближении
             if distance_to_player <= self.shoot_range:
+                self.state = "SHOOT"
                 self.shoot()
                 self.alive = False
                 
@@ -729,7 +829,9 @@ class Kamikaze(NPC):
 class Boss(NPC):
     """Босс — очень сильный, много здоровья, большой урон"""
     def __init__(self, game, pos=(8.5, 7.5)):
-        super().__init__(game, pos)
+        self.name = "boss"
+        super().__init__(game, "boss", pos)
+        
         self.speed = 0.05
         self.hp = 1000
         self.damage = 30
@@ -741,3 +843,245 @@ class Boss(NPC):
         self.image = pygame.image.load(self.image_path).convert_alpha()
         self.sprite_width, self.sprite_height = self.image.get_size()
         self.sprite_ratio = self.sprite_width / self.sprite_height
+
+class Tree(NPC):
+    # Классовые переменные
+    _spawn_points = []
+    _spawn_index = 0
+    _spawn_timer = 0
+    _spawn_delay = 300  # мс между спавном
+    _max_active_trees = 100
+    _level_start_time = 0
+    _level_duration = 60000  # 60 секунд в миллисекундах
+    _spawning_active = True
+    
+    @classmethod
+    def init_spawn_points(cls, game):
+        """Инициализация пула точек спавна из карты"""
+        cls._game_ref = game
+        cls._spawn_points = []
+        cls._spawn_index = 0
+        cls._level_start_time = pygame.time.get_ticks()
+        cls._spawning_active = True
+        
+        if hasattr(game, 'map') and hasattr(game.map, 'text_map'):
+            for j, row in enumerate(game.map.text_map):
+                for i, char in enumerate(row):
+                    if char == '/':
+                        cls._spawn_points.append((i, j))
+            shuffle(cls._spawn_points)
+        
+        print(f"Загружено {len(cls._spawn_points)} точек спавна деревьев")
+        print(f"Спавн включён на {cls._level_duration // 1000} секунд")
+    
+    @classmethod
+    def update_spawn(cls, game):
+        """Динамический спавн деревьев"""
+        # Проверка времени уровня
+        current_time = pygame.time.get_ticks()
+        elapsed = current_time - cls._level_start_time
+        
+        # Если прошло больше 60 секунд - выключаем спавн
+        if elapsed >= cls._level_duration:
+            if cls._spawning_active:
+                cls._spawning_active = False
+                print("Время вышло! Спавн деревьев остановлен")
+            return
+        
+        if not cls._spawn_points:
+            return
+        
+        # Подсчитываем активные деревья
+        active_trees = 0
+        for npc in game.npcs:
+            if isinstance(npc, Tree) and npc.alive:
+                active_trees += 1
+        
+        if active_trees >= cls._max_active_trees:
+            return
+        
+        cls._spawn_timer += game.delta_time
+        if cls._spawn_timer >= cls._spawn_delay:
+            cls._spawn_timer = 0
+            tree = Tree(game)
+            if tree.alive:
+                game.npcs.append(tree)
+    
+    @classmethod
+    def is_spawning_active(cls):
+        """Возвращает True, если спавн ещё активен"""
+        current_time = pygame.time.get_ticks()
+        elapsed = current_time - cls._level_start_time
+        return elapsed < cls._level_duration
+    
+    def __init__(self, game, pos=None):
+        if pos is None:
+            if not Tree._spawn_points:
+                super().__init__(game, (0, 0))
+                self.alive = False
+                return
+            
+            # Получаем следующую точку спавна (бесконечно)
+            x_cell, y_cell = Tree._spawn_points[Tree._spawn_index % len(Tree._spawn_points)]
+            Tree._spawn_index += 1
+            
+            # Случайное смещение внутри клетки
+            offset_x = uniform(-0.4, 0.4)
+            offset_y = uniform(-0.4, 0.4)
+            pos = (x_cell + 0.5 + offset_x, y_cell + 0.5 + offset_y)
+        
+        super().__init__(game, pos)
+        
+        # Характеристики дерева
+        self.hp = 50
+        self.speed = 4
+        self.damage = 25
+        self.radius = 0.35
+        self.size = 0.7
+        self.alive = True
+        self.hurt_flash = 0
+        self.state = "IDLE"
+        
+        # Отключаем A*
+        self.path = []
+        self.last_path_update = pygame.time.get_ticks()
+        
+        # Загрузка текстуры
+        try:
+            self.image = pygame.image.load('resources/textures/Tree.png').convert_alpha()
+            self.image = pygame.transform.scale(self.image, (60, 100))
+        except:
+            self.image = pygame.Surface((60, 100))
+            self.image.fill((80, 160, 40))
+        
+        self.sprite_width, self.sprite_height = self.image.get_size()
+        self.sprite_ratio = self.sprite_width / self.sprite_height
+    
+    def update(self):
+        if not self.alive:
+            return
+        
+        # Движение строго вниз
+        self.y += self.speed * self.game.delta_time / 1000
+        
+        # Проверка столкновения с игроком
+        dx = abs(self.x - self.game.player.x)
+        dy = abs(self.y - self.game.player.y)
+        
+        if dx < self.radius + 0.4 and dy < self.radius + 0.4:
+            self.game.player.take_damage(self.damage)
+            self.alive = False
+            return
+        
+        # Если дерево ушло за пределы карты - удаляем
+        if self.y > self.game.map.height + 5:
+            self.alive = False
+            return
+        
+        if self.hurt_flash > 0:
+            self.hurt_flash -= 1
+    
+    def get_damage(self, damage):
+        if not self.alive:
+            return
+        
+        self.hp -= damage
+        self.hurt_flash = 8
+        
+        if self.hp <= 0:
+            self.alive = False
+            for _ in range(25):
+                self.game.particles.append(Particle(
+                    self.game,
+                    (self.x, self.y),
+                    (80, 160, 40),
+                    uniform(0.005, 0.02)
+                ))
+    
+    def draw(self):
+        if not self.alive:
+            return
+        
+        dx = self.x - self.game.player.x
+        dy = self.y - self.game.player.y
+        dist = math.hypot(dx, dy)
+        
+        if dist < 0.1:
+            return
+        
+        theta = math.atan2(dy, dx)
+        delta = theta - self.game.player.angle
+        delta = (delta + math.pi) % math.tau - math.pi
+        
+        if abs(delta) > HALF_FOV:
+            return
+        
+        dist_flat = dist * math.cos(delta)
+        if dist_flat < 0.1:
+            return
+        
+        proj_height = int(SCREEN_DIST / dist_flat * 1.8)
+        proj_width = int(proj_height * self.sprite_ratio)
+        
+        center_x = (HALF_NUM_RAYS + delta / DELTA_ANGLE) * SCALE
+        x = int(center_x - proj_width // 2)
+        y = int(HALF_HEIGHT - proj_height // 2)
+        
+        img = pygame.transform.scale(self.image, (proj_width, proj_height))
+        self.game.screen.blit(img, (x, y))
+        
+        if self.hurt_flash > 0:
+            flash = pygame.Surface((proj_width, proj_height))
+            flash.set_alpha(100)
+            flash.fill((255, 0, 0))
+            self.game.screen.blit(flash, (x, y))
+
+class Fog(NPC):
+    def __init__(self, game, pos):
+        super().__init__(game, pos)
+        self.alive = True
+        self.size = 2.0
+        self.radius = 0  # без коллизии
+        self.state = "IDLE"
+        self.speed = 0
+        
+        # Загрузка спрайта тумана
+        try:
+            self.image = pygame.image.load('resources/textures/fog.png').convert_alpha()
+            # Масштабируем до нужного размера
+            self.image = pygame.transform.scale(self.image, (300, 300))
+            
+            # Настраиваем прозрачность (второй способ)
+            # Создаём копию с альфа-каналом
+            temp = pygame.Surface(self.image.get_size(), pygame.SRCALPHA)
+            temp.blit(self.image, (0, 0))
+            # Устанавливаем общую прозрачность (30-100 - легкий туман, 150-200 - густой)
+            temp.set_alpha(180)
+            self.image = temp
+            
+        except:
+            # Если файла нет — создаём заглушку
+            self.image = pygame.Surface((300, 300), pygame.SRCALPHA)
+            self.image.fill((180, 190, 170, 80))  # цвет тумана с прозрачностью
+            # Добавляем лёгкую текстуру
+            for _ in range(30):
+                x = randint(0, 300)
+                y = randint(0, 300)
+                alpha = randint(20, 50)
+                pygame.draw.circle(self.image, (200, 210, 190, alpha), (x, y),randint(10, 30))
+        
+        self.sprite_width, self.sprite_height = self.image.get_size()
+        self.sprite_ratio = self.sprite_width / self.sprite_height
+    
+    def update(self):
+        pass  # туман не двигается
+    
+    def get_damage(self, damage):
+        pass  # неуязвим
+    
+    def draw(self):
+        if not self.alive:
+            return
+        # Стандартная отрисовка NPC
+        super().draw()
+

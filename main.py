@@ -7,11 +7,12 @@ from raycasting import RayCasting
 from renderer import Renderer
 from weapon import Weapon, Pistol, Shotgun, MachineGun, PlasmaGun
 from weapon import Particle
-from npc import NPC, Solder, Jaggernaut, Kamikaze, Boss, Lightning
+from npc import NPC, Solder, Jaggernaut, Kamikaze, Boss, Lightning, Tree, Fog
 from pathfinding import PathFinder
 from level_manager import LevelManager
 from ui_manager import UIManager
 from save_system import SaveSystem
+from console import DevConsole
 
 class Game:
     def __init__(self):
@@ -25,11 +26,14 @@ class Game:
         self.save_system = SaveSystem()
         self.total_kills = 0
         
+        self.console = DevConsole(self)
+        
+        pygame.mixer.init(frequency=22050, size=-16, channels=2, buffer=512)
         self.ui_manager = UIManager(self)
         self.level_manager = LevelManager(self)
         self.current_level = 1
         self.load_level(self.current_level)
-        
+
         
     """
     def new_game(self):
@@ -73,53 +77,77 @@ class Game:
           
     def load_level(self, level_num):
         '''Вся инициализация здесь'''
+        import time
+        start_total = time.time()
+        
+        print(f"\n{'='*60}")
+        print(f"ЗАГРУЗКА УРОВНЯ {level_num}")
+        print(f"{'='*60}")
+        
+        # ========== 1. ПРОВЕРКА СКИПА 2 УРОВНЯ ==========
+        if level_num == 2:
+            print("[1] Пропускаем 2 уровень (лесной)")
+            self.current_level += 1
+            return self.load_level(self.current_level)
+        
+        # ========== 2. СОЗДАНИЕ РЕЙКАСТИНГА (1 РАЗ) ==========
+        if not hasattr(self, 'raycasting'):
+            print("[2] Создание рейкастинга...")
+            self.raycasting = RayCasting(self)
+            self.renderer = Renderer(self)
+            self.pathfinder = PathFinder(self)
+            print("    Готово")
+        
+        # ========== 3. ЗАГРУЗКА JSON ==========
+        t1 = time.time()
+        print("[3] Загрузка JSON...")
         level_data = self.level_manager.load_level(level_num)
         if not level_data:
+            print("    ОШИБКА: JSON не загружен")
             self.game_over()
             return
-        # Очистка кэша тектур
-        if hasattr(self, 'renderer'):
+        print(f"    Загружено за {time.time()-t1:.2f}с")
+        
+        # ========== 4. ОЧИСТКА КЭША ==========
+        if hasattr(self, 'raycasting'):
             self.raycasting.texture_cache.clear()
-        # партикли 
+            print("[4] Кэш текстур очищен")
+        
+        # ========== 5. ПАРТИКЛЫ И СТАТЫ ==========
         self.particles = []
-        
-        # Статы
         self.total_kills = 0
-        #self.level_time = 0
-        #self.level_start_time = pygame.time.get_ticks()
+        print("[5] Партиклы и статы сброшены")
         
-        # карта
-        self.map = Map(self, level_data['map_data'], level_data['doors'])
+        # ========== 6. КАРТА ==========
+        t6 = time.time()
+        print("[6] Создание карты...")
+        self.map = Map(self, level_data['map_data'], level_data.get('doors', []))
+        print(f"    Карта: {self.map.width}x{self.map.height}, стен: {len(self.map.world_map)}")
+        print(f"    Загружено за {time.time()-t6:.2f}с")
+        
+        # ========== 7. ФОН ==========
+        background = level_data.get('background', {})
+        self.renderer.set_background(background)
+        print("[7] Фон установлен")
+        
+        # ========== 8. ВЫХОД ==========
         self.exit_pos = self.map.get_exit_pos()
+        print(f"[8] Выход: {self.exit_pos}")
         
-        # NPC
-        self.npcs = []
-        for npc_x, npc_y, npc_type in self.map.npc_positions:
-            x, y = npc_x + 0.5, npc_y + 0.5
-            if npc_type == 'Solder':
-                self.npcs.append(Solder(self, pos=(x, y)))
-            elif npc_type == 'Kamikaze':
-                self.npcs.append(Kamikaze(self, pos=(x, y)))
-            elif npc_type == 'Jaggernaut':
-                self.npcs.append(Jaggernaut(self, pos=(x, y)))
-            elif npc_type == 'Boss':
-                self.npcs.append(Boss(self, pos=(x, y)))
-            elif npc_type == 'Lightning':
-                self.npcs.append(Lightning(self, pos=(x, y)))
-        
-        for npc in self.npcs:
-            npc.generate_waypoints_auto(4)
-            npc.state = "PATROL"
-        
-        # игрок
+        # ========== 9. ИГРОК ==========
+        t9 = time.time()
+        print("[9] Создание игрока...")
         if hasattr(self, 'player'):
             self.player.x, self.player.y = level_data['player_start']
             self.player.hp = 100
         else:
             self.player = Player(self)
             self.player.x, self.player.y = level_data['player_start']
-            
-        # оружие
+        print(f"    Игрок на ({self.player.x}, {self.player.y}) за {time.time()-t9:.2f}с")
+        
+        # ========== 10. ОРУЖИЕ ==========
+        t10 = time.time()
+        print("[10] Создание оружия...")
         self.inventory = []
         for weapon_name in level_data.get('inventory', ['Pistol']):
             if weapon_name == 'Pistol':
@@ -132,20 +160,83 @@ class Game:
                 self.inventory.append(PlasmaGun(self))
         self.current_weapon_index = 0
         self.weapon = self.inventory[0]
-        # fill ammo
+        
         starting_ammo = level_data.get('starting_ammo', {})
         for gun in self.inventory:
-            if gun.name in starting_ammo:
-                gun.ammo = starting_ammo[gun.name]
-            else:
-                gun.ammo = 0
+            gun.ammo = starting_ammo.get(gun.name, 0)
+        print(f"    Оружие: {[w.name for w in self.inventory]} за {time.time()-t10:.2f}с")
         
+        # ========== 11. NPC (С ЗАЩИТОЙ ОТ ВИСНУТА) ==========
+        t11 = time.time()
+        npc_positions = list(self.map.npc_positions)
+        print(f"[11] Создание NPC: {len(npc_positions)} шт.")
         
-        # Raycasting + render
-        if not hasattr(self, 'raycasting'):
-            self.raycasting = RayCasting(self)
-            self.renderer = Renderer(self)
-            self.pathfinder = PathFinder(self)
+        self.npcs = []
+        for i, (npc_x, npc_y, npc_type) in enumerate(npc_positions):
+            x, y = npc_x + 0.5, npc_y + 0.5
+            print(f"    {i+1}/{len(npc_positions)}: {npc_type} на ({x:.1f}, {y:.1f})...", end=" ", flush=True)
+            
+            try:
+                if npc_type == 'Solder':
+                    self.npcs.append(Solder(self, pos=(x, y)))
+                elif npc_type == 'Kamikaze':
+                    self.npcs.append(Kamikaze(self, pos=(x, y)))
+                elif npc_type == 'Jaggernaut':
+                    self.npcs.append(Jaggernaut(self, pos=(x, y)))
+                elif npc_type == 'Boss':
+                    self.npcs.append(Boss(self, pos=(x, y)))
+                elif npc_type == 'Lightning':
+                    self.npcs.append(Lightning(self, pos=(x, y)))
+                elif npc_type == 'Tree':
+                    self.npcs.append(Tree(self, pos=(x, y)))
+                elif npc_type == 'Fog':
+                    self.npcs.append(Fog(self, pos=(x, y)))
+                else:
+                    print(f"НЕИЗВЕСТНЫЙ ТИП!")
+                    continue
+                print("OK")
+            except Exception as e:
+                print(f"ОШИБКА: {e}")
+                import traceback
+                traceback.print_exc()
+                # Не прерываем загрузку, просто пропускаем этого NPC
+                continue
+        
+        print(f"    Создано NPC: {len(self.npcs)} за {time.time()-t11:.2f}с")
+        
+        # ========== 12. ПАТРУЛЬНЫЕ ТОЧКИ (С ЗАЩИТОЙ) ==========
+        t12 = time.time()
+        print("[12] Генерация патрульных точек...")
+        for i, npc in enumerate(self.npcs):
+            print(f"    {i+1}/{len(self.npcs)}: {npc.name}...", end=" ", flush=True)
+            try:
+                npc.generate_waypoints_auto(4)
+                npc.state = "PATROL"
+                print("OK")
+            except Exception as e:
+                print(f"ОШИБКА: {e}")
+                npc.waypoints = []
+                npc.state = "IDLE"
+        print(f"    Готово за {time.time()-t12:.2f}с")
+        
+        # ========== 13. ЛЕСНОЙ УРОВЕНЬ (ОСОБЫЙ СЛУЧАЙ) ==========
+        if level_num == 2:
+            print("[13] Настройка лесного уровня...")
+            self.start_time = pygame.time.get_ticks()
+            self.level_duration = 20000
+            Tree.init_spawn_points(self)
+            for _ in range(10):
+                tree = Tree(self)
+                self.npcs.append(tree)
+            print("    Готово")
+        
+        # ========== 14. ПОВОРОТ ИГРОКА ==========
+        if level_num == 2:
+            self.player.angle = math.pi * 1.5
+        
+        print(f"\n{'='*60}")
+        print(f"УРОВЕНЬ {level_num} ЗАГРУЖЕН за {time.time()-start_total:.2f}с")
+        print(f"{'='*60}\n")
             
         # Close
         #self.exit_pos = level_data.get('exit', (-1, -1))
@@ -165,7 +256,12 @@ class Game:
         # Проверяем расстояние до выхода (можно по клеткам)
         player_cell = (int(self.player.x), int(self.player.y))
         exit_cell = (int(self.exit_pos[0]), int(self.exit_pos[1]))
-        
+        if self.current_level == 2:
+            Tree.update_spawn(self)
+            
+            # Проверка завершения уровня
+            if not Tree.is_spawning_active() and not any(isinstance(npc, Tree) for npc in self.npcs):
+                self.next_level()
         if player_cell == exit_cell:
             self.ui_manager.current_state = self.ui_manager.states['LEVEL_END']
             self.next_level()
@@ -182,10 +278,68 @@ class Game:
         self.player.hp = 100
         self.level_start_time = pygame.time.get_ticks()
         self.load_level(self.current_level)            
+    
+    def play_music(self):
+        """Управление музыкой в зависимости от текущего состояния"""
+        current_state = self.ui_manager.current_state
+        # Музыка для главного меню
+        if current_state == self.ui_manager.states['MENU']:
+            if not hasattr(self, 'current_music') or self.current_music != 'menu':
+                try:
+                    pygame.mixer.music.load('resources/ui_sounds/main_menu_song.wav')
+                    pygame.mixer.music.set_volume(0.4)
+                    pygame.mixer.music.play(-1)
+                    self.current_music = 'menu'
+                    print("Музыка меню запущена")  # отладка
+                except Exception as e:
+                    print(f"error download: main_menu_song - {e}")
+        
+        # Музыка для уровня 1
+        elif current_state == self.ui_manager.states['PLAYING'] and self.current_level == 1:
+            if not hasattr(self, 'current_music') or self.current_music != 'level1':
+                try:
+                    pygame.mixer.music.load('resources/level_music/level_1.wav')
+                    pygame.mixer.music.set_volume(0.5)
+                    pygame.mixer.music.play(-1)
+                    self.current_music = 'level1'
+                    print("Музыка уровня 1 запущена")  # отладка
+                except Exception as e:
+                    print(f"error download: level music - {e}")
                     
+        elif current_state == self.ui_manager.states['BRIEFING']:
+            if not hasattr(self, 'current_music') or current_state != 'briefing':
+                try:
+                    pygame.mixer.music.load('resources/ui_sounds/briefing.wav')
+                    pygame.mixer.music.set_volume(0.5)
+                    pygame.mixer.music.play(-1)
+                    self.current_music = 'briefing'
+                except Exception as e:
+                    print(f"error download: level music - {e}")
+        
+        # Останавливаем музыку при смерти или конце уровня
+        elif current_state in (self.ui_manager.states['DEAD'], self.ui_manager.states['LEVEL_END']):
+            if pygame.mixer.music.get_busy():
+                pygame.mixer.music.stop()
+                if hasattr(self, 'current_music'):
+                    delattr(self, 'current_music')
+                print("Музыка остановлена")
+               
     def update(self):
         self.player.update()
         self.check_exit()
+        
+        if self.current_level == 2:
+            current_time = pygame.time.get_ticks()
+            if current_time - self.level_start_time >= self.level_duration:
+                self.next_level()
+                return
+            Tree._spawn_timer += self.delta_time
+            if Tree._spawn_timer >= Tree._spawn_delay:
+                Tree._spawn_timer = 0
+                tree = Tree(self)
+                if tree.alive:
+                    self.npcs.append(tree)
+        
         # Проверка зажатой ЛКМ для автоматического оружия
         mouse_buttons = pygame.mouse.get_pressed()
         if mouse_buttons[0]: # 0 - это левая кнопка
@@ -201,7 +355,9 @@ class Game:
         for npc in self.npcs:
             npc.update()
         self.delta_time = self.clock.tick(FPS)
+        self.player.update_regen()
         pygame.display.set_caption(f'FPS: {self.clock.get_fps() :.1f}')
+        
 
     def draw(self):
         #self.screen.fill('black') # Очистка экрана перед каждым кадром
@@ -216,10 +372,11 @@ class Game:
         for p in self.particles:
             p.draw()
         self.weapon.draw()
+        self.renderer.draw_fog_filter()
         self.renderer.draw_interface()
         self.renderer.draw_crosshair()
         #self.renderer.draw_line_of_cells()
-        
+        self.console.draw(self.screen)
         
         pygame.display.flip()
 
@@ -268,6 +425,12 @@ class Game:
                     if event.button == 5: # Колесо вниз
                         self.current_weapon_index = (self.current_weapon_index - 1) % len(self.inventory)
                     self.weapon = self.inventory[self.current_weapon_index]
+                    
+                if self.console.active:
+                    self.console.handle_event(event)
+                    return
+                if event.type == pygame.KEYDOWN and event.key == pygame.K_BACKQUOTE:
+                    self.console.toggle()
 
 
     def run(self):
@@ -275,6 +438,7 @@ class Game:
             self.check_events()
             # Обновление UI
             self.ui_manager.update()
+            self.play_music()
             
             # Если в игре - обновляем игровую логику
             if self.ui_manager.current_state == self.ui_manager.states['PLAYING']:
