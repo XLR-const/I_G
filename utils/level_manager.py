@@ -5,7 +5,6 @@ from setting import *
 class LevelManager:
     def __init__(self, game):
         self.game = game
-        self.current_level = 1
         self.levels_folder = "resources/levels"
         
         if not os.path.exists(self.levels_folder):
@@ -20,9 +19,8 @@ class LevelManager:
         with open(file_path, 'r') as f:
             level_data = json.load(f)
             
-        # парсинг джисона
-        map_data = level_data['map'] # матрица-лвл
-        player_start = tuple(level_data['player_start']) # x, y
+        map_data = level_data['map']
+        player_start = tuple(level_data['player_start'])
         npc_spawns = level_data.get('npcs', [])
         doors = level_data.get('doors', [])
         exit_pos = tuple(level_data.get('exit', (-1, -1)))
@@ -46,7 +44,6 @@ class LevelManager:
         }
         
     def save_level(self, level_num, map_data, player_start, npcs, doors, exit_pos):
-        """Сохраняет уровень в JSON (для создания новых уровней)"""
         level_data = {
             'map': map_data,
             'player_start': list(player_start),
@@ -60,4 +57,3 @@ class LevelManager:
             json.dump(level_data, f, indent=4)
         
         print(f"Уровень сохранён: {file_path}")
-      

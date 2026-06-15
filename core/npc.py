@@ -2,7 +2,7 @@ import pygame
 import math
 from setting import *
 from random import uniform, shuffle, randint
-from weapon import Particle
+from core.weapon import Particle
 
 
 class NPC:

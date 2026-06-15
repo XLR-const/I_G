@@ -2,7 +2,7 @@ import pygame
 import setting
 import sys
 import random
-from save_system import SaveSystem
+from utils.save_system import SaveSystem
 
 class UIManager:
     def __init__(self, game):
