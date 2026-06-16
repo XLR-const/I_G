@@ -200,16 +200,45 @@ class NPC:
 
         self.update_state(dt)
 
+        # ============================================================
+        # ОПРЕДЕЛЕНИЕ НАПРАВЛЕНИЯ ОТНОСИТЕЛЬНО ИГРОКА
+        # ============================================================
         dx_move = self.x - self.last_x
         dy_move = self.y - self.last_y
+
+        # Угол, куда направлен сам NPC (по умолчанию смотрит на игрока)
         if dx_move != 0 or dy_move != 0:
-            if abs(dx_move) > abs(dy_move):
-                self.move_direction = "right" if dx_move < 0 else "left"
-            else:
-                self.move_direction = "front" if dy_move < 0 else "back"
+            npc_angle = math.atan2(dy_move, dx_move)
+        else:
+            # Если NPC стоит, пусть его взгляд будет направлен в сторону игрока
+            npc_angle = math.atan2(self.game.player.y - self.y, self.game.player.x - self.x)
+
+        # Угол вектора от NPC к игроку
+        player_angle = math.atan2(self.game.player.y - self.y, self.game.player.x - self.x)
+
+        # Относительный угол (под каким ракурсом игрок видит NPC)
+        rel_angle = player_angle - npc_angle
+        
+        # Нормализуем угол в диапазон от -pi до pi
+        rel_angle = math.atan2(math.sin(rel_angle), math.cos(rel_angle))
+        
+        # Переводим в градусы для удобства (от 0 до 360)
+        rel_angle_deg = math.degrees(rel_angle) % 360
+
+                # Разделяем 360 градусов на 4 сектора (инвертированные направления)
+        if 45 <= rel_angle_deg < 135:
+            self.move_direction = "right"  # Было "left"
+        elif 135 <= rel_angle_deg < 225:
+            self.move_direction = "back"   # Было "front"
+        elif 225 <= rel_angle_deg < 315:
+            self.move_direction = "left"   # Было "right"
+        else:
+            self.move_direction = "front"  # Было "back"
+
 
         self.last_x = self.x
         self.last_y = self.y
+
 
         if self.state == "ATTACK":
             self.image = self.sprites.get("ATTACK", self.sprites.get("IDLE_front"))
