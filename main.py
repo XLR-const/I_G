@@ -47,10 +47,6 @@ class Game:
         print(f"ЗАГРУЗКА УРОВНЯ {level_num}")
         print(f"{'=' * 60}")
 
-        if level_num == 2:
-            print("[1] Пропускаем 2 уровень (лесной)")
-            self.current_level += 1
-            return self.load_level(self.current_level)
 
         level_data = self.level_manager.load_level(level_num)
         if not level_data:
@@ -266,7 +262,6 @@ class Game:
             p.draw()
 
         self.weapon.draw()
-        self.renderer.draw_fog_filter()
         self.renderer.draw_interface()
         self.renderer.draw_crosshair()
         self.console.draw(self.screen)

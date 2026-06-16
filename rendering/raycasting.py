@@ -182,16 +182,6 @@ class RayCasting:
             if side == 1:
                 color = (color[0] * 0.7, color[1] * 0.7, color[2] * 0.7)
             
-            # Затенения от дистанции с учетом леса  
-            if self.game.current_level == 2:
-                dark_factor = 1 / (1 + dist * dist * 0.0005)
-                color = (int(color[0] * dark_factor),
-                        int(color[1] * dark_factor),
-                        int(color[2] * dark_factor))
-            else:
-                color = (int(color[0] / (1 + dist * dist * 0.01)),
-                    int(color[1] / (1 + dist * dist * 0.01)),
-                    int(color[2] / (1 + dist * dist * 0.01)))
 
             # Фикс прорисовки стен - зубчики
             # Рассчитываем параметры один раз
@@ -217,10 +207,6 @@ class RayCasting:
                     hit_y = oy + (side_dist_y - delta_dist_y) * sin_a
                     # Для горизонтальной стены используем координату X
                     tex_x = hit_x % 1.0
-                if self.game.current_level == 2 and side == 0:
-                    speed = 2
-                    time_offset = (pygame.time.get_ticks() * speed / 1000) % 1.0
-                    tex_x = (tex_x - time_offset) % 1.0
                 tex_x = int(tex_x * TEXTURE_SIZE)
                 tex_x = max(0, min(tex_x, TEXTURE_SIZE - 1))
                 # Получаем полоску из кэша
