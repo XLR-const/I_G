@@ -8,7 +8,7 @@ from rendering.raycasting import RayCasting
 from rendering.renderer import Renderer
 from core.weapon import Weapon, Pistol, Shotgun, MachineGun, PlasmaGun
 from core.weapon import Particle
-from core.npc import NPC, Solder, Jaggernaut, Kamikaze, Boss, Lightning, Tree, Fog
+from core.npc import NPC, Solder, Jaggernaut, Kamikaze, Boss, Lightning
 from utils.pathfinding import PathFinder
 from utils.level_manager import LevelManager
 from ui.ui_manager import UIManager
@@ -114,10 +114,6 @@ class Game:
                     self.npcs.append(Boss(self, pos=(x, y)))
                 elif npc_type == 'Lightning':
                     self.npcs.append(Lightning(self, pos=(x, y)))
-                elif npc_type == 'Tree':
-                    self.npcs.append(Tree(self, pos=(x, y)))
-                elif npc_type == 'Fog':
-                    self.npcs.append(Fog(self, pos=(x, y)))
                 else:
                     continue
             except Exception as e:
@@ -132,14 +128,6 @@ class Game:
                 print(f"Ошибка waypoints: {e}")
                 npc.waypoints = []
                 npc.state = "IDLE"
-
-        if level_num == 2:
-            self.start_time = pygame.time.get_ticks()
-            self.level_duration = 20000
-            Tree.init_spawn_points(self)
-            for _ in range(10):
-                self.npcs.append(Tree(self))
-            self.player.angle = math.pi * 1.5
 
         print(f"Уровень {level_num} загружен за {time.time() - start_total:.2f}с")
         print(f"{'=' * 60}\n")
@@ -156,10 +144,6 @@ class Game:
         player_cell = (int(self.player.x), int(self.player.y))
         exit_cell = (int(self.exit_pos[0]), int(self.exit_pos[1]))
 
-        if self.current_level == 2:
-            Tree.update_spawn(self)
-            if not Tree.is_spawning_active() and not any(isinstance(npc, Tree) for npc in self.npcs):
-                self.next_level()
 
         if player_cell == exit_cell:
             self.ui_manager.current_state = self.ui_manager.states['LEVEL_END']
@@ -217,18 +201,6 @@ class Game:
     def update(self):
         self.player.update()
         self.check_exit()
-
-        if self.current_level == 2:
-            current_time = pygame.time.get_ticks()
-            if current_time - self.level_start_time >= self.level_duration:
-                self.next_level()
-                return
-            Tree._spawn_timer += self.delta_time
-            if Tree._spawn_timer >= Tree._spawn_delay:
-                Tree._spawn_timer = 0
-                tree = Tree(self)
-                if tree.alive:
-                    self.npcs.append(tree)
 
         mouse_buttons = pygame.mouse.get_pressed()
         if mouse_buttons[0]:

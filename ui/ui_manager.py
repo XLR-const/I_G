@@ -436,7 +436,7 @@ class UIManager:
         screen.blit(title, title_rect)
         
         stats = [
-            f"УБИТО НЕГОДЯЕВ: {self._get_kills_count()}",
+            f"УБИТО ВРАГОВ: {self._get_kills_count()}",
             f"ВРЕМЯ: {self._get_level_time()}",
             "",
             "НАЖМИТЕ ЛЮБУЮ КЛАВИШУ ДЛЯ ПРОДОЛЖЕНИЯ..."
