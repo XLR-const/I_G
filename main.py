@@ -6,6 +6,7 @@ from rendering.raycasting import RayCasting
 from rendering.renderer import Renderer
 from utils.pathfinding import PathFinder
 from utils.level_manager import LevelManager
+from utils.music_manager import MusicManager
 from ui.ui_manager import UIManager
 from utils.save_system import SaveSystem
 from ui.console import DevConsole
@@ -30,10 +31,13 @@ class Game:
         self.ui_manager = UIManager(self)
         self.console = DevConsole(self)
         
-        # Level Manager (все данные уровня теперь внутри)
+        # Музыка
+        self.music_manager = MusicManager()
+        
+        # Level Manager
         self.level_manager = LevelManager(self)
         
-        # Ссылки на объекты уровня (для удобства)
+        # Ссылки на объекты уровня
         self.player = None
         self.map = None
         self.npcs = []
@@ -163,50 +167,13 @@ class Game:
                 if event.type == pygame.KEYDOWN and event.key == pygame.K_BACKQUOTE:
                     self.console.toggle()
 
-    def play_music(self):
-        current_state = self.ui_manager.current_state
-
-        if current_state == self.ui_manager.states['MENU']:
-            if not hasattr(self, 'current_music') or self.current_music != 'menu':
-                try:
-                    pygame.mixer.music.load('resources/ui_sounds/main_menu_song.wav')
-                    pygame.mixer.music.set_volume(0.4)
-                    pygame.mixer.music.play(-1)
-                    self.current_music = 'menu'
-                except:
-                    pass
-
-        elif current_state == self.ui_manager.states['PLAYING'] and self.current_level == 1:
-            if not hasattr(self, 'current_music') or self.current_music != 'level1':
-                try:
-                    pygame.mixer.music.load('resources/level_music/level_1.wav')
-                    pygame.mixer.music.set_volume(0.5)
-                    pygame.mixer.music.play(-1)
-                    self.current_music = 'level1'
-                except:
-                    pass
-
-        elif current_state == self.ui_manager.states['BRIEFING']:
-            if not hasattr(self, 'current_music') or self.current_music != 'briefing':
-                try:
-                    pygame.mixer.music.load('resources/ui_sounds/briefing.wav')
-                    pygame.mixer.music.set_volume(0.5)
-                    pygame.mixer.music.play(-1)
-                    self.current_music = 'briefing'
-                except:
-                    pass
-
-        elif current_state in (self.ui_manager.states['DEAD'], self.ui_manager.states['LEVEL_END']):
-            if pygame.mixer.music.get_busy():
-                pygame.mixer.music.stop()
-                if hasattr(self, 'current_music'):
-                    delattr(self, 'current_music')
-
     def run(self):
         while True:
             self.handle_events()
             self.ui_manager.update()
-            self.play_music()
+            
+            # Одно обращение к UI и один вызов музыки
+            self.music_manager.update(self.ui_manager.current_state, self.current_level)
 
             if self.ui_manager.current_state == self.ui_manager.states['PLAYING']:
                 self.update()

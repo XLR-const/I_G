@@ -12,22 +12,21 @@ class UIManager:
         self.font_small = pygame.font.Font(None, int(setting.CELL_H * 0.4))
         
         self.states = {
-            'BOOT': 0,         # загрузка игры
-            'MENU': 1,         # главное меню
-            'BRIEFING': 2,     # брифинг
-            'PLAYING': 3,      # игра
-            'PAUSE': 4,        # меню паузы
-            'LEVEL_END': 5,    # конец уровня
-            'DEAD': 6,         # без сознания хэх
-            'CUTSCENE': 7,     # катсцены
-            'OPTIONS': 8       # опции
+            'BOOT': 0,
+            'MENU': 1,
+            'BRIEFING': 2,
+            'PLAYING': 3,
+            'PAUSE': 4,
+            'LEVEL_END': 5,
+            'DEAD': 6,
+            'CUTSCENE': 7,
+            'OPTIONS': 8
         }
         
         self.current_state = self.states['BOOT']
         self.selected_option = 0
         
         self.briefing_images = {}
-        self.music_start = True
         self.load_assets()
     
     def load_assets(self):
@@ -55,7 +54,7 @@ class UIManager:
             except:
                 pass
         
-        # Загрузка звуков
+        # Звуки UI (только звуки, без музыки)
         self.swap_sound = pygame.mixer.Sound('resources/ui_sounds/swap.wav')
         self.swap_sound.set_volume(0.1)
         self.enter_sound = pygame.mixer.Sound('resources/ui_sounds/enter.wav')
@@ -98,26 +97,22 @@ class UIManager:
                 return True
             if event.key == pygame.K_RETURN:
                 self.enter_sound.play()
-                # 0: NEW GAME
                 if self.selected_option == 0:
                     self.game.level_manager.reset_game()
                     self.current_state = self.states['BRIEFING']
-                # 1: LOAD GAME
                 elif self.selected_option == 1:
                     saved = SaveSystem.load()
                     if saved:
-                        self.game.current_level = saved['current_level']
-                        self.game.total_kills = saved['total_kills']
+                        self.game.current_level = int(saved['current_level'])
+                        self.game.total_kills = int(saved['total_kills'])
                         self.game.load_level(self.game.current_level)
                         self.current_state = self.states['BRIEFING']
                     else:
                         self.game.level_manager.reset_game()
                         self.current_state = self.states['BRIEFING']
-                # 2: OPTIONS
                 elif self.selected_option == 2:
                     self.selected_option = 0
                     self.current_state = self.states['OPTIONS']
-                # 3: QUIT
                 elif self.selected_option == 3:
                     pygame.quit()
                     sys.exit()
@@ -149,15 +144,15 @@ class UIManager:
                 return True
             if event.key == pygame.K_RETURN:
                 self.enter_sound.play()
-                if self.selected_option == 0:      # RESUME
+                if self.selected_option == 0:
                     self.current_state = self.states['PLAYING']
-                elif self.selected_option == 1:    # RESTART LEVEL
+                elif self.selected_option == 1:
                     self.game.level_start_time = pygame.time.get_ticks()
                     self.game.load_level(self.game.current_level)
                     self.current_state = self.states['PLAYING']
-                elif self.selected_option == 2:    # MAIN MENU
+                elif self.selected_option == 2:
                     self.current_state = self.states['MENU']
-                elif self.selected_option == 3:    # QUIT
+                elif self.selected_option == 3:
                     pygame.quit()
                     sys.exit()
                 return True
@@ -165,7 +160,6 @@ class UIManager:
 
     def _handle_level_end_event(self, event):
         if event.type == pygame.KEYDOWN:
-            # Не увеличиваем здесь, просто загружаем текущий уровень
             self.game.load_level(self.game.level_manager.current_level)
             self.current_state = self.states['BRIEFING']
             return True
@@ -174,12 +168,12 @@ class UIManager:
     def _handle_dead_event(self, event):
         """Обработка экрана смерти"""
         if event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_r:          # RESTART
+            if event.key == pygame.K_r:
                 self.game.level_start_time = pygame.time.get_ticks()
                 self.game.load_level(self.game.current_level)
                 self.current_state = self.states['PLAYING']
                 return True
-            if event.key == pygame.K_m:          # MAIN MENU
+            if event.key == pygame.K_m:
                 self.current_state = self.states['MENU']
                 return True
         return False
@@ -205,16 +199,14 @@ class UIManager:
                 self.swap_sound.play()
                 return True
             if event.key == pygame.K_LEFT:
-                print("Сработала левая стрелка")
-                if self.selected_option == 0:   # sensitivity
+                if self.selected_option == 0:
                     new_val = max(0.0005, setting.MOUSE_SENSITIVITY - 0.0005)
                     setting.MOUSE_SENSITIVITY = new_val
-                elif self.selected_option == 1:   # volume
+                elif self.selected_option == 1:
                     new_val = max(0.0, setting.MASTER_VOLUME - 0.1)
                     setting.MASTER_VOLUME = new_val
                 return True
             if event.key == pygame.K_RIGHT:
-                print("Сработала правая стрелка")
                 if self.selected_option == 0:
                     new_val = min(0.01, setting.MOUSE_SENSITIVITY + 0.0005)
                     setting.MOUSE_SENSITIVITY = new_val
@@ -224,7 +216,7 @@ class UIManager:
                 return True
             if event.key in (pygame.K_RETURN, pygame.K_ESCAPE):
                 self.enter_sound.play()
-                if self.selected_option == 2:   # back
+                if self.selected_option == 2:
                     self.current_state = self.states['MENU']
                 return True
         return False
@@ -233,7 +225,6 @@ class UIManager:
     # UPDATE LOOPS
     # ----------------------------------------------------------------------
     def update(self):
-        """Ретранслятор апдейтов отдельных экранов"""
         if self.current_state == self.states['BOOT']:
             self._update_boot()
         elif self.current_state == self.states['MENU']:
@@ -250,10 +241,8 @@ class UIManager:
             self._update_cutscene()
         elif self.current_state == self.states['OPTIONS']:
             self._update_options()
-                
     
     def draw(self, screen):
-        """Ретранслятор отрисовки по отдельным экранам"""
         if self.current_state == self.states['BOOT']:
             self._draw_boot(screen)
         elif self.current_state == self.states['MENU']:
@@ -305,7 +294,6 @@ class UIManager:
         else:
             screen.fill((20, 40, 20))
         
-        # Title
         title = self.font_tile.render("Ilyusha Grate", True, (255, 250, 0))
         title_rect = title.get_rect(center=(setting.WIDTH // 2, int(setting.CELL_H * 2)))
         screen.blit(title, title_rect)
@@ -319,7 +307,6 @@ class UIManager:
             screen.blit(text, text_rect)
             
             if i == self.selected_option:
-                # draw little arrow
                 arrow_x = text_rect.left - 30
                 arrow_y = text_rect.centery
                 pygame.draw.line(screen, (255, 200, 0), (arrow_x, arrow_y - 10), (arrow_x + 15, arrow_y), 3)
@@ -329,7 +316,6 @@ class UIManager:
     # BRIEFING
     # ----------------------------------------------------------------------
     def _update_briefing(self):
-        # No automatic skip, only manual key press
         pass
     
     def _start_level(self):
@@ -343,12 +329,10 @@ class UIManager:
         if level_num in self.briefing_images:
             screen.blit(self.briefing_images[level_num], (0, 0))
             
-            # Подсказка внизу экрана (полупрозрачная)
             font = pygame.font.Font(None, 36)
             text = font.render("Press any key to continue...", True, (255, 255, 255))
             text_rect = text.get_rect(center=(setting.WIDTH // 2, setting.HEIGHT - setting.CELL_H))
             
-            # Полупрозрачный фон для текста
             bg = pygame.Surface((text.get_width() + 20, text.get_height() + 10))
             bg.set_alpha(128)
             bg.fill((0, 0, 0))
@@ -506,13 +490,11 @@ class UIManager:
     def _draw_options(self, screen):
         screen.fill((20, 20, 40))
         
-        # Заголовок
         title = self.font_tile.render("НАСТРОЙКИ", True, (255, 200, 0))
         title_rect = title.get_rect(center=(setting.WIDTH // 2, int(setting.CELL_H * 2)))
         screen.blit(title, title_rect)
         
         start_row = 4
-        # 1. Чувствительность мыши
         y_text = int(setting.CELL_H * start_row)
         sens_text = self.font_normal.render(f"ЧУВСТВИТЕЛЬНОСТЬ МЫШИ: {setting.MOUSE_SENSITIVITY:.3f}", True, (200, 200, 200))
         sens_rect = sens_text.get_rect(center=(setting.WIDTH // 2, y_text))
@@ -523,7 +505,6 @@ class UIManager:
             bar_x = setting.WIDTH // 2 - bar_width // 2
             bar_y = y_text + int(setting.CELL_H * 0.3)
             pygame.draw.rect(screen, (80, 80, 80), (bar_x, bar_y, bar_width, 8))
-            # Normalize value from 0.0005..0.01 to 0..1
             norm = (setting.MOUSE_SENSITIVITY - 0.0005) / (0.01 - 0.0005)
             handle_x = bar_x + int(bar_width * norm)
             pygame.draw.rect(screen, (255, 200, 0), (handle_x - 5, bar_y - 4, 10, 16))
@@ -532,7 +513,6 @@ class UIManager:
             screen.blit(left_arr, (bar_x - 25, bar_y - 8))
             screen.blit(right_arr, (bar_x + bar_width + 15, bar_y - 8))
         
-        # 2. Громкость
         y_text = int(setting.CELL_H * (start_row + 1.2))
         vol_text = self.font_normal.render(f"ГРОМКОСТЬ: {int(setting.MASTER_VOLUME * 100)}%", True, (200, 200, 200))
         vol_rect = vol_text.get_rect(center=(setting.WIDTH // 2, y_text))
@@ -550,19 +530,16 @@ class UIManager:
             screen.blit(left_arr, (bar_x - 25, bar_y - 8))
             screen.blit(right_arr, (bar_x + bar_width + 15, bar_y - 8))
         
-        # 3. Кнопка НАЗАД
         y_text = int(setting.CELL_H * (start_row + 2.4))
         color = (255, 255, 255) if self.selected_option == 2 else (150, 150, 150)
         back_text = self.font_normal.render("НАЗАД", True, color)
         back_rect = back_text.get_rect(center=(setting.WIDTH // 2, y_text))
         screen.blit(back_text, back_rect)
         
-        # Подсказка
         tip = self.font_small.render("↑/↓ - ВЫБОР, ←/→ - ИЗМЕНИТЬ, ESC/ENTER - НАЗАД", True, (150, 150, 150))
         tip_rect = tip.get_rect(center=(setting.WIDTH // 2, setting.HEIGHT - int(setting.CELL_H * 2)))
         screen.blit(tip, tip_rect)
         
-        # Таблица управления
         controls_start_row = 10
         controls = [
             "УПРАВЛЕНИЕ:", "W/A/S/D - ДВИЖЕНИЕ", "МЫШЬ - ПОВОРОТ",
@@ -578,8 +555,5 @@ class UIManager:
     # ----------------------------------------------------------------------
     # HELPERS
     # ----------------------------------------------------------------------
-    def _get_kills_count(self):
-        return self.game.total_kills
-    
     def _get_level_time(self):
         return f"{self.game.level_manager.level_time // 60}:{self.game.level_manager.level_time % 60:02d}"

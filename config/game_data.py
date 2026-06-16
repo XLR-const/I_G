@@ -152,10 +152,11 @@ WEAPON_CONFIG = {
 # КОНФИГУРАЦИЯ МУЗЫКИ
 # ============================================================
 MUSIC_CONFIG = {
-    'menu': 'resources/ui_sounds/main_menu_song.wav',
-    'briefing': 'resources/ui_sounds/briefing.wav',
-    'level_1': 'resources/level_music/level_1.wav',
-    'level_2': 'resources/level_music/level_2.wav',
-    'level_3': 'resources/level_music/level_3.wav',
-    'level_end': 'resources/level_music/level_end.wav',
+    'menu': 'resources/music/menus/menu.wav',
+    'briefing': 'resources/music/briefings/briefing.wav',
+    'level_1': 'resources/music/levels/level_1.wav',
+    'level_2': 'resources/music/levels/level_2.wav',
+    'level_3': 'resources/music/levels/level_3.wav',
+    'death': 'resources/music/deaths/death.wav',
+    'level_end': 'resources/music/levelends/level_end.wav',
 }
