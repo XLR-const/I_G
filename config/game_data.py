@@ -12,17 +12,17 @@
 # ============================================================
 SYMBOLS_CONFIG = {
     # Стены
-    '1': {'type': 'wall', 'texture': 'stone.png'},
-    'R': {'type': 'wall', 'texture': 'red_brick.png'},
-    'B': {'type': 'wall', 'texture': 'blue_brick.png'},
-    'G': {'type': 'wall', 'texture': 'green_brick.png'},
-    'W': {'type': 'wall', 'texture': 'wood.png'},
-    'M': {'type': 'wall', 'texture': 'metal.png'},
-    'C': {'type': 'wall', 'texture': 'concrete.png'},
-    'L': {'type': 'wall', 'texture': 'stone.png'},
+    '1': {'type': 'wall'},  # дефолтная белая стена (без текстуры)
+    'M': {'type': 'wall', 'texture': 'resources/textures/M.png'},
+    'C': {'type': 'wall', 'texture': 'resources/textures/C.png'},
+    'L': {'type': 'wall', 'texture': 'resources/textures/L.png'},
+    'R': {'type': 'wall', 'texture': 'resources/textures/R.png'},
+    'B': {'type': 'wall', 'texture': 'resources/textures/B.png'},
+    'G': {'type': 'wall', 'texture': 'resources/textures/G.png'},
+    'W': {'type': 'wall', 'texture': 'resources/textures/W.png'},
     
     # Дверь
-    'D': {'type': 'door'},
+    'D': {'type': 'door', 'texture': 'resources/textures/D.png'},
     
     # Выход
     'E': {'type': 'exit'},

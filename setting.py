@@ -1,88 +1,86 @@
 import math
 import pygame
-# Game setting
+
+# Game settings
 pygame.init()
 info = pygame.display.Info()
+
 WIDTH = info.current_w
 HEIGHT = info.current_h
 RES = (WIDTH, HEIGHT)
+
 GRID_W = 32
 GRID_H = 18
-CELL_W, CELL_H = WIDTH // GRID_W, HEIGHT // GRID_H
+CELL_W = WIDTH // GRID_W
+CELL_H = HEIGHT // GRID_H
+
 HALF_WIDTH = WIDTH // 2
 HALF_HEIGHT = HEIGHT // 2
+
 MASTER_VOLUME = 0.5
 FPS = 300
-TILE = 100 # Коэффициент масштабирования
+TILE = 100
 
-# Players settings
+# Player settings
 PLAYER_POS = (1.5, 5)
 PLAYER_ANGLE = 0
 PLAYER_SPEED = 0.004
 PLAYER_ROT_SPEED = 0.002
-PLAYER_SIZE_SCALE = 0.2 # Коллизия игрока внутри клетки
+PLAYER_SIZE_SCALE = 0.2
 
 # Mouse control
 MOUSE_SENSITIVITY = 0.002
-MOUSE_MAX_REL = 40 # Ограничение резкого рывка
+MOUSE_MAX_REL = 40
 MOUSE_BORDER_LEFT = 100
 MOUSE_BORDER_RIGHT = WIDTH - 100
 
 # Raycasting
-FOV = math.pi / 3 # 60 degrees
+FOV = math.pi / 3
 HALF_FOV = FOV / 2
 NUM_RAYS = WIDTH // 2
 SCALE = math.ceil(WIDTH // NUM_RAYS)
 HALF_NUM_RAYS = NUM_RAYS // 2
-DELTA_ANGLE = FOV / NUM_RAYS # шаг угла меж лучами
-SCREEN_DIST = WIDTH // 2 / math.tan(HALF_FOV) # Масштабирование мира 
+DELTA_ANGLE = FOV / NUM_RAYS
+SCREEN_DIST = (WIDTH // 2) / math.tan(HALF_FOV)
 MAX_DEPTH = 20
-# Цвета стен
+
+# Wall colors (fallback when textures are disabled)
 WALL_COLORS = {
-    '1': (200, 200, 200),  # белый/серый (стандарт)
-    'R': (200, 150, 150),  # пастельно-красный
-    'B': (150, 150, 200),  # пастельно-синий
-    'G': (150, 200, 150),  # пастельно-зелёный
-    'Y': (200, 200, 150),  # пастельно-жёлтый
-    'P': (200, 150, 200),  # пастельно-пурпурный
-    'O': (200, 180, 150),  # пастельно-оранжевый
-    'C': (150, 200, 200),  # пастельно-голубой
-    'W': (180, 160, 140),  # пастельно-деревянный
-    'S': (160, 160, 160),  # пастельно-каменный
-    'M': (170, 170, 190),  # пастельно-металлик
+    '1': (200, 200, 200),
+    'R': (200, 150, 150),
+    'B': (150, 150, 200),
+    'G': (150, 200, 150),
+    'Y': (200, 200, 150),
+    'P': (200, 150, 200),
+    'O': (200, 180, 150),
+    'C': (150, 200, 200),
+    'W': (180, 160, 140),
+    'S': (160, 160, 160),
+    'M': (170, 170, 190),
 }
 
-# Текстуры
+# Textures
 TEXTURE_SIZE = 128
 TEXTURES_PATH = "resources/textures/"
 USE_TEXTURES = True
 TEXTURE_NAMES = ['W', 'R', 'B', 'G', 'Y', 'P', 'O', 'C', 'S', 'M', "D", "^", "L"]
 
 
-# === КОНВЕРТЕР КООРДИНАТ СЕТКИ ===
 def grid_to_pixel(col, row, mod='topleft'):
-    """
-    Преобразует координаты сетки (32×18) в пиксельные координаты экрана.
-    
-    Параметры:
-        col, row - координаты в сетке (0-31, 0-17)
-        mod - точка привязки:
-            'topleft' - верхний левый угол (по умолчанию)
-            'center' - центр клетки
-            'midtop' - середина верхней границы
-            'midbottom' - середина нижней границы
-            'midleft' - середина левой границы
-            'midright' - середина правой границы
-            'topright' - правый верхний угол
-            'bottomleft' - левый нижний угол
-            'bottomright' - правый нижний угол
-    
-    Возвращает:
-        (x, y) - координаты в пикселях
+    """Преобразует координаты сетки в пиксельные координаты экрана
+
+    Args:
+        col: Номер колонки в сетке (0-31)
+        row: Номер строки в сетке (0-17)
+        mod: Точка привязки (topleft, center, midtop, midbottom,
+            midleft, midright, topright, bottomleft, bottomright)
+
+    Returns:
+        tuple: Координаты (x, y) в пикселях
     """
     x = col * CELL_W
     y = row * CELL_H
-    
+
     if mod == 'topleft':
         return (x, y)
     elif mod == 'center':

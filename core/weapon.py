@@ -5,12 +5,39 @@ from setting import *
 from config.game_data import WEAPON_CONFIG
 from core.particle import Particle
 
+
 class Weapon:
+    """Базовый класс для оружия
+
+    Attributes:
+        game: Объект игры
+        weapon_name: Название оружия
+        name: Отображаемое имя
+        damage: Урон
+        reload_time: Время перезарядки в мс
+        is_continuous: Непрерывная стрельба
+        ammo_start: Начальное количество патронов
+        sprite_path: Путь к спрайту
+        sound_path: Путь к звуку выстрела
+        reloading: Флаг перезарядки
+        ammo: Текущее количество патронов
+        last_shot_time: Время последнего выстрела
+        recoil: Отдача (для анимации)
+        sound: Звук выстрела
+        sound_empty_ammo: Звук пустого магазина
+        sprite: Спрайт оружия
+    """
+
     def __init__(self, game, weapon_name):
+        """Инициализирует оружие
+
+        Args:
+            game: Объект игры
+            weapon_name: Название оружия
+        """
         self.game = game
         self.weapon_name = weapon_name
-        
-        # Читаем параметры из конфига
+
         config = WEAPON_CONFIG.get(weapon_name, {})
         self.name = config.get('name', weapon_name)
         self.damage = config.get('damage', 10)
@@ -19,23 +46,22 @@ class Weapon:
         self.ammo_start = config.get('ammo_start', 0)
         self.sprite_path = config.get('sprite', f'resources/weapons/{weapon_name}.png')
         self.sound_path = config.get('sound', f'resources/weapons/{weapon_name}_shot.wav')
-        
+
         self.reloading = False
         self.ammo = self.ammo_start
         self.last_shot_time = 0
         self.recoil = 0
-        
-        # Звуки
+
         self.sound = pygame.mixer.Sound(self.sound_path)
         self.sound.set_volume(0.2)
         self.sound_empty_ammo = pygame.mixer.Sound('resources/weapons/empty.wav')
         self.sound_empty_ammo.set_volume(0.2)
-        
-        # Спрайт
+
         self.sprite = None
         self._load_sprite()
 
     def _load_sprite(self):
+        """Загружает спрайт оружия"""
         try:
             original = pygame.image.load(self.sprite_path).convert_alpha()
             if self.name == "Pistol":
@@ -54,6 +80,7 @@ class Weapon:
             self.sprite = None
 
     def update_animation(self):
+        """Обновляет анимацию отдачи"""
         if self.reloading:
             self.elapsed = pygame.time.get_ticks() - self.last_shot_time
             if self.elapsed < self.reload_time:
@@ -65,7 +92,11 @@ class Weapon:
             self.elapsed = 9999
 
     def fire(self):
-        print(f"[DEBUG] fire() called, ammo={self.ammo}, reloading={self.reloading}")
+        """Выполняет выстрел
+
+        Returns:
+            tuple: (hit_x, hit_y, dist, side) или None
+        """
         if self.reloading or self.ammo <= 0:
             if self.ammo <= 0:
                 self.sound_empty_ammo.play()
@@ -98,11 +129,18 @@ class Weapon:
         for _ in range(10):
             p_x = hit_x + uniform(-0.02, 0.02)
             p_y = hit_y + uniform(-0.02, 0.02)
-            self.game.particles.append(Particle(self.game, (p_x, p_y), (255, 200, 50), uniform(0.001, 0.005)))
+            self.game.particles.append(
+                Particle(self.game, (p_x, p_y), (255, 200, 50), uniform(0.001, 0.005))
+            )
 
         return hit_x, hit_y, dist, side
 
     def _get_hit_pos(self):
+        """DDA алгоритм для определения точки попадания в стену
+
+        Returns:
+            tuple: (hit_x, hit_y, distance, side)
+        """
         ox, oy = self.game.player.x, self.game.player.y
         x_map, y_map = int(ox), int(oy)
 
@@ -152,14 +190,18 @@ class Weapon:
         return hit_x, hit_y, dist, side
 
     def draw(self):
+        """Рисует оружие (заглушка, переопределяется в дочерних классах)"""
         pass
 
 
 class Pistol(Weapon):
+    """Пистолет"""
+
     def __init__(self, game):
         super().__init__(game, 'Pistol')
 
     def draw(self):
+        """Рисует пистолет"""
         self.update_animation()
 
         if self.sprite is None:
@@ -180,6 +222,7 @@ class Pistol(Weapon):
             pygame.draw.circle(self.game.screen, (255, 255, 255), (flash_x, flash_y), 20)
 
     def _draw_fallback(self):
+        """Запасная отрисовка если спрайт не загружен"""
         center_x = (GRID_W // 2) * CELL_W
         bottom_y = HEIGHT + int(80 * (CELL_H / 60)) + self.recoil * 2.0
 
@@ -201,10 +244,13 @@ class Pistol(Weapon):
 
 
 class Shotgun(Weapon):
+    """Дробовик"""
+
     def __init__(self, game):
         super().__init__(game, 'Shotgun')
 
     def draw(self):
+        """Рисует дробовик"""
         self.update_animation()
 
         if self.sprite is None:
@@ -225,6 +271,7 @@ class Shotgun(Weapon):
             pygame.draw.circle(self.game.screen, (255, 255, 180), (flash_x, flash_y), 50)
 
     def _draw_fallback(self):
+        """Запасная отрисовка если спрайт не загружен"""
         center_x = (GRID_W // 2) * CELL_W
         bottom_y = HEIGHT + int(80 * (CELL_H / 60)) + self.recoil * 2.0
 
@@ -248,10 +295,13 @@ class Shotgun(Weapon):
 
 
 class MachineGun(Weapon):
+    """Автомат"""
+
     def __init__(self, game):
         super().__init__(game, 'Machine Gun')
 
     def draw(self):
+        """Рисует автомат"""
         self.update_animation()
 
         if self.sprite is None:
@@ -272,6 +322,7 @@ class MachineGun(Weapon):
             pygame.draw.circle(self.game.screen, (255, 255, 255), (flash_x, flash_y), 30)
 
     def _draw_fallback(self):
+        """Запасная отрисовка если спрайт не загружен"""
         center_x = (GRID_W // 2) * CELL_W
         bottom_y = HEIGHT + int(120 * (CELL_H / 60)) + self.recoil
         shake = math.sin(pygame.time.get_ticks() * 0.3) * 6 if self.reloading else 0
@@ -289,10 +340,13 @@ class MachineGun(Weapon):
 
 
 class PlasmaGun(Weapon):
+    """Плазмаган"""
+
     def __init__(self, game):
         super().__init__(game, 'Plasma Gun')
 
     def draw(self):
+        """Рисует плазмаган"""
         self.update_animation()
 
         if self.sprite is None:

@@ -7,21 +7,46 @@ from core.map import Map
 from core.player import Player
 from core.npc import Solder, Kamikaze, Jaggernaut, Lightning, Boss
 from core.weapon import Pistol, Shotgun, MachineGun, PlasmaGun
-from config.game_data import *
+from config.game_data import NPC_CONFIG, WEAPON_CONFIG
 
 
 class LevelManager:
+    """Менеджер загрузки уровней
+
+    Отвечает за загрузку уровней из JSON, создание всех игровых объектов,
+    переход между уровнями и сброс игры.
+
+    Attributes:
+        game: Объект игры
+        current_level: Текущий уровень
+        total_kills: Общее количество убийств
+        level_start_time: Время начала уровня
+        level_time: Время прохождения уровня
+        exit_pos: Позиция выхода
+        player: Объект игрока
+        map: Объект карты
+        npcs: Список NPC
+        inventory: Инвентарь игрока
+        weapon: Текущее оружие
+        current_weapon_index: Индекс текущего оружия
+        particles: Список частиц
+        levels_folder: Папка с уровнями
+    """
+
     def __init__(self, game):
+        """Инициализирует менеджер уровней
+
+        Args:
+            game: Объект игры
+        """
         self.game = game
-        
-        # Переменные уровня (были в main.py)
+
         self.current_level = 1
         self.total_kills = 0
         self.level_start_time = 0
         self.level_time = 0
         self.exit_pos = None
-        
-        # Объекты уровня (были в main.py)
+
         self.player = None
         self.map = None
         self.npcs = []
@@ -29,15 +54,22 @@ class LevelManager:
         self.weapon = None
         self.current_weapon_index = 0
         self.particles = []
-        
+
         self.levels_folder = "resources/levels"
 
     def load_level(self, level_num):
+        """Загружает уровень из JSON
+
+        Args:
+            level_num: Номер уровня
+
+        Returns:
+            bool: True если загрузка успешна
+        """
         print(f"\n{'=' * 60}")
         print(f"ЗАГРУЗКА УРОВНЯ {level_num}")
         print(f"{'=' * 60}")
 
-        # Загрузка JSON
         file_path = f"{self.levels_folder}/level_{level_num}.json"
         if not os.path.exists(file_path):
             print(f"Ошибка: уровень {file_path} не найден!")
@@ -46,24 +78,18 @@ class LevelManager:
         with open(file_path, 'r') as f:
             level_data = json.load(f)
 
-        # Очистка кэша текстур
         if hasattr(self.game, 'raycasting'):
             self.game.raycasting.texture_cache.clear()
 
-        # Сброс данных уровня
         self.particles = []
         self.total_kills = 0
         self.npcs = []
 
-        # Создание карты
         self.map = Map(self.game, level_data['map'])
 
-        # Установка фона
         background = level_data.get('background', {})
         self.game.renderer.set_background(background)
 
-
-        # Игрок
         if self.map.player_spawn_pos:
             if self.player is None:
                 self.player = Player(self.game)
@@ -74,54 +100,48 @@ class LevelManager:
         else:
             print("ОШИБКА: Нет спавна игрока на карте (символ 'S')")
             return False
-        
 
-        # Оружие
         self.inventory = []
         for weapon_name in level_data.get('inventory', ['Pistol']):
             config = WEAPON_CONFIG.get(weapon_name)
             if not config:
                 continue
-            
+
             class_name = config.get('class_name')
             if not class_name:
                 continue
-            
+
             weapon_class = globals().get(class_name)
             if not weapon_class:
                 continue
-            
+
             weapon = weapon_class(self.game)
             self.inventory.append(weapon)
 
-        # Если инвентарь пуст — даём пистолет по умолчанию
         if not self.inventory:
             self.inventory = [Pistol(self.game)]
 
         self.current_weapon_index = 0
         self.weapon = self.inventory[0]
 
-        # Создание NPC
         self.npcs = []
         for npc_x, npc_y, npc_type in self.map.npc_positions:
             config = NPC_CONFIG.get(npc_type)
             if not config:
                 continue
-            
+
             class_name = config.get('class_name')
             if not class_name:
                 continue
-            
-            # Получаем класс по имени из глобальной области
+
             npc_class = globals().get(class_name)
             if not npc_class:
                 continue
-            
+
             x, y = npc_x + 0.5, npc_y + 0.5
             npc = npc_class(self.game, pos=(x, y))
             self.npcs.append(npc)
 
-        # Генерация патрульных точек
         for npc in self.npcs:
             try:
                 npc.generate_waypoints_auto(4)
@@ -137,7 +157,6 @@ class LevelManager:
     def next_level(self):
         """Переход на следующий уровень"""
         self.level_time = (pygame.time.get_ticks() - self.level_start_time) // 1000
-        # Сохранение через game.save_system
         self.current_level += 1
         self.game.save_system.save(self.current_level, self.total_kills, self.level_time)
         self.game.ui_manager.current_state = self.game.ui_manager.states['LEVEL_END']
@@ -154,7 +173,7 @@ class LevelManager:
             self.next_level()
 
     def reset_game(self):
-        """Полный сброс игры"""
+        """Полный сброс игры (новый старт)"""
         self.game.save_system.delete()
         self.total_kills = 0
         self.level_time = 0

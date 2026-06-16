@@ -1,3 +1,8 @@
+"""Главный файл игры
+
+Содержит класс Game и точку входа.
+"""
+
 import pygame
 import sys
 import math
@@ -13,31 +18,56 @@ from ui.console import DevConsole
 
 
 class Game:
+    """Главный класс игры
+
+    Управляет игровым циклом, загрузкой уровней и компонентами.
+
+    Attributes:
+        screen: Экран pygame
+        clock: Часы для FPS
+        delta_time: Время между кадрами
+        font: Шрифт для отладки
+        save_system: Система сохранений
+        raycasting: Система рейкастинга
+        renderer: Рендерер интерфейса
+        pathfinder: Система поиска пути
+        ui_manager: Менеджер UI
+        console: Консоль разработчика
+        music_manager: Менеджер музыки
+        level_manager: Менеджер уровней
+        player: Игрок
+        map: Карта
+        npcs: Список NPC
+        inventory: Инвентарь игрока
+        weapon: Текущее оружие
+        particles: Список частиц
+        exit_pos: Позиция выхода
+        total_kills: Общее количество убийств
+        current_level: Текущий уровень
+        level_start_time: Время начала уровня
+    """
+
     def __init__(self):
+        """Инициализирует игру"""
         pygame.mouse.set_visible(False)
         self.screen = pygame.display.set_mode(RES, pygame.SCALED | pygame.FULLSCREEN)
         self.clock = pygame.time.Clock()
         self.delta_time = 1
         self.font = pygame.font.SysFont('Arial', 30, bold=True)
-        
-        # Системы
+
         self.save_system = SaveSystem()
         self.raycasting = RayCasting(self)
         self.renderer = Renderer(self)
         self.pathfinder = PathFinder(self)
-        
-        # UI
+
         pygame.mixer.init(frequency=22050, size=-16, channels=2, buffer=512)
         self.ui_manager = UIManager(self)
         self.console = DevConsole(self)
-        
-        # Музыка
+
         self.music_manager = MusicManager()
-        
-        # Level Manager
+
         self.level_manager = LevelManager(self)
-        
-        # Ссылки на объекты уровня
+
         self.player = None
         self.map = None
         self.npcs = []
@@ -48,16 +78,17 @@ class Game:
         self.total_kills = 0
         self.current_level = 1
         self.level_start_time = 0
-        
-        # Загружаем первый уровень
+
         self.load_level(self.current_level)
 
-    
     def load_level(self, level_num):
-        """Загружает уровень через LevelManager и обновляет ссылки"""
+        """Загружает уровень через LevelManager и обновляет ссылки
+
+        Args:
+            level_num: Номер уровня
+        """
         self.level_manager.load_level(level_num)
-        
-        # Обновляем ссылки после загрузки
+
         self.player = self.level_manager.player
         self.map = self.level_manager.map
         self.npcs = self.level_manager.npcs
@@ -70,41 +101,40 @@ class Game:
         self.level_start_time = self.level_manager.level_start_time
 
     def update(self):
+        """Обновляет состояние игры"""
         self.player.update()
         self.level_manager.check_exit()
-        
-        # Обновление дверей
+
         for door in self.map.doors:
             door.update()
-        
-        # Обновление частиц
-        self.particles = [p for p in self.particles if pygame.time.get_ticks() - p.start_time < p.life_time]
+
+        self.particles = [p for p in self.particles
+                          if pygame.time.get_ticks() - p.start_time < p.life_time]
         for p in self.particles:
             p.update()
-        
-        # Обновление NPC
+
         for npc in self.npcs:
             npc.update()
-        
-        # Обновление оружия
+
         self.weapon.update_animation()
-        # Проверка зажатой ЛКМ для автоматического оружия
+
         mouse_buttons = pygame.mouse.get_pressed()
         if mouse_buttons[0]:
             if self.weapon.is_continuous and not self.weapon.reloading:
                 self.weapon.fire()
-        
+
         self.delta_time = self.clock.tick(FPS)
         self.player.update_regen()
         pygame.display.set_caption(f'FPS: {self.clock.get_fps():.1f}')
 
     def draw(self):
+        """Отрисовывает игру"""
         self.renderer.draw_background()
         self.raycasting.ray_cast()
         self.renderer.draw_fps()
 
-        # Сортировка NPC по глубине
-        self.npcs.sort(key=lambda npc: math.hypot(npc.x - self.player.x, npc.y - self.player.y), reverse=True)
+        self.npcs.sort(key=lambda npc: math.hypot(
+            npc.x - self.player.x, npc.y - self.player.y), reverse=True)
         for npc in self.npcs:
             npc.draw()
 
@@ -119,6 +149,7 @@ class Game:
         pygame.display.flip()
 
     def handle_events(self):
+        """Обрабатывает события pygame"""
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 pygame.quit()
@@ -155,9 +186,13 @@ class Game:
 
                 if event.type == pygame.MOUSEBUTTONDOWN:
                     if event.button == 4:
-                        self.level_manager.current_weapon_index = (self.level_manager.current_weapon_index + 1) % len(self.inventory)
+                        self.level_manager.current_weapon_index = (
+                            self.level_manager.current_weapon_index + 1
+                        ) % len(self.inventory)
                     if event.button == 5:
-                        self.level_manager.current_weapon_index = (self.level_manager.current_weapon_index - 1) % len(self.inventory)
+                        self.level_manager.current_weapon_index = (
+                            self.level_manager.current_weapon_index - 1
+                        ) % len(self.inventory)
                     self.weapon = self.inventory[self.level_manager.current_weapon_index]
 
                 if self.console.active:
@@ -168,11 +203,11 @@ class Game:
                     self.console.toggle()
 
     def run(self):
+        """Главный игровой цикл"""
         while True:
             self.handle_events()
             self.ui_manager.update()
-            
-            # Одно обращение к UI и один вызов музыки
+
             self.music_manager.update(self.ui_manager.current_state, self.current_level)
 
             if self.ui_manager.current_state == self.ui_manager.states['PLAYING']:
