@@ -19,7 +19,6 @@
     ["M", "E", "M", "_", "_", "_", "_", "_", "_", "M"],
     ["M", "M", "M", "M", "C", "M", "M", "M", "M", "M"]
   ],
-  "player_start": [1.5, 5],
   "inventory": ["Pistol", "Shotgun", "Machine Gun", "Plasma Gun"],
   "starting_ammo": {
     "Pistol": 30,

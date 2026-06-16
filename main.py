@@ -60,7 +60,7 @@ class Game:
         self.particles = []
         self.total_kills = 0
 
-        self.map = Map(self, level_data['map_data'], level_data.get('doors', []))
+        self.map = Map(self, level_data['map_data'])
         print(f"Карта: {self.map.width}x{self.map.height}, стен: {len(self.map.world_map)}")
 
         background = level_data.get('background', {})
@@ -104,15 +104,15 @@ class Game:
             x, y = npc_x + 0.5, npc_y + 0.5
 
             try:
-                if npc_type == 'Solder':
+                if npc_type == '2':
                     self.npcs.append(Solder(self, pos=(x, y)))
-                elif npc_type == 'Kamikaze':
+                elif npc_type == '3':
                     self.npcs.append(Kamikaze(self, pos=(x, y)))
-                elif npc_type == 'Jaggernaut':
+                elif npc_type == '4':
                     self.npcs.append(Jaggernaut(self, pos=(x, y)))
-                elif npc_type == 'Boss':
+                elif npc_type == '6':
                     self.npcs.append(Boss(self, pos=(x, y)))
-                elif npc_type == 'Lightning':
+                elif npc_type == '5':
                     self.npcs.append(Lightning(self, pos=(x, y)))
                 else:
                     continue
