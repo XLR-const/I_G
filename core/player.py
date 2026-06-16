@@ -55,6 +55,7 @@ class Player:
 
         if self.hp <= 0:
             self.hp = 0
+            self.death_sound.play()
             self.game.ui_manager.current_state = self.game.ui_manager.states['DEAD']
 
     def movement(self):

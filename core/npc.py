@@ -168,7 +168,7 @@ class NPC:
 
         if self.hp <= 0:
             self.alive = False
-            self.game.total_kills += 1
+            self.game.level_manager.total_kills += 1
             for _ in range(20):
                 self.game.particles.append(Particle(
                     self.game,
