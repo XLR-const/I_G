@@ -61,18 +61,19 @@ class LevelManager:
         background = level_data.get('background', {})
         self.game.renderer.set_background(background)
 
-        # Выход
-        self.exit_pos = self.map.get_exit_pos()
-        print(f"Выход: {self.exit_pos}")
 
         # Игрок
-        player_start = level_data.get('player_start', (1.5, 5))
-        if self.player is None:
-            self.player = Player(self.game)
-        self.player.x, self.player.y = player_start
-        self.player.hp = 100
-        self.player.angle = 0
-        print(f"Игрок на ({self.player.x}, {self.player.y})")
+        if self.map.player_spawn_pos:
+            if self.player is None:
+                self.player = Player(self.game)
+            self.player.x, self.player.y = self.map.player_spawn_pos
+            self.player.hp = 100
+            self.player.angle = 0
+            self.exit_pos = self.map.exit_pos
+        else:
+            print("ОШИБКА: Нет спавна игрока на карте (символ 'S')")
+            return False
+        
 
         # Оружие
         self.inventory = []
