@@ -7,6 +7,7 @@ from core.map import Map
 from core.player import Player
 from core.npc import Solder, Kamikaze, Jaggernaut, Lightning, Boss
 from core.weapon import Pistol, Shotgun, MachineGun, PlasmaGun
+from config.game_data import *
 
 
 class LevelManager:
@@ -78,40 +79,46 @@ class LevelManager:
         # Оружие
         self.inventory = []
         for weapon_name in level_data.get('inventory', ['Pistol']):
-            if weapon_name == 'Pistol':
-                self.inventory.append(Pistol(self.game))
-            elif weapon_name == 'Shotgun':
-                self.inventory.append(Shotgun(self.game))
-            elif weapon_name == 'Machine Gun':
-                self.inventory.append(MachineGun(self.game))
-            elif weapon_name == 'Plasma Gun':
-                self.inventory.append(PlasmaGun(self.game))
+            config = WEAPON_CONFIG.get(weapon_name)
+            if not config:
+                continue
+            
+            class_name = config.get('class_name')
+            if not class_name:
+                continue
+            
+            weapon_class = globals().get(class_name)
+            if not weapon_class:
+                continue
+            
+            weapon = weapon_class(self.game)
+            self.inventory.append(weapon)
+
+        # Если инвентарь пуст — даём пистолет по умолчанию
+        if not self.inventory:
+            self.inventory = [Pistol(self.game)]
 
         self.current_weapon_index = 0
         self.weapon = self.inventory[0]
 
-        starting_ammo = level_data.get('starting_ammo', {})
-        for gun in self.inventory:
-            gun.ammo = starting_ammo.get(gun.name, 0)
-        print(f"Оружие: {[w.name for w in self.inventory]}")
-
         # Создание NPC
+        self.npcs = []
         for npc_x, npc_y, npc_type in self.map.npc_positions:
-            x, y = npc_x + 0.5, npc_y + 0.5
-
-            if npc_type == '2':
-                npc = Solder(self.game, pos=(x, y))
-            elif npc_type == '3':
-                npc = Kamikaze(self.game, pos=(x, y))
-            elif npc_type == '4':
-                npc = Jaggernaut(self.game, pos=(x, y))
-            elif npc_type == '5':
-                npc = Lightning(self.game, pos=(x, y))
-            elif npc_type == '6':
-                npc = Boss(self.game, pos=(x, y))
-            else:
+            config = NPC_CONFIG.get(npc_type)
+            if not config:
                 continue
-
+            
+            class_name = config.get('class_name')
+            if not class_name:
+                continue
+            
+            # Получаем класс по имени из глобальной области
+            npc_class = globals().get(class_name)
+            if not npc_class:
+                continue
+            
+            x, y = npc_x + 0.5, npc_y + 0.5
+            npc = npc_class(self.game, pos=(x, y))
             self.npcs.append(npc)
 
         # Генерация патрульных точек
@@ -131,6 +138,7 @@ class LevelManager:
         """Переход на следующий уровень"""
         self.level_time = (pygame.time.get_ticks() - self.level_start_time) // 1000
         # Сохранение через game.save_system
+        self.current_level += 1
         self.game.save_system.save(self.current_level, self.total_kills, self.level_time)
         self.game.ui_manager.current_state = self.game.ui_manager.states['LEVEL_END']
 

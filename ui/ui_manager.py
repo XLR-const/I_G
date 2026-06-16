@@ -162,18 +162,15 @@ class UIManager:
                     sys.exit()
                 return True
         return False
-    
+
     def _handle_level_end_event(self, event):
-        """Обработка конца уровня"""
         if event.type == pygame.KEYDOWN:
-            self.game.current_level += 1
-            # Save progress (kills and level number, time is just for display)
-            SaveSystem.save(self.game.current_level, self.game.total_kills, self._get_level_time())
-            self.game.load_level(self.game.current_level)
+            # Не увеличиваем здесь, просто загружаем текущий уровень
+            self.game.load_level(self.game.level_manager.current_level)
             self.current_state = self.states['BRIEFING']
             return True
         return False
-    
+        
     def _handle_dead_event(self, event):
         """Обработка экрана смерти"""
         if event.type == pygame.KEYDOWN:
@@ -436,10 +433,10 @@ class UIManager:
         screen.blit(title, title_rect)
         
         stats = [
-            f"УБИТО ВРАГОВ: {self._get_kills_count()}",
+            f"УБИТО: {self.game.level_manager.total_kills}",
             f"ВРЕМЯ: {self._get_level_time()}",
             "",
-            "НАЖМИТЕ ЛЮБУЮ КЛАВИШУ ДЛЯ ПРОДОЛЖЕНИЯ..."
+            "НАЖМИТЕ ЛЮБУЮ КЛАВИШУ ДЛЯ ПРОДОЛЖЕНИЯ"
         ]
         for i, stat in enumerate(stats):
             y = setting.HEIGHT // 2 + i * 40
@@ -585,4 +582,4 @@ class UIManager:
         return self.game.total_kills
     
     def _get_level_time(self):
-        return f"{self.game.level_time // 60}:{self.game.level_time % 60:02d}"
+        return f"{self.game.level_manager.level_time // 60}:{self.game.level_manager.level_time % 60:02d}"

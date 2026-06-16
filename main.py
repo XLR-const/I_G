@@ -108,7 +108,6 @@ class Game:
             p.draw()
 
         self.weapon.draw()
-        self.renderer.draw_fog_filter()
         self.renderer.draw_interface()
         self.renderer.draw_crosshair()
         self.console.draw(self.screen)
