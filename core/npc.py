@@ -235,7 +235,7 @@ class NPC:
             for dist in range(2, 6):
                 check_x = int(self.x) + dx * dist
                 check_y = int(self.y) + dy * dist
-                if (0 <= check_x < self.game.map.width and 0 <= check_y < self.game.map.height):
+                if (0 <= check_x < self.game.level_manager.map.width and 0 <= check_y < self.game.level_manager.map.height):
                     if not self.game.map.is_wall(check_x, check_y):
                         waypoints.append((check_x + 0.5, check_y + 0.5))
                         break

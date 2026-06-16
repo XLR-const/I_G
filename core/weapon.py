@@ -65,6 +65,7 @@ class Weapon:
             self.elapsed = 9999
 
     def fire(self):
+        print(f"[DEBUG] fire() called, ammo={self.ammo}, reloading={self.reloading}")
         if self.reloading or self.ammo <= 0:
             if self.ammo <= 0:
                 self.sound_empty_ammo.play()

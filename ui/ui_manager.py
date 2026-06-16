@@ -100,7 +100,7 @@ class UIManager:
                 self.enter_sound.play()
                 # 0: NEW GAME
                 if self.selected_option == 0:
-                    self.game.reset_game()
+                    self.game.level_manager.reset_game()
                     self.current_state = self.states['BRIEFING']
                 # 1: LOAD GAME
                 elif self.selected_option == 1:
@@ -111,7 +111,7 @@ class UIManager:
                         self.game.load_level(self.game.current_level)
                         self.current_state = self.states['BRIEFING']
                     else:
-                        self.game.reset_game()
+                        self.game.level_manager.reset_game()
                         self.current_state = self.states['BRIEFING']
                 # 2: OPTIONS
                 elif self.selected_option == 2:
