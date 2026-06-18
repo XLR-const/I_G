@@ -17,6 +17,7 @@ class NPC:
         radius: Радиус коллизии
         size: Размер для определения попадания
         hp: Здоровье
+        max_hp: Макс здоровье
         damage: Урон
         shoot_range: Дальность стрельбы
         shoot_delay: Задержка между выстрелами
@@ -66,6 +67,7 @@ class NPC:
         self.radius = config.get('radius', 0.35)
         self.size = 0.3
         self.hp = config.get('hp', 100)
+        self.max_hp = self.hp
         self.damage = config.get('damage', 10)
         self.shoot_range = config.get('shoot_range', 5.0)
         self.shoot_delay = config.get('shoot_delay', 800)
@@ -607,9 +609,71 @@ class Lightning(NPC):
     def __init__(self, game, pos=(8.5, 7.5)):
         super().__init__(game, '5', pos)
 
-
 class Boss(NPC):
-    """Босс - животное"""
-
     def __init__(self, game, pos=(8.5, 7.5)):
+        # Инициализируем базового NPC. Передаем тип '6' (или какой символ у вас на карте)
         super().__init__(game, '6', pos)
+        
+        # Перезаписываем характеристики под Босса
+        self.hp = 2000
+        self.max_hp = 2000
+        self.speed = 0.04
+        self.damage = 25
+        self.shoot_range = 7.0
+        self.shoot_delay = 600
+        self.radius = 0.9
+        self.is_boss = True  # Флаг, чтобы рендерер знал, что это босс
+
+        # Звук выстрела босса
+        try:
+            self.shoot_sound = pygame.mixer.Sound('resources/npc/boss_shot.wav')
+            self.shoot_sound.set_volume(0.3)
+        except:
+            pass
+
+    def update(self):
+        if not self.alive:
+            return
+        
+        # Полностью доверяем базовой стейт-машине NPC: 
+        # она сама водит босса, проверяет углы, меняет спрайты и заставляет его стрелять
+        super().update()
+
+    def draw(self):
+        # Просто отрисовываем спрайт босса через базовый метод NPC без спецэффектов
+        super().draw()
+
+    def draw_boss_hud(self):
+        """Рисует полоску HP босса, смещенную вниз, чтобы не перекрывать компас"""
+        if not self.alive:
+            return
+            
+        bar_width = 400
+        bar_height = 16
+        
+        # Получаем размеры экрана динамически
+        screen_w = self.game.screen.get_width()
+        
+        bar_x = (screen_w - bar_width) // 2
+        bar_y = 70  # Место под компас свободно
+        
+        # 1. ТЕМНО-СЕРАЯ ТОНКАЯ РАМКА ВОКРУГ ШКАЛЫ
+        pygame.draw.rect(self.game.screen, (25, 25, 25), (bar_x - 3, bar_y - 3, bar_width + 6, bar_height + 6))
+        
+        # 2. ЗАДНИЙ ФОН ШКАЛЫ (ЯРКО-КРАСНЫЙ - цвет потерянного здоровья)
+        # RGB: (220, 20, 20) — чистый насыщенный красный цвет
+        pygame.draw.rect(self.game.screen, (220, 20, 20), (bar_x, bar_y, bar_width, bar_height))
+        
+        # Вычисление ширины текущего здоровья
+        hp_percent = max(0.0, min(1.0, self.hp / self.max_hp))
+        hp_width = int(bar_width * hp_percent)
+        
+        # 3. ТЕКУЩЕЕ ЗДОРОВЬЕ (СВЕТЛО-СИНИЙ цвет)
+        # RGB: (100, 180, 255) — красивый, мягкий и светлый оттенок синего (голубой/неоновый)
+        pygame.draw.rect(self.game.screen, (100, 180, 255), (bar_x, bar_y, hp_width, bar_height))
+        
+        # Текст с именем над полоской
+        font = pygame.font.Font(None, 22)
+        text = font.render(f"=== {self.name.upper()} ===", True, (240, 240, 240))
+        text_rect = text.get_rect(center=(bar_x + bar_width // 2, bar_y - 12))
+        self.game.screen.blit(text, text_rect)

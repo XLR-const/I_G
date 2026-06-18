@@ -280,3 +280,73 @@ class Renderer:
             fog = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
             fog.fill((180, 190, 170, 40))
             self.game.screen.blit(fog, (0, 0))
+
+    def draw_npc_health(self, npc):
+        """Рисует полоску HP над NPC"""
+        if not npc.alive:
+            return
+        
+        # Теперь эта проверка сработает корректно
+        if not hasattr(npc, 'max_hp') or npc.max_hp <= 0:
+            return
+        
+        dx = npc.x - self.game.player.x
+        dy = npc.y - self.game.player.y
+        dist = math.hypot(dx, dy)
+        
+        if dist > 10:
+            return
+        
+        theta = math.atan2(dy, dx)
+        delta = theta - self.game.player.angle
+        delta = (delta + math.pi) % math.tau - math.pi
+        
+        if abs(delta) > HALF_FOV:
+            return
+        
+        dist_flat = dist * math.cos(delta)
+        if dist_flat < 0.2:
+            return
+        
+        # ПОЛУЧАЕМ ИНДЕКС ЛУЧА ДЛЯ ПРОВЕРКИ Z-БУФЕРА
+        center_x = (HALF_NUM_RAYS + delta / DELTA_ANGLE) * SCALE
+        ray_idx = int(center_x // SCALE)
+        
+        # Проверяем, не скрыт ли центр NPC стеной
+        if 0 <= ray_idx < NUM_RAYS:
+            if dist_flat > self.game.raycasting.z_buffer[ray_idx]:
+                return  # NPC за стеной, полоску рисовать не нужно
+        
+        proj_height = int(SCREEN_DIST / dist_flat)
+        y_pos = int(HALF_HEIGHT - proj_height // 2 - 20)
+        
+        # Ширина полоски зависит от размера NPC
+        bar_width = max(30, proj_height // 2)
+        if bar_width > 80:
+            bar_width = 80
+        bar_height = 4
+        
+        bar_x = int(center_x - bar_width // 2)
+        bar_y = y_pos
+        
+        # Ограничение отрисовки границами экрана по горизонтали
+        if bar_x + bar_width < 0 or bar_x > WIDTH:
+            return
+
+        # Фон
+        pygame.draw.rect(self.game.screen, (30, 30, 30), (bar_x, bar_y, bar_width, bar_height))
+        
+        # HP
+        hp_percent = npc.hp / npc.max_hp
+        hp_width = int(bar_width * max(0, min(1, hp_percent)))
+        
+        # Цвет
+        if hp_percent > 0.5:
+            color = (0, 255, 0)
+        elif hp_percent > 0.25:
+            color = (255, 255, 0)
+        else:
+            color = (255, 0, 0)
+        
+        pygame.draw.rect(self.game.screen, color, (bar_x, bar_y, hp_width, bar_height))
+

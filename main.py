@@ -137,6 +137,11 @@ class Game:
             npc.x - self.player.x, npc.y - self.player.y), reverse=True)
         for npc in self.npcs:
             npc.draw()
+            if npc.alive:
+                if not getattr(npc, 'is_boss', False):
+                    self.renderer.draw_npc_health(npc)
+                else:
+                    npc.draw_boss_hud()
 
         for p in self.particles:
             p.draw()
