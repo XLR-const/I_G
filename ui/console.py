@@ -116,7 +116,7 @@ class DevConsole:
             try:
                 ammo = int(command[5:])
                 ammo = max(0, ammo)
-                self.game.level_manager.weapon.ammo = ammo
+                self.game.weapon.ammo = ammo
                 self.lines.append(f"Патроны установлены на {ammo}")
             except Exception:
                 self.lines.append("Ошибка: ammo <число>")
