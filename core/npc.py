@@ -79,7 +79,7 @@ class NPC:
         self.state_timer = 0
 
         self.last_shot = 0
-        self.shoot_flash = 0
+        self.shoot_flash = 20
 
         sound_path = config.get('sound', 'resources/npc/npc_rifle.wav')
         sound_volume = config.get('sound_volume', 0.2)
@@ -317,7 +317,7 @@ class NPC:
         now = pygame.time.get_ticks()
         if now - self.last_shot >= self.shoot_delay:
             self.last_shot = now
-            self.shoot_flash = 12
+            self.shoot_flash = 6
             self.shoot_sound.play()
             self.game.player.take_damage(self.damage)
 
@@ -506,18 +506,46 @@ class NPC:
         else:
             img = self.image
 
-        if self.shoot_flash > 0:
-            flash_surface = pygame.Surface((proj_width, proj_height), pygame.SRCALPHA)
-            intensity = min(255, self.shoot_flash * 40)
-            center_flash_x = proj_width // 2
-            center_flash_y = proj_height // 2
-            radius = min(proj_width, proj_height) // 2
-            pygame.draw.circle(flash_surface, (255, 200, 50, intensity),
-                               (center_flash_x, center_flash_y), radius)
-            img.blit(flash_surface, (0, 0), special_flags=pygame.BLEND_RGB_ADD)
+        img = self.image.copy()
 
+        # 2. Накладываем эффект урона (красный фильтр)
+        if self.hurt_flash > 0:
+            red_surface = pygame.Surface(img.get_size())
+            red_surface.fill((255, 0, 0))
+            img.blit(red_surface, (0, 0), special_flags=pygame.BLEND_RGB_ADD)
+
+        # 3. Масштабируем спрайт под проекцию экрана
         img = pygame.transform.scale(img, (proj_width, proj_height))
 
+        # 4. Накладываем вспышку выстрела (ТЕПЕРЬ ПОВЕРХ МАСШТАБИРОВАННОГО ИЗОБРАЖЕНИЯ)
+        if self.shoot_flash > 0:
+            flash_surface = pygame.Surface((proj_width, proj_height), pygame.SRCALPHA)
+            
+            # Рассчитываем прогресс (от 1.0 до 0.0)
+            progress = self.shoot_flash / 12  
+            if progress > 1.0: progress = 1.0
+            
+            # Вычисляем радиус относительно размеров проекции
+            max_radius = min(proj_width, proj_height) // 3  # Сделали чуть меньше (//3), чтобы не на весь экран
+            radius = int(max_radius * (1 - progress * 0.2))
+            
+            if radius > 0:
+                # Внешний ореол
+                alpha_outer = int(180 * progress)
+                color_outer = (255, 140, 0, alpha_outer)
+                pygame.draw.circle(flash_surface, color_outer, 
+                                   (proj_width // 2, proj_height // 2), radius)
+                
+                # Яркое ядро
+                alpha_inner = int(255 * progress)
+                color_inner = (255, 255, 200, alpha_inner)
+                pygame.draw.circle(flash_surface, color_inner, 
+                                   (proj_width // 2, proj_height // 2), int(radius * 0.4))
+            
+            # Накладываем вспышку на уже отмасштабированный img
+            img.blit(flash_surface, (0, 0))
+
+        # 5. Отрисовка на экран через Z-буфер (ваш оригинальный цикл)
         start_x = int(center_x - proj_width // 2)
         for x in range(start_x, start_x + proj_width, SCALE):
             ray_idx = int(x // SCALE)
@@ -527,6 +555,7 @@ class NPC:
                     if 0 <= sub_x < proj_width:
                         self.game.screen.blit(img, (x, HALF_HEIGHT - proj_height // 2),
                                               (sub_x, 0, SCALE, proj_height))
+
 
 
 class Solder(NPC):
