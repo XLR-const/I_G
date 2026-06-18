@@ -357,7 +357,7 @@ class NPC:
             rand_x = self.x + uniform(-3, 3)
             rand_y = self.y + uniform(-3, 3)
             if 1 < rand_x < self.game.map.width - 1 and 1 < rand_y < self.game.map.height - 1:
-                if not self.game.map.is_wall(int(rand_x), int(rand_y)):
+                if not self.game.level_manager.map.is_wall(check_x, check_y):
                     waypoints.append((rand_x, rand_y))
 
         self.waypoints = waypoints[:num_points]
@@ -609,153 +609,169 @@ class Lightning(NPC):
     def __init__(self, game, pos=(8.5, 7.5)):
         super().__init__(game, '5', pos)
 
-class BossBall(NPC):
-    """Снаряд босса, движущийся по прямой и наносящий урон игроку
-
-    Attributes:
-        angle: Угол движения в радианах
-        speed: Скорость снаряда
-    """
-
+class BossBall:
+    """Полностью независимый класс снаряда босса (без наследования от NPC)"""
     def __init__(self, game, pos, angle):
         self.game = game
+        self.x, self.y = pos
         self.angle = angle
-
-        super().__init__(game, 'ball', pos)
-
-        # Скорость из конфига босса
-        config = NPC_CONFIG.get('6', {})
-        self.speed = config.get('ball_speed', 2.5)
+        self.speed = 4.5  # Комфортная скорость полета сфер
+        self.radius = 0.1 # Радиус коллизии под размер шара
         self.alive = True
+        self.is_boss = False 
 
-    def load_all_sprites(self):
-        """Создаёт спрайт снаряда без загрузки из файла"""
+        # Создаем текстуру маленького шара сразу в памяти (размер 16x16)
         self.image = pygame.Surface((16, 16), pygame.SRCALPHA)
-        pygame.draw.circle(self.image, (255, 100, 0), (8, 8), 7)
-        pygame.draw.circle(self.image, (255, 255, 200), (8, 8), 3)
-
+        pygame.draw.circle(self.image, (255, 100, 0), (8, 8), 7)  # Оранжевая сфера
+        pygame.draw.circle(self.image, (255, 255, 200), (8, 8), 2)  # Светящееся ядро
+        
         self.sprite_width, self.sprite_height = self.image.get_size()
         self.sprite_ratio = self.sprite_width / self.sprite_height
 
-        self.sprites = {
-            "IDLE_front": self.image,
-            "IDLE_back": self.image,
-            "IDLE_left": self.image,
-            "IDLE_right": self.image,
-            "MOVE_front": self.image,
-            "MOVE_back": self.image,
-            "MOVE_left": self.image,
-            "MOVE_right": self.image
-        }
-
     def update(self):
-        """Обновляет позицию снаряда и проверяет столкновения"""
         dt = self.game.delta_time
-        if dt > 0.033:
-            dt = 0.033
-
+        if dt > 0.033: dt = 0.033  
+        
         self.x += math.cos(self.angle) * self.speed * dt
         self.y += math.sin(self.angle) * self.speed * dt
 
+        # 1. Если шар врезался в стену — уничтожаем его
         if (int(self.x), int(self.y)) in self.game.map.world_map:
             self.alive = False
             return
 
-        dist_to_player = math.hypot(self.x - self.game.player.x,
-                                    self.y - self.game.player.y)
+        # 2. Если подлетел близко к игроку — наносит 20 урона и исчезает
+        dist_to_player = math.hypot(self.x - self.game.player.x, self.y - self.game.player.y)
         if dist_to_player < 0.4:
-            config = NPC_CONFIG.get('6', {})
-            self.game.player.take_damage(config.get('ball_damage', 20))
+            player = self.game.player
+            if hasattr(player, 'get_damage'): player.get_damage(20)
+            elif hasattr(player, 'damage'): player.damage(20)
+            elif hasattr(player, 'health'): player.health -= 20
             self.alive = False
+
+    def draw(self):
+        """Рендеринг шара через стандартный алгоритм проекции рейкастинга"""
+        dx = self.x - self.game.player.x
+        dy = self.y - self.game.player.y
+        dist = math.hypot(dx, dy)
+        if dist < 0.2: return
+
+        theta = math.atan2(dy, dx)
+        delta = theta - self.game.player.angle
+        delta = (delta + math.pi) % math.tau - math.pi
+
+        if abs(delta) > HALF_FOV: return
+
+        dist_flat = dist * math.cos(delta)
+        if dist_flat < 0.2: return
+
+        ray_idx = int((HALF_NUM_RAYS + delta / DELTA_ANGLE))
+        if 0 <= ray_idx < NUM_RAYS:
+            if dist_flat > self.game.raycasting.z_buffer[ray_idx]:
+                return
+
+        proj_height = int(SCREEN_DIST / dist_flat)
+        proj_width = int(proj_height * self.sprite_ratio)
+        
+        center_x = ray_idx * SCALE
+        start_x = int(center_x - proj_width // 2)
+
+        img = pygame.transform.scale(self.image, (proj_width, proj_height))
+
+        for x in range(start_x, start_x + proj_width, SCALE):
+            r_idx = int(x // SCALE)
+            if 0 <= r_idx < NUM_RAYS:
+                if dist_flat < self.game.raycasting.z_buffer[r_idx]:
+                    sub_x = int(x - start_x)
+                    if 0 <= sub_x < proj_width:
+                        self.game.screen.blit(img, (x, HALF_HEIGHT - proj_height // 2),
+                                              (sub_x, 0, SCALE, proj_height))
 
 
 class Boss(NPC):
-    """Класс босса с уникальными атаками и HP-баром
-
-    Attributes:
-        is_boss: Флаг для идентификации босса
-        ball_cooldown: Таймер следующей атаки шарами
-    """
-
+    """Гибридный класс Босса: использует анимации NPC, но защищен от исчезновения"""
     def __init__(self, game, pos=(8.5, 7.5)):
         super().__init__(game, '6', pos)
+        self.hp = 2000
+        self.max_hp = 2000
+        self.speed = 0.04    # Возвращаем стандартную скорость для базового NPC
+        self.damage = 25
+        self.is_boss = True  
+        self.alive = True    
 
-        self.is_boss = True
-        self.ball_cooldown = 0
+        self.balls = []
+        self.ball_cooldown = 0 
+
+        try:
+            self.shoot_sound = pygame.mixer.Sound('resources/npc/boss_shot.wav')
+            self.shoot_sound.set_volume(0.3)
+        except:
+            pass
 
     def update(self):
-        """Обновляет состояние босса и управляет атаками"""
-        if not self.alive:
+        # 1. ЗАЩИТА ОТ ИСЧЕЗНОВЕНИЯ ПРИ СТРЕЛЬБЕ: 
+        # Форсируем жизнь, ТОЛЬКО ЕСЛИ у босса реально есть очки здоровья!
+        if self.hp > 0:
+            self.alive = True
+        else:
+            self.alive = False
+            # Если босс мертв, просто очищаем его шары и выходим
+            for ball in self.balls[:]:
+                ball.update()
+                if not ball.alive:
+                    self.balls.remove(ball)
             return
 
+        # 2. Базовый ИИ (Анимации, ходьба, направление)
         super().update()
+        
+        # Повторная защита после выполнения базового апдейта
+        if self.hp > 0:
+            self.alive = True
 
-        config = NPC_CONFIG.get('6', {})
+        # 3. Обновляем и чистим шары босса
+        for ball in self.balls[:]:
+            ball.update()
+            if not ball.alive:
+                self.balls.remove(ball)
 
+        # 4. СПАВН ШАРОВ ПРИ АТАКЕ
         if self.state == "ATTACK" and pygame.time.get_ticks() > self.ball_cooldown:
-            num_balls = config.get('ball_count', 12)
-            for i in range(num_balls):
-                angle = i * (2 * math.pi / num_balls)
-                new_ball = BossBall(self.game, (self.x, self.y), angle)
-                self.game.npcs.append(new_ball)
+            if self.has_line_of_sight():
+                num_balls = 12
+                for i in range(num_balls):
+                    angle = i * (2 * math.pi / num_balls)
+                    self.balls.append(BossBall(self.game, (self.x, self.y), angle))
+                    
+                if hasattr(self, 'shoot_sound'): 
+                    self.shoot_sound.play()
+                    
+                self.ball_cooldown = pygame.time.get_ticks() + 2000
 
-            self.ball_cooldown = pygame.time.get_ticks() + config.get('ball_cooldown', 2000)
+
+    def draw(self):
+        # 1. Сначала рисуем шары босса
+        for ball in self.balls:
+            ball.draw()
+        # 2. Затем рисуем тело самого босса через базовый метод
+        super().draw()
 
     def draw_boss_hud(self):
-        """Рисует HP-бар босса в верхней части экрана"""
+        """Рисует светло-синий HP-бар босса на красном фоне под компасом"""
         if not self.alive:
             return
-
-        bar_width = 400
-        bar_height = 16
+        bar_width, bar_height = 400, 16
         screen_w = self.game.screen.get_width()
-
-        bar_x = (screen_w - bar_width) // 2
-        bar_y = 70
-
-        pygame.draw.rect(self.game.screen, (25, 25, 25),
-                         (bar_x - 3, bar_y - 3, bar_width + 6, bar_height + 6))
-        pygame.draw.rect(self.game.screen, (220, 20, 20),
-                         (bar_x, bar_y, bar_width, bar_height))
-
+        bar_x, bar_y = (screen_w - bar_width) // 2, 70  
+        
+        pygame.draw.rect(self.game.screen, (25, 25, 25), (bar_x - 3, bar_y - 3, bar_width + 6, bar_height + 6))
+        pygame.draw.rect(self.game.screen, (220, 20, 20), (bar_x, bar_y, bar_width, bar_height))
+        
         hp_percent = max(0.0, min(1.0, self.hp / self.max_hp))
-        hp_width = int(bar_width * hp_percent)
-
-        pygame.draw.rect(self.game.screen, (100, 180, 255),
-                         (bar_x, bar_y, hp_width, bar_height))
-
+        pygame.draw.rect(self.game.screen, (100, 180, 255), (bar_x, bar_y, int(bar_width * hp_percent), bar_height))
+        
         font = pygame.font.Font(None, 22)
         text = font.render(f"=== {self.name.upper()} ===", True, (240, 240, 240))
         text_rect = text.get_rect(center=(bar_x + bar_width // 2, bar_y - 12))
         self.game.screen.blit(text, text_rect)
 
-    def draw(self):
-        """Отрисовывает босса и его HP-бар"""
-        super().draw()
-        self.draw_boss_hud()
-
-    def get_damage(self, damage):
-        """Обрабатывает получение урона боссом"""
-        self.hp -= damage
-        self.hurt_flash = 10
-        self.state = "HURT"
-        self.state_timer = pygame.time.get_ticks() + 200
-
-        for _ in range(10):
-            self.game.particles.append(Particle(
-                self.game,
-                (self.x + uniform(-0.3, 0.3), self.y + uniform(-0.3, 0.3)),
-                (200, 50, 0),
-                uniform(0.003, 0.01)
-            ))
-
-        if self.hp <= 0:
-            self.alive = False
-            self.game.total_kills += 1
-            for _ in range(50):
-                self.game.particles.append(Particle(
-                    self.game,
-                    (self.x + uniform(-0.5, 0.5), self.y + uniform(-0.5, 0.5)),
-                    (255, 150, 0),
-                    uniform(0.01, 0.03)
-                ))

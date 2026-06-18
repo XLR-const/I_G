@@ -45,12 +45,10 @@
     ["M", "M", "M", "M", "L", "M", "M", "M", "M", "M", "M", "M", "L", "M", "M", "M", "M", "M"]
   ],
   "player_start": [1.5, 5],
-  "inventory": ["Pistol", "Shotgun", "Machine Gun", "Plasma Gun"],
+  "inventory": ["Pistol", "Shotgun"],
   "starting_ammo": {
     "Pistol": 30,
-    "Shotgun": 10,
-    "Machine Gun": 50,
-    "Plasma Gun": 20
+    "Shotgun": 20
   },
   "background": {
     "ceiling_texture": null,

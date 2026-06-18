@@ -179,11 +179,11 @@ class Game:
                 if event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_1:
                         self.level_manager.current_weapon_index = 0
-                    if event.key == pygame.K_2:
+                    if event.key == pygame.K_2 and len(self.inventory) > 1:
                         self.level_manager.current_weapon_index = 1
-                    if event.key == pygame.K_3:
+                    if event.key == pygame.K_3 and len(self.inventory) > 2:
                         self.level_manager.current_weapon_index = 2
-                    if event.key == pygame.K_4:
+                    if event.key == pygame.K_4 and len(self.inventory) > 3:
                         self.level_manager.current_weapon_index = 3
 
                     if self.level_manager.current_weapon_index < len(self.inventory):

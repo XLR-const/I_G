@@ -6,7 +6,7 @@
 import pygame
 import math
 from setting import *
-
+from config.game_data import SYMBOLS_CONFIG
 
 class RayCasting:
     """Класс для рейкастинга и отрисовки стен
@@ -31,24 +31,19 @@ class RayCasting:
         self.load_textures()
 
     def load_textures(self):
-        """Загружает текстуры из TEXTURES_PATH"""
-        try:
-            if USE_TEXTURES:
-                for name in TEXTURE_NAMES:
-                    try:
-                        path = TEXTURES_PATH + f"{name}.png"
-                        tex = pygame.image.load(path).convert_alpha()
-                        self.textures[name] = pygame.transform.scale(tex, (TEXTURE_SIZE, TEXTURE_SIZE))
-                    except Exception:
-                        print(f"Ошибка загрузки {path}")
-                        self.textures[name] = None
-            else:
-                for name in TEXTURE_NAMES:
-                    self.textures[name] = None
-        except Exception as e:
-            print(f"Ошибка загрузки текстур: {e}")
-            for name in TEXTURE_NAMES:
-                self.textures[name] = None
+        """Загружает текстуры из SYMBOLS_CONFIG"""
+        if not USE_TEXTURES:
+            return
+
+        for symbol, config in SYMBOLS_CONFIG.items():
+            texture_path = config.get('texture')
+            if texture_path:
+                try:
+                    tex = pygame.image.load(texture_path).convert_alpha()
+                    self.textures[symbol] = pygame.transform.scale(tex, (TEXTURE_SIZE, TEXTURE_SIZE))
+                except Exception as e:
+                    print(f"Ошибка загрузки текстуры {texture_path}: {e}")
+                    self.textures[symbol] = None
 
     def get_texture_slice(self, texture, tex_x, height):
         """Возвращает вертикальную полоску текстуры

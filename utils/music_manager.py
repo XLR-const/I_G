@@ -53,7 +53,7 @@ class MusicManager:
             pygame.mixer.music.play(loop)
             self.current_track = track_key
         except Exception as e:
-            print(f"Ошибка загрузки музыки {track_key}: {e}")
+            #print(f"Ошибка загрузки музыки {track_key}: {e}")
             self.stop()
 
     def stop(self, fade=False):
