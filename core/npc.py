@@ -620,7 +620,7 @@ class BossBall:
         self.alive = True
         self.is_boss = False 
 
-        # Создаем текстуру маленького шара сразу в памяти (размер 16x16)
+        # Создаем текстуру шара
         self.image = pygame.Surface((16, 16), pygame.SRCALPHA)
         pygame.draw.circle(self.image, (255, 100, 0), (8, 8), 7)  # Оранжевая сфера
         pygame.draw.circle(self.image, (255, 255, 200), (8, 8), 2)  # Светящееся ядро
@@ -644,9 +644,12 @@ class BossBall:
         dist_to_player = math.hypot(self.x - self.game.player.x, self.y - self.game.player.y)
         if dist_to_player < 0.4:
             player = self.game.player
-            if hasattr(player, 'get_damage'): player.get_damage(20)
-            elif hasattr(player, 'damage'): player.damage(20)
-            elif hasattr(player, 'health'): player.health -= 20
+            if hasattr(player, 'get_damage'): 
+                player.get_damage(20)
+            elif hasattr(player, 'damage'): 
+                player.damage(20)
+            elif hasattr(player, 'health'): 
+                player.health -= 20
             self.alive = False
 
     def draw(self):
@@ -709,51 +712,53 @@ class Boss(NPC):
             pass
 
     def update(self):
-        # 1. ЗАЩИТА ОТ ИСЧЕЗНОВЕНИЯ ПРИ СТРЕЛЬБЕ: 
-        # Форсируем жизнь, ТОЛЬКО ЕСЛИ у босса реально есть очки здоровья!
         if self.hp > 0:
             self.alive = True
         else:
             self.alive = False
-            # Если босс мертв, просто очищаем его шары и выходим
             for ball in self.balls[:]:
                 ball.update()
                 if not ball.alive:
                     self.balls.remove(ball)
             return
 
-        # 2. Базовый ИИ (Анимации, ходьба, направление)
+        # Базовый ИИ (наследуется от NPC)
         super().update()
-        
-        # Повторная защита после выполнения базового апдейта
+
         if self.hp > 0:
             self.alive = True
 
-        # 3. Обновляем и чистим шары босса
+        # Обновляем шары
         for ball in self.balls[:]:
             ball.update()
             if not ball.alive:
                 self.balls.remove(ball)
 
-        # 4. СПАВН ШАРОВ ПРИ АТАКЕ
-        if self.state == "ATTACK" and pygame.time.get_ticks() > self.ball_cooldown:
-            if self.has_line_of_sight():
-                num_balls = 12
-                for i in range(num_balls):
-                    angle = i * (2 * math.pi / num_balls)
-                    self.balls.append(BossBall(self.game, (self.x, self.y), angle))
-                    
-                if hasattr(self, 'shoot_sound'): 
-                    self.shoot_sound.play()
-                    
-                self.ball_cooldown = pygame.time.get_ticks() + 2000
+        # Дистанция до игрока
+        dist_to_player = math.hypot(self.x - self.game.player.x,
+                                    self.y - self.game.player.y)
+
+        # ============================================================
+        # ЛОГИКА АТАК ПО ДИСТАНЦИИ
+        # ============================================================
+        if self.state == "ATTACK":
+            # ДАЛЬНЯЯ АТАКА (> 3 клеток) — шары по кругу
+            if dist_to_player > 3.0 and pygame.time.get_ticks() > self.ball_cooldown:
+                if self.has_line_of_sight():
+                    num_balls = 12
+                    for i in range(num_balls):
+                        angle = i * (2 * math.pi / num_balls)
+                        self.balls.append(BossBall(self.game, (self.x, self.y), angle))
+
+                    if hasattr(self, 'shoot_sound'):
+                        self.shoot_sound.play()
+
+                    self.ball_cooldown = pygame.time.get_ticks() + 2000
 
 
     def draw(self):
-        # 1. Сначала рисуем шары босса
         for ball in self.balls:
             ball.draw()
-        # 2. Затем рисуем тело самого босса через базовый метод
         super().draw()
 
     def draw_boss_hud(self):
