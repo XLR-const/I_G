@@ -113,7 +113,7 @@ class UIManager:
         if self.current_state == self.states['DEAD']:
             return self._handle_dead_event(event)
         if self.current_state == self.states['CUTSCENE']:
-            return self._handle_cutscene_event(event)
+            return False
         if self.current_state == self.states['OPTIONS']:
             return self._handle_options_event(event)
         return False
@@ -145,11 +145,11 @@ class UIManager:
                     self.swap_sound.play()
                 return True
             if event.key == pygame.K_RETURN:
-                if self.enter_sound:
-                    self.enter_sound.play()
                 if self.selected_option == 0:
+                    self.enter_sound.play()
                     self.game.level_manager.reset_game()
-                    self.current_state = self.states['BRIEFING']
+                    self.game.intro_player.play()
+                    return True
                 elif self.selected_option == 1:
                     saved = SaveSystem.load()
                     if saved:
@@ -339,7 +339,7 @@ class UIManager:
         elif self.current_state == self.states['DEAD']:
             self._update_dead()
         elif self.current_state == self.states['CUTSCENE']:
-            self._update_cutscene()
+            pass
         elif self.current_state == self.states['OPTIONS']:
             self._update_options()
 
@@ -613,9 +613,9 @@ class UIManager:
     def _draw_cutscene(self, screen):
         """Рисует катсцену"""
         screen.fill((0, 0, 0))
-        text = self.font_tile.render("CUTSCENE", True, (255, 255, 255))
-        text_rect = text.get_rect(center=(setting.WIDTH // 2, setting.HEIGHT // 2))
-        screen.blit(text, text_rect)
+        font = pygame.font.Font(None, 36)
+        text = font.render("Press any key to skip intro", True, (200, 200, 200))
+        screen.blit(text, (screen.get_width() // 2 - 150, screen.get_height() - 100))
 
     # ----------------------------------------------------------------------
     # OPTIONS

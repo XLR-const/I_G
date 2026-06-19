@@ -15,6 +15,7 @@ from utils.music_manager import MusicManager
 from ui.ui_manager import UIManager
 from utils.save_system import SaveSystem
 from ui.console import DevConsole
+from utils.intro_player import IntroPlayer
 
 
 class Game:
@@ -79,6 +80,10 @@ class Game:
         self.current_level = 1
         self.level_start_time = 0
 
+        # Катсцена
+        self.intro_player = IntroPlayer(self)
+
+        # Загружаем уровень
         self.load_level(self.current_level)
 
     def load_level(self, level_num):
@@ -160,6 +165,15 @@ class Game:
                 pygame.quit()
                 sys.exit()
 
+            # КАТСЦЕНА - пропуск
+            if self.intro_player.is_active():
+                if event.type in (pygame.KEYDOWN, pygame.MOUSEBUTTONDOWN):
+                    self.intro_player.skip()
+                    return
+                # Обновляем статус
+                self.intro_player.update()
+                return
+            
             handled = self.ui_manager.handle_event(event)
 
             if not handled and self.ui_manager.current_state == self.ui_manager.states['PLAYING']:
@@ -212,6 +226,12 @@ class Game:
         while True:
             self.handle_events()
             self.ui_manager.update()
+            
+            if self.intro_player.is_active():
+                self.ui_manager.draw(self.screen)
+                pygame.display.flip()
+                self.clock.tick(FPS)
+                continue
 
             self.music_manager.update(self.ui_manager.current_state, self.current_level)
 
