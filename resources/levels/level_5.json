@@ -53,7 +53,7 @@
   "starting_ammo": {
     "Pistol": 40,
     "Shotgun": 20,
-    "Machine Gun": 150,
+    "Machine Gun": 400,
     "Plasma Gun": 15
   },
   "background": {

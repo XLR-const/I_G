@@ -47,8 +47,8 @@
   "player_start": [1.5, 5],
   "inventory": ["Pistol", "Shotgun"],
   "starting_ammo": {
-    "Pistol": 30,
-    "Shotgun": 20
+    "Pistol": 40,
+    "Shotgun": 25
   },
   "background": {
     "ceiling_texture": "resources/textures/fallen_sky.png",

@@ -415,7 +415,7 @@ class UIManager:
         title_rect = title.get_rect(center=(setting.WIDTH // 2, int(setting.CELL_H * 2)))
         screen.blit(title, title_rect)
 
-        options = ['НОВАЯ ИГРА', 'ЗАГРУЗИТЬ ИГРУ', 'НАСТРОЙКИ', 'ВЫХОД']
+        options = ['НОВАЯ ИГРА', 'ЗАГРУЗИТЬ ПОСЛЕДНЮЮ ИГРУ', 'НАСТРОЙКИ', 'ВЫХОД']
         for i, opt in enumerate(options):
             y = setting.HEIGHT // 2 + i * 60
             color = (255, 255, 255) if i == self.selected_option else (255, 140, 0)
@@ -451,15 +451,15 @@ class UIManager:
         if level_num in self.briefing_images:
             screen.blit(self.briefing_images[level_num], (0, 0))
 
-            font = pygame.font.Font(None, 36)
-            text = font.render("Press any key to continue...", True, (255, 255, 255))
+            """font = pygame.font.Font(None, 36)
+            text = font.render("Нажмите на любую кнопку...", True, (255, 255, 255))
             text_rect = text.get_rect(center=(setting.WIDTH // 2, setting.HEIGHT - setting.CELL_H))
 
             bg = pygame.Surface((text.get_width() + 20, text.get_height() + 10))
             bg.set_alpha(128)
             bg.fill((0, 0, 0))
             screen.blit(bg, (text_rect.x - 10, text_rect.y - 5))
-            screen.blit(text, text_rect)
+            screen.blit(text, text_rect)"""
         else:
             lines = [
                 f"МИССИЯ {level_num}",
@@ -616,10 +616,10 @@ class UIManager:
             self.current_state = self.states['MENU']
 
     def _draw_cutscene(self, screen):
-        """Рисует катсцену"""
+        """Рисует строчку скипа катсцены"""
         screen.fill((0, 0, 0))
         font = pygame.font.Font(None, 36)
-        text = font.render("Press any key to skip intro", True, (200, 200, 200))
+        text = font.render("Нажмити на любую кнопку", True, (200, 200, 200))
         screen.blit(text, (screen.get_width() // 2 - 150, screen.get_height() - 100))
 
     # ----------------------------------------------------------------------

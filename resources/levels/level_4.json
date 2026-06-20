@@ -53,7 +53,7 @@
   "starting_ammo": {
     "Pistol": 30,
     "Shotgun": 15,
-    "Machine Gun": 150
+    "Machine Gun": 300
   },
   "background": {
     "ceiling_texture": "resources/textures/fallen_sky.png",

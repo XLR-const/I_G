@@ -51,8 +51,8 @@
   ],
   "inventory": ["Pistol", "Shotgun"],
   "starting_ammo": {
-    "Pistol": 40,
-    "Shotgun": 20
+    "Pistol": 50,
+    "Shotgun": 30
   },
   "background": {
     "ceiling_texture": "resources/textures/fallen_sky.png",
