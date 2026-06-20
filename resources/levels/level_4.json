@@ -56,7 +56,7 @@
     "Machine Gun": 150
   },
   "background": {
-    "ceiling_texture": null,
+    "ceiling_texture": "resources/textures/fallen_sky.png",
     "floor_texture": null,
     "ceiling_color": [150, 130, 100],
     "floor_color": [50, 40, 30]

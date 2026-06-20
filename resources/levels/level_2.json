@@ -51,7 +51,7 @@
     "Shotgun": 20
   },
   "background": {
-    "ceiling_texture": null,
+    "ceiling_texture": "resources/textures/fallen_sky.png",
     "floor_texture": null,
     "ceiling_color": [128, 128, 128],
     "floor_color": [40, 40, 40]

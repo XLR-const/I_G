@@ -57,7 +57,7 @@
     "Plasma Gun": 15
   },
   "background": {
-    "ceiling_texture": null,
+    "ceiling_texture": "resources/textures/red_sky.png",
     "floor_texture": null,
     "ceiling_color": [180, 100, 100],
     "floor_color": [60, 30, 30]
