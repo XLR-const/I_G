@@ -12,6 +12,8 @@ class UIManager:
 
     Attributes:
         game: Объект игры
+        font_tile_path: Путь для шрифта заголовка
+        font_path: Путь для шрифта
         font_tile: Шрифт для заголовков
         font_normal: Основной шрифт
         font_small: Мелкий шрифт
@@ -31,11 +33,11 @@ class UIManager:
             game: Объект игры
         """
         self.game = game
-        font_path = 'resources/fonts/Fy.ttf'
-        font_tile_path = 'resources/fonts/Evolve.otf'
-        self.font_tile = pygame.font.Font(font_tile_path, int(setting.CELL_H * 2))
-        self.font_normal = pygame.font.Font(font_path, int(setting.CELL_H * 0.6))
-        self.font_small = pygame.font.Font(font_path, int(setting.CELL_H * 0.4))
+        self.font_path = 'resources/fonts/Fy.ttf'
+        self.font_tile_path = 'resources/fonts/Evolve.otf'
+        self.font_tile = pygame.font.Font(self.font_tile_path, int(setting.CELL_H * 2))
+        self.font_normal = pygame.font.Font(self.font_path, int(setting.CELL_H * 0.6))
+        self.font_small = pygame.font.Font(self.font_path, int(setting.CELL_H * 0.4))
 
         self.states = {
             'BOOT': 0,
@@ -157,7 +159,8 @@ class UIManager:
                     if saved:
                         self.game.current_level = int(saved['current_level'])
                         self.game.total_kills = int(saved['total_kills'])
-                        self.game.load_level(self.game.current_level)
+                        self.game.level_manager.current_level = self.game.current_level
+                        self.game.level_manager.load_level(self.game.current_level)
                         self.current_state = self.states['BRIEFING']
                     else:
                         self.game.level_manager.reset_game()
@@ -415,7 +418,7 @@ class UIManager:
         options = ['НОВАЯ ИГРА', 'ЗАГРУЗИТЬ ИГРУ', 'НАСТРОЙКИ', 'ВЫХОД']
         for i, opt in enumerate(options):
             y = setting.HEIGHT // 2 + i * 60
-            color = (255, 255, 255) if i == self.selected_option else (0, 250, 250)
+            color = (255, 255, 255) if i == self.selected_option else (255, 140, 0)
             text = self.font_normal.render(opt, True, color)
             text_rect = text.get_rect(center=(setting.WIDTH // 2, y))
             screen.blit(text, text_rect)
