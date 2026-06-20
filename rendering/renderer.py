@@ -216,7 +216,8 @@ class Renderer:
         hp = self.game.player.hp
         current_weapon = self.game.weapon.name
         ammo = self.game.weapon.ammo
-
+        font_path = 'resources/fonts/Fy.ttf'
+        
         health_bar_pos = grid_to_pixel(1, 16)
         health_bar_width = 6 * CELL_W
         health_bar_height = 1 * CELL_H
@@ -228,9 +229,9 @@ class Renderer:
         weapon_name_pos = grid_to_pixel(25, 15)
         weapon_ammo_pos = grid_to_pixel(25, 16)
 
-        font = pygame.font.Font(None, 64)
+        font = pygame.font.Font(font_path, 64)
         text_weapon = font.render(current_weapon, True, (255, 255, 255))
-        font = pygame.font.Font(None, 50)
+        font = pygame.font.Font(font_path, 50)
         text_ammo = font.render(str(ammo), True, (255, 200, 255))
 
         pygame.draw.rect(self.game.screen, (200, 50, 50),
@@ -242,6 +243,7 @@ class Renderer:
         self.game.screen.blit(text_ammo, weapon_ammo_pos)
         self.draw_health_sprite()
         self.draw_compass()
+        #self.draw_line_of_cells()
 
     def draw_line_of_cells(self):
         """Рисует линии сетки (для отладки)"""

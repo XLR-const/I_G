@@ -31,9 +31,11 @@ class UIManager:
             game: Объект игры
         """
         self.game = game
-        self.font_tile = pygame.font.Font(None, int(setting.CELL_H * 2))
-        self.font_normal = pygame.font.Font(None, int(setting.CELL_H * 0.6))
-        self.font_small = pygame.font.Font(None, int(setting.CELL_H * 0.4))
+        font_path = 'resources/fonts/Fy.ttf'
+        font_tile_path = 'resources/fonts/Evolve.otf'
+        self.font_tile = pygame.font.Font(font_tile_path, int(setting.CELL_H * 2))
+        self.font_normal = pygame.font.Font(font_path, int(setting.CELL_H * 0.6))
+        self.font_small = pygame.font.Font(font_path, int(setting.CELL_H * 0.4))
 
         self.states = {
             'BOOT': 0,
