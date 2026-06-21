@@ -15,3 +15,4 @@ config.json
 # Временные файлы
 *.tmp
 *.log
+dist/
