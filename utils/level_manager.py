@@ -159,7 +159,11 @@ class LevelManager:
         self.level_time = (pygame.time.get_ticks() - self.level_start_time) // 1000
         self.current_level += 1
         self.game.save_system.save(self.current_level, self.total_kills, self.level_time)
-        self.game.ui_manager.current_state = self.game.ui_manager.states['LEVEL_END']
+        next_level_path = f"{self.levels_folder}/level_{self.current_level}.json"
+        if os.path.exists(next_level_path):
+            self.game.ui_manager.current_state = self.game.ui_manager.states['BRIEFING']
+        else:
+            self.game.ui_manager.current_state = self.game.ui_manager.states['MENU']
 
     def check_exit(self):
         """Проверяет, достиг ли игрок выхода"""
