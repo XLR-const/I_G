@@ -52,8 +52,7 @@ class MusicManager:
             pygame.mixer.music.set_volume(self.volume)
             pygame.mixer.music.play(loop)
             self.current_track = track_key
-        except Exception as e:
-            #print(f"Ошибка загрузки музыки {track_key}: {e}")
+        except Exception:
             self.stop()
 
     def stop(self, fade=False):
@@ -76,6 +75,7 @@ class MusicManager:
             level_num: Номер уровня (для PLAYING)
         """
         state_music = {
+            0: 'menu',       # BOOT
             1: 'menu',       # MENU
             2: 'briefing',   # BRIEFING
             5: 'level_end',  # LEVEL_END
@@ -83,7 +83,12 @@ class MusicManager:
         }
 
         if state in state_music:
-            self.play(state_music[state])
+            track = state_music[state]
+            # Если уже играет этот трек — ничего не делаем
+            if self.current_track == track:
+                return
+            self.play(track)
+
         elif state == 3:  # PLAYING
             if level_num == 1:
                 self.play('level_1')
@@ -91,8 +96,10 @@ class MusicManager:
                 self.play('level_2')
             elif level_num == 3:
                 self.play('level_3')
+            elif level_num == 4:
+                self.play('level_4')
             else:
-                self.play('level_1')
+                self.play('level_5')
 
     def set_volume(self, volume):
         """Устанавливает громкость музыки

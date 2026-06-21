@@ -163,6 +163,8 @@ MUSIC_CONFIG = {
     'level_1': 'resources/music/levels/level_1.wav',
     'level_2': 'resources/music/levels/level_2.wav',
     'level_3': 'resources/music/levels/level_3.wav',
+    'level_4': 'resources/music/levels/level_4.wav',
+    'level_5': 'resources/music/levels/level_5.wav',
     'death': 'resources/music/deaths/death.wav',
-    'level_end': 'resources/music/levelends/level_end.wav',
+    'level_end': 'resources/music/levelends/levelend.wav',
 }
