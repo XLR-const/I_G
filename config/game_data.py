@@ -21,6 +21,7 @@ SYMBOLS_CONFIG = {
     'G': {'type': 'wall', 'texture': 'resources/textures/G.png'},
     'W': {'type': 'wall', 'texture': 'resources/textures/W.png'},
     'I': {'type': 'wall', 'texture': 'resources/textures/I.png'},
+    'N': {'type': 'wall', 'texture': 'resources/textures/N.png'},
     
     # Дверь
     'D': {'type': 'door', 'texture': 'resources/textures/D.png'},
@@ -119,7 +120,7 @@ WEAPON_CONFIG = {
         'continuous': False,
         'sprite': 'resources/weapons/Pistol.png',
         'sound': 'resources/weapons/Pistol_shot.wav',
-        'ammo_start': 20,
+        'ammo_start': 40,
     },
     'Shotgun': {
         'name': 'Shotgun',
@@ -129,7 +130,7 @@ WEAPON_CONFIG = {
         'continuous': False,
         'sprite': 'resources/weapons/Shotgun.png',
         'sound': 'resources/weapons/Shotgun_shot.wav',
-        'ammo_start': 10,
+        'ammo_start': 20,
     },
     'Machine Gun': {
         'name': 'Machine Gun',
@@ -139,7 +140,7 @@ WEAPON_CONFIG = {
         'continuous': True,
         'sprite': 'resources/weapons/Machine Gun.png',
         'sound': 'resources/weapons/Machine Gun_shot.wav',
-        'ammo_start': 100,
+        'ammo_start': 300,
     },
     'Plasma Gun': {
         'name': 'Plasma Gun',
@@ -149,7 +150,7 @@ WEAPON_CONFIG = {
         'continuous': False,
         'sprite': 'resources/weapons/Plasma Gun.png',
         'sound': 'resources/weapons/Plasma Gun_shot.wav',
-        'ammo_start': 5,
+        'ammo_start': 8,
     },
 }
 

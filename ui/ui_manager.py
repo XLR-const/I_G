@@ -619,7 +619,7 @@ class UIManager:
         """Рисует строчку скипа катсцены"""
         screen.fill((0, 0, 0))
         font = pygame.font.Font(None, 36)
-        text = font.render("Нажмити на любую кнопку", True, (200, 200, 200))
+        text = font.render("Нажмите на любую кнопку", True, (200, 200, 200))
         screen.blit(text, (screen.get_width() // 2 - 150, screen.get_height() - 100))
 
     # ----------------------------------------------------------------------
