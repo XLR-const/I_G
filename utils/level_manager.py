@@ -161,7 +161,7 @@ class LevelManager:
         self.game.save_system.save(self.current_level, self.total_kills, self.level_time)
         next_level_path = f"{self.levels_folder}/level_{self.current_level}.json"
         if os.path.exists(next_level_path):
-            self.game.ui_manager.current_state = self.game.ui_manager.states['BRIEFING']
+            self.game.ui_manager.current_state = self.game.ui_manager.states['LEVEL_END']
         else:
             self.game.ui_manager.current_state = self.game.ui_manager.states['MENU']
 
