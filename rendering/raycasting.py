@@ -194,7 +194,7 @@ class RayCasting:
             x_map, y_map = int(ox), int(oy)
 
     def ray_cast_native(self):
-        """Нативный рейкастинг (медленный, оставлен для справки)"""
+        """Нативный рейкастинг (оставлен для справки)"""
         ox, oy = self.game.player.x, self.game.player.y
         for i in range(NUM_RAYS):
             ray_angle = self.game.player.angle - HALF_FOV + i * DELTA_ANGLE

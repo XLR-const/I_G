@@ -218,16 +218,16 @@ class NPC:
         # Угол вектора от NPC к игроку
         player_angle = math.atan2(self.game.player.y - self.y, self.game.player.x - self.x)
 
-        # Относительный угол (под каким ракурсом игрок видит NPC)
+        # Относительный угол
         rel_angle = player_angle - npc_angle
         
         # Нормализуем угол в диапазон от -pi до pi
         rel_angle = math.atan2(math.sin(rel_angle), math.cos(rel_angle))
         
-        # Переводим в градусы для удобства (от 0 до 360)
+        # Переводим в градусы для удобства
         rel_angle_deg = math.degrees(rel_angle) % 360
 
-                # Разделяем 360 градусов на 4 сектора (инвертированные направления)
+                # Разделяем 360 градусов на 4 сектора
         if 45 <= rel_angle_deg < 135:
             self.move_direction = "right"  # Было "left"
         elif 135 <= rel_angle_deg < 225:
@@ -510,7 +510,7 @@ class NPC:
 
         img = self.image.copy()
 
-        # 2. Накладываем эффект урона (красный фильтр)
+        # 2. Эффект урона
         if self.hurt_flash > 0:
             red_surface = pygame.Surface(img.get_size())
             red_surface.fill((255, 0, 0))
@@ -519,35 +519,29 @@ class NPC:
         # 3. Масштабируем спрайт под проекцию экрана
         img = pygame.transform.scale(img, (proj_width, proj_height))
 
-        # 4. Накладываем вспышку выстрела (ТЕПЕРЬ ПОВЕРХ МАСШТАБИРОВАННОГО ИЗОБРАЖЕНИЯ)
+        # 4. Вспышка выстрела
         if self.shoot_flash > 0:
             flash_surface = pygame.Surface((proj_width, proj_height), pygame.SRCALPHA)
-            
-            # Рассчитываем прогресс (от 1.0 до 0.0)
             progress = self.shoot_flash / 12  
             if progress > 1.0: progress = 1.0
             
-            # Вычисляем радиус относительно размеров проекции
-            max_radius = min(proj_width, proj_height) // 3  # Сделали чуть меньше (//3), чтобы не на весь экран
+            max_radius = min(proj_width, proj_height) // 3
             radius = int(max_radius * (1 - progress * 0.2))
             
             if radius > 0:
-                # Внешний ореол
                 alpha_outer = int(180 * progress)
                 color_outer = (255, 140, 0, alpha_outer)
                 pygame.draw.circle(flash_surface, color_outer, 
                                    (proj_width // 2, proj_height // 2), radius)
-                
-                # Яркое ядро
+
                 alpha_inner = int(255 * progress)
                 color_inner = (255, 255, 200, alpha_inner)
                 pygame.draw.circle(flash_surface, color_inner, 
                                    (proj_width // 2, proj_height // 2), int(radius * 0.4))
             
-            # Накладываем вспышку на уже отмасштабированный img
             img.blit(flash_surface, (0, 0))
 
-        # 5. Отрисовка на экран через Z-буфер (ваш оригинальный цикл)
+        # 5. Отрисовка на экран через Z-буфер
         start_x = int(center_x - proj_width // 2)
         for x in range(start_x, start_x + proj_width, SCALE):
             ray_idx = int(x // SCALE)
@@ -615,15 +609,14 @@ class BossBall:
         self.game = game
         self.x, self.y = pos
         self.angle = angle
-        self.speed = 4.5  # Комфортная скорость полета сфер
-        self.radius = 0.1 # Радиус коллизии под размер шара
+        self.speed = 4.5
+        self.radius = 0.1
         self.alive = True
         self.is_boss = False 
 
-        # Создаем текстуру шара
         self.image = pygame.Surface((16, 16), pygame.SRCALPHA)
-        pygame.draw.circle(self.image, (255, 100, 0), (8, 8), 7)  # Оранжевая сфера
-        pygame.draw.circle(self.image, (255, 255, 200), (8, 8), 2)  # Светящееся ядро
+        pygame.draw.circle(self.image, (255, 100, 0), (8, 8), 7)
+        pygame.draw.circle(self.image, (255, 255, 200), (8, 8), 2)
         
         self.sprite_width, self.sprite_height = self.image.get_size()
         self.sprite_ratio = self.sprite_width / self.sprite_height
@@ -635,12 +628,10 @@ class BossBall:
         self.x += math.cos(self.angle) * self.speed * dt
         self.y += math.sin(self.angle) * self.speed * dt
 
-        # 1. Если шар врезался в стену — уничтожаем его
         if (int(self.x), int(self.y)) in self.game.map.world_map:
             self.alive = False
             return
 
-        # 2. Если подлетел близко к игроку — наносит 20 урона и исчезает
         dist_to_player = math.hypot(self.x - self.game.player.x, self.y - self.game.player.y)
         if dist_to_player < 0.4:
             player = self.game.player
@@ -692,12 +683,12 @@ class BossBall:
 
 
 class Boss(NPC):
-    """Гибридный класс Босса: использует анимации NPC, но защищен от исчезновения"""
+    """Гибридный класс Босса"""
     def __init__(self, game, pos=(8.5, 7.5)):
         super().__init__(game, '6', pos)
         self.hp = 2000
         self.max_hp = 2000
-        self.speed = 0.04    # Возвращаем стандартную скорость для базового NPC
+        self.speed = 0.04
         self.damage = 25
         self.is_boss = True  
         self.alive = True    
@@ -722,19 +713,17 @@ class Boss(NPC):
                     self.balls.remove(ball)
             return
 
-        # Базовый ИИ (наследуется от NPC)
+        # Базовый ИИ
         super().update()
 
         if self.hp > 0:
             self.alive = True
 
-        # Обновляем шары
         for ball in self.balls[:]:
             ball.update()
             if not ball.alive:
                 self.balls.remove(ball)
 
-        # Дистанция до игрока
         dist_to_player = math.hypot(self.x - self.game.player.x,
                                     self.y - self.game.player.y)
 
@@ -742,7 +731,6 @@ class Boss(NPC):
         # ЛОГИКА АТАК ПО ДИСТАНЦИИ
         # ============================================================
         if self.state == "ATTACK":
-            # ДАЛЬНЯЯ АТАКА (> 3 клеток) — шары по кругу
             if dist_to_player > 3.0 and pygame.time.get_ticks() > self.ball_cooldown:
                 if self.has_line_of_sight():
                     num_balls = 12
