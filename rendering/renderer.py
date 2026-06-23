@@ -229,7 +229,7 @@ class Renderer:
         weapon_name_pos = grid_to_pixel(25, 15)
         weapon_ammo_pos = grid_to_pixel(25, 16)
 
-        font = pygame.font.Font(font_path, 64)
+        font = pygame.font.Font(font_path, 48)
         text_weapon = font.render(current_weapon, True, (255, 255, 255))
         font = pygame.font.Font(font_path, 50)
         text_ammo = font.render(str(ammo), True, (255, 200, 255))
