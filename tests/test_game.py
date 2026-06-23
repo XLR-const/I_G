@@ -5,16 +5,21 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import math
 from setting import *
-from pathfinding import PathFinder
-from door import Door
-from player import Player
+from utils.pathfinding import PathFinder
+from core.door import Door
+from core.player import Player
+
 
 class MockGame:
-    """Мок-объект Game для тестирования"""
+    """Объект Game для тестирования"""
     def __init__(self):
         self.map = MockMap()
         self.player = MockPlayer()
         self.delta_time = 0.016
+        self.npcs = []
+        self.particles = []
+        self.total_kills = 0
+
 
 class MockMap:
     def __init__(self):
@@ -30,16 +35,22 @@ class MockMap:
     def is_wall(self, x, y):
         return (x, y) in self.world_map
 
+
 class MockPlayer:
     def __init__(self):
         self.x = 2.0
         self.y = 2.0
         self.angle = 0
         self.hp = 100
+        self.last_damage_time = 0
+        self.death_sound = None
+        self.damage_sound = None
+        self.door_keys = []
 
-# ============================================================
+
+# ----------------------
 # ТЕСТ 1: A* поиск пути
-# ============================================================
+# ---------------------
 def test_astar_pathfinding():
     """Тест: A* находит путь, обходя стены"""
     game = MockGame()
@@ -58,23 +69,23 @@ def test_astar_pathfinding():
     assert path[0] == (2, 2), "Стартовая позиция не совпадает"
     assert path[-1] == (8, 8), "Целевая позиция не достигнута"
     
-    # Проверяем, что путь не идёт сквозь стены
     for cell in path:
         assert not game.map.is_wall(cell[0], cell[1]), f"Путь идёт сквозь стену {cell}"
     
     print(f"  ✅ Успех! Длина пути: {len(path)}")
     return True
 
-# ============================================================
+
+# -----------------------------------
 # ТЕСТ 2: Ограничение дистанции A*
-# ============================================================
+# -----------------------------------
 def test_astar_distance_limit():
     """Тест: A* не ищет путь дальше max_distance"""
     game = MockGame()
     pathfinder = PathFinder(game)
     
     start = (2.0, 2.0)
-    goal = (20.0, 20.0)  # далеко
+    goal = (20.0, 20.0)
     
     path = pathfinder.a_star(start, goal, max_distance=5)
     
@@ -86,22 +97,22 @@ def test_astar_distance_limit():
     print(f"  ✅ Успех! Поиск за пределами радиуса отключён")
     return True
 
-# ============================================================
+
+# ---------------------------------------
 # ТЕСТ 3: LOS (Line of Sight) через стены
-# ============================================================
+# ---------------------------------------
 def test_line_of_sight():
     """Тест: Проверка видимости через стены"""
-    from npc import NPC
+    from core.npc import NPC
     
     game = MockGame()
-    npc = NPC(game, "test", pos=(2.0, 2.0))
+    npc = NPC(game, '2', pos=(2.0, 2.0))
     npc.game = game
+    npc.x, npc.y = 2.0, 2.0
     
-    # Позиция игрока
     game.player.x = 8.0
     game.player.y = 8.0
     
-    # Ручная проверка LOS
     def check_los(npc, player):
         x1, y1 = int(npc.x), int(npc.y)
         x2, y2 = int(player.x), int(player.y)
@@ -137,9 +148,10 @@ def test_line_of_sight():
     print(f"  ✅ Успех! Стена блокирует видимость")
     return True
 
-# ============================================================
+
+# -----------------------------
 # ТЕСТ 4: Коллизия со стеной
-# ============================================================
+# ----------------------------
 def test_collision():
     """Тест: Игрок не может пройти сквозь стены"""
     game = MockGame()
@@ -153,9 +165,7 @@ def test_collision():
                 return True
         return False
     
-    # Позиция внутри стены
     inside_wall = (5.5, 5.5)
-    # Позиция на свободном месте
     free_space = (2.5, 2.5)
     
     collides_wall = check_collision(inside_wall[0], inside_wall[1])
@@ -170,9 +180,10 @@ def test_collision():
     print(f"  ✅ Успех! Коллизия работает")
     return True
 
-# ============================================================
+
+# ------------------------------------------
 # ТЕСТ 5: Дверь открывается при приближении
-# ============================================================
+# -----------------------------------------
 def test_door_opening():
     """Тест: Дверь меняет состояние при приближении игрока"""
     game = MockGame()
@@ -182,7 +193,6 @@ def test_door_opening():
     print(f"  Начальное состояние: {door.state}")
     assert door.state == "CLOSED", "Дверь должна быть закрыта изначально"
     
-    # Симулируем игрока рядом с дверью
     game.player.x = 5.2
     game.player.y = 5.2
     door.update()
@@ -194,12 +204,12 @@ def test_door_opening():
     print(f"  ✅ Успех! Дверь реагирует на приближение")
     return True
 
-# ============================================================
+
+# --------------------------------------------
 # ТЕСТ 6: Здоровье игрока не уходит в минус
-# ============================================================
+# -------------------------------------------
 def test_player_health():
     """Тест: HP игрока не становится меньше 0"""
-    game = MockGame()
     player = MockPlayer()
     player.hp = 100
     
@@ -217,9 +227,10 @@ def test_player_health():
     print(f"  ✅ Успех! HP не уходит в минус")
     return True
 
-# ============================================================
+
+# ----------------------------------------------------
 # ТЕСТ 7: Угол поворота игрока в диапазоне 0-360°
-# ============================================================
+# -----------------------------------------------------
 def test_player_angle():
     """Тест: Угол поворота всегда в пределах [0, 2π]"""
     angles = [0.5, 6.0, 7.0, -0.5, -3.0, 100.0]
@@ -234,9 +245,10 @@ def test_player_angle():
     print(f"  ✅ Успех! Все углы нормализованы")
     return True
 
-# ============================================================
+
+# ------------------------------
 # ЗАПУСК ВСЕХ ТЕСТОВ
-# ============================================================
+# ------------------------------
 def run_all_tests():
     print("\n" + "="*60)
     print("ЗАПУСК ТЕСТОВ")
@@ -272,6 +284,7 @@ def run_all_tests():
     print("="*60)
     
     return passed, failed
+
 
 if __name__ == "__main__":
     run_all_tests()
