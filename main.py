@@ -244,7 +244,99 @@ class Game:
 
             self.delta_time = self.clock.tick(FPS)
 
+    def run_dev_mode(self):
+        """Режим разработки - без UI, сразу в игру"""
+        # Принудительно в игру
+        self.ui_manager.current_state = self.ui_manager.states['PLAYING']
+        self.current_level = DEV_LEVEL
+        self.load_level(self.current_level)
+        
+        print("\n" + "="*50)
+        print("🔧 РЕЖИМ РАЗРАБОТКИ")
+        print(f"📁 Уровень: {self.current_level}")
+        print(f"🎯 NPC: {len(self.npcs)}")
+        print("="*50 + "\n")
+        
+        while True:
+            # Обработка событий для DEV режима
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    pygame.quit()
+                    sys.exit()
+                
+                if event.type == pygame.KEYDOWN:
+                    # F1-F5 - смена уровня
+                    if event.key == pygame.K_F1:
+                        self.current_level = 1
+                        self.load_level(1)
+                        print(f"📁 Уровень {self.current_level}")
+                    if event.key == pygame.K_F2:
+                        self.current_level = 2
+                        self.load_level(2)
+                        print(f"📁 Уровень {self.current_level}")
+                    if event.key == pygame.K_F3:
+                        self.current_level = 3
+                        self.load_level(3)
+                        print(f"📁 Уровень {self.current_level}")
+                    if event.key == pygame.K_F4:
+                        self.current_level = 4
+                        self.load_level(4)
+                        print(f"📁 Уровень {self.current_level}")
+                    if event.key == pygame.K_F5:
+                        self.current_level = 5
+                        self.load_level(5)
+                        print(f"📁 Уровень {self.current_level}")
+                    
+                    # F5 - рестарт текущего уровня
+                    if event.key == pygame.K_F5:
+                        self.load_level(self.current_level)
+                        print("🔄 Рестарт")
+                    
+                    # ESC - выход
+                    if event.key == pygame.K_ESCAPE:
+                        pygame.quit()
+                        sys.exit()
+                    
+                    # Смена оружия
+                    if event.key == pygame.K_1:
+                        self.level_manager.current_weapon_index = 0
+                    if event.key == pygame.K_2 and len(self.inventory) > 1:
+                        self.level_manager.current_weapon_index = 1
+                    if event.key == pygame.K_3 and len(self.inventory) > 2:
+                        self.level_manager.current_weapon_index = 2
+                    if event.key == pygame.K_4 and len(self.inventory) > 3:
+                        self.level_manager.current_weapon_index = 3
+                    if self.level_manager.current_weapon_index < len(self.inventory):
+                        self.weapon = self.inventory[self.level_manager.current_weapon_index]
+                
+                # Стрельба
+                if event.type == pygame.MOUSEBUTTONDOWN:
+                    if event.button == 1:
+                        if not self.weapon.reloading and not self.weapon.is_continuous:
+                            self.weapon.fire()
+                
+                # Колёсико мыши
+                if event.type == pygame.MOUSEBUTTONDOWN:
+                    if event.button == 4:
+                        self.level_manager.current_weapon_index = (
+                            self.level_manager.current_weapon_index + 1
+                        ) % len(self.inventory)
+                    if event.button == 5:
+                        self.level_manager.current_weapon_index = (
+                            self.level_manager.current_weapon_index - 1
+                        ) % len(self.inventory)
+                    self.weapon = self.inventory[self.level_manager.current_weapon_index]
+            
+            # Обновление и отрисовка
+            self.update()
+            self.draw()
+            
+            self.delta_time = self.clock.tick(FPS)
 
 if __name__ == "__main__":
     game = Game()
-    game.run()
+    
+    if DEV_MODE:
+        game.run_dev_mode()
+    else:
+        game.run()

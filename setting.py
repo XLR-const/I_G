@@ -4,6 +4,8 @@ import pygame
 # Game settings
 pygame.init()
 info = pygame.display.Info()
+DEV_MODE = True
+DEV_LEVEL = 1
 
 WIDTH = info.current_w
 HEIGHT = info.current_h
