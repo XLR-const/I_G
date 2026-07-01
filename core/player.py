@@ -22,6 +22,8 @@ class Player:
         self.game = game
         self.x, self.y = PLAYER_POS
         self.angle = PLAYER_ANGLE
+        self.z = 0.0
+        self.height = 1.7
         self.hp = 100
         self.last_damage_time = 0
         self.regen_delay = 10000
@@ -34,6 +36,18 @@ class Player:
 
         pygame.mouse.set_pos([WIDTH // 2, HEIGHT // 2])
 
+    def update_z(self):
+        """Обновляет высоту игрока в зависимости от пола"""
+        # Пол под игроком
+        floor_here = self.game.map.get_floor_height(self.x, self.y)
+        
+        # Если игрок ниже пола - поднимаем
+        if self.z < floor_here:
+            self.z = floor_here
+        elif self.z > floor_here:
+            # Плавное опускание на пол (если нет поддержки)
+            self.z += (floor_here - self.z) * 0.1
+    
     def update_regen(self):
         """Обновляет регенерацию здоровья"""
         current_time = pygame.time.get_ticks()
@@ -141,6 +155,7 @@ class Player:
         """Обновляет состояние игрока"""
         self.mouse_control()
         self.movement()
+        self.update_z()
         self.angle %= math.tau
 
         if self.hp <= 0:

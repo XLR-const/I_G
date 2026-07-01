@@ -264,7 +264,25 @@ class Game:
                     pygame.quit()
                     sys.exit()
                 
+                # ============================================================
+                # КОНСОЛЬ - ПЕРВЫЙ ПРИОРИТЕТ
+                # ============================================================
+                if self.console.active:
+                    self.console.handle_event(event)
+                    # Если консоль активна - другие события не обрабатываем
+                    if event.type == pygame.KEYDOWN and event.key == pygame.K_BACKQUOTE:
+                        self.console.toggle()
+                    continue
+                
+                # ============================================================
+                # ОСТАЛЬНЫЕ СОБЫТИЯ (ТОЛЬКО ЕСЛИ КОНСОЛЬ НЕ АКТИВНА)
+                # ============================================================
                 if event.type == pygame.KEYDOWN:
+                    # Открытие/закрытие консоли
+                    if event.key == pygame.K_BACKQUOTE:
+                        self.console.toggle()
+                        continue
+                    
                     # F1-F5 - смена уровня
                     if event.key == pygame.K_F1:
                         self.current_level = 1

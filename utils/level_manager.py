@@ -85,7 +85,11 @@ class LevelManager:
         self.total_kills = 0
         self.npcs = []
 
-        self.map = Map(self.game, level_data['map'])
+        map_data = level_data.get('map', [])
+        floor_data = level_data.get('floor', [])
+        ceiling_data = level_data.get('ceiling', [])
+
+        self.map = Map(self.game, map_data, floor_data, ceiling_data)
 
         background = level_data.get('background', {})
         self.game.renderer.set_background(background)
