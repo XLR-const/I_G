@@ -17,7 +17,6 @@ class LevelGenerator:
                     grid[i][j] = "_"
 
     def generate_and_save(self, level_num, seed, style, num_rooms):
-        # Инициализируем сид случайности
         if seed:
             random.seed(seed)
         else:
@@ -27,142 +26,144 @@ class LevelGenerator:
         # Заливаем карту монолитными стенами "1"
         grid = [["1" for _ in range(self.width)] for _ in range(self.height)]
 
-        playable_height = self.height - 8
-        section_h = playable_height // num_rooms
         rooms_y_centers = []
+        start_y = 4
+        end_y = self.height - 5
+        playable_height = end_y - start_y
+        section_h = max(2, playable_height // num_rooms)
 
         # -------------------------------------------------------------
-        # ГЕНЕРАЦИЯ СТРУКТУРЫ ПО СТИЛЯМ
+        # ГЕНЕРАЦИЯ СТРУКТУРЫ ПО СТИЛЯМ (Динамический размер)
         # -------------------------------------------------------------
         
         if style == "lab":
-            # Стиль ЛАБОРАТОРИЯ: Прямая сквозная шахта-коридор по центру
+            # Стиль ЛАБОРАТОРИЯ: Центральный сквозной коридор
             center_corridor_x = self.width // 2 - 1
             for y in range(2, self.height - 2):
                 grid[y][center_corridor_x] = "_"
                 grid[y][center_corridor_x + 1] = "_"
 
-            # Генерируем боковые комнаты-боксы
+            # Компактные боксы по бокам распределяются по высоте
             for i in range(num_rooms):
-                min_y = 4 + (i * section_h)
-                rh = random.randint(5, max(5, section_h - 2))
-                ry = random.randint(min_y, min_y + section_h - rh - 1 if section_h > rh else min_y)
+                t = i / max(1, num_rooms - 1) if num_rooms > 1 else 0.5
+                ry = int(start_y + t * (playable_height - 4))
+                rh = random.randint(3, max(4, section_h))
                 
-                # Случайно выбираем сторону: левая комната или правая
-                if random.choice([True, False]):
-                    # Левый бокс
-                    rw = random.randint(4, 5)
+                # Ограничиваем высоту комнаты, чтобы не выйти за массив
+                rh = min(rh, self.height - ry - 3)
+                if rh < 3: continue
+
+                if i % 2 == 0:  # Левый бокс
+                    rw = random.randint(3, max(4, self.width // 4))
                     rx = 2
                     self._carve_rect(grid, rx, ry, rw, rh)
-                    # Проход в центральный коридор
                     grid[ry + rh // 2][center_corridor_x - 1] = "_"
                     grid[ry + rh // 2][center_corridor_x] = "_"
-                else:
-                    # Правый бокс
-                    rw = random.randint(4, 5)
+                else:  # Правый бокс
+                    rw = random.randint(3, max(4, self.width // 4))
                     rx = center_corridor_x + 2
                     self._carve_rect(grid, rx, ry, rw, rh)
-                    # Проход в центральный коридор
                     grid[ry + rh // 2][center_corridor_x + 1] = "_"
                     grid[ry + rh // 2][center_corridor_x + 2] = "_"
                     
                 rooms_y_centers.append((center_corridor_x + 1, ry + rh // 2, ry, ry + rh))
 
         elif style == "out":
-            # Стиль УЛИЦА: Вырезаем огромный сквозной полигон под открытым небом
+            # Стиль УЛИЦА: Очищаем весь внутренний полигон
             self._carve_rect(grid, 1, 1, self.width - 2, self.height - 2)
             
-            # Возводим внутри редкие строения, бункеры или заборы-КПП
+            # Возводим домики/бункеры пропорционально размерам карты
             for i in range(num_rooms):
-                min_y = 4 + (i * section_h)
-                bw = random.randint(5, 7)
-                bh = random.randint(5, 6)
-                bx = random.randint(2, self.width - bw - 2)
-                by = random.randint(min_y, min_y + max(1, section_h - bh - 1))
+                t = i / max(1, num_rooms - 1) if num_rooms > 1 else 0.5
+                by = int(start_y + t * (playable_height - 5)) + random.randint(-1, 1)
+                by = max(start_y, min(end_y - 4, by))
                 
-                # Заливаем эту зону стеной (строение на улице)
+                bw = random.randint(3, max(4, self.width // 4))
+                bh = random.randint(3, max(4, self.height // 10))
+                bx = random.randint(2, max(3, self.width - bw - 2))
+                
+                # Проверка границ перед заливкой
+                if by + bh >= self.height - 1: bh = self.height - by - 2
+                if bh < 3 or bw < 3: continue
+
                 for y in range(by, by + bh):
                     for x in range(bx, bx + bw):
                         if 1 <= x < self.width - 1 and 1 <= y < self.height - 1:
                             grid[y][x] = "1"
                 
-                # Вырезаем внутренность домика (комнату внутри бункера)
-                for y in range(by + 1, by + bh - 1):
-                    for x in range(bx + 1, bx + bw - 1):
-                        grid[y][x] = "_"
-                        
-                # Прорубаем дверь в бункер
-                grid[by + bh - 1][bx + bw // 2] = "_"
+                # Вырезаем пол внутри бункера, если позволяют размеры
+                if bw > 3 and bh > 3:
+                    for y in range(by + 1, by + bh - 1):
+                        for x in range(bx + 1, bx + bw - 1):
+                            grid[y][x] = "_"
+                    grid[by + bh - 1][bx + bw // 2] = "_"  # Дверь
+                else:
+                    grid[by][bx] = "_"  # Микро-ниша
+                    
                 rooms_y_centers.append((bx + bw // 2, by + bh // 2, by, by + bh))
 
         else:
-            # Стили HALL и VENT (классическая зачистка по секциям)
+            # Стили HALL и VENT
             for i in range(num_rooms):
-                min_y = 4 + (i * section_h)
-                max_y = min_y + section_h - 2
+                t = i / max(1, num_rooms - 1) if num_rooms > 1 else 0.5
+                ry = int(start_y + t * (playable_height - 5)) + random.randint(-1, 1)
+                ry = max(start_y, min(end_y - 5, ry))
                 
                 if style == "hall":
-                    rw = random.randint(10, self.width - 4)
-                    rh = random.randint(6, max(6, section_h - 3))
-                    rx = random.randint(2, self.width - rw - 2)
-                    ry = random.randint(min_y, max(min_y, max_y - rh))
+                    rw = random.randint(max(4, self.width // 3), self.width - 4)
+                    rh = random.randint(3, max(4, self.height // 10))
+                    rx = random.randint(2, max(3, self.width - rw - 2))
                     self._carve_rect(grid, rx, ry, rw, rh)
-                    if random.choice([True, False]):
-                        self._carve_rect(grid, rx - 1, ry + 1, 1, rh - 2)
-                        self._carve_rect(grid, rx + rw, ry + 1, 1, rh - 2)
                 else:  # vent
-                    rw = random.randint(4, 6)
-                    rh = random.randint(4, 5)
-                    rx = random.randint(2, self.width - rw - 2)
-                    ry = random.randint(min_y, max(min_y, max_y - rh))
+                    rw = random.randint(3, max(4, self.width // 5))
+                    rh = random.randint(3, max(4, self.height // 12))
+                    rx = random.randint(2, max(3, self.width - rw - 2))
                     self._carve_rect(grid, rx, ry, rw, rh)
                     
                 rooms_y_centers.append((rx + rw // 2, ry + rh // 2, ry, ry + rh))
 
-            # Прокладываем извилистые коридоры для Hall и Vent
-            for i in range(num_rooms - 1):
+            # Прокладка коридоров-дуг
+            for i in range(len(rooms_y_centers) - 1):
                 cx1, cy1, _, r1_bottom = rooms_y_centers[i]
                 cx2, cy2, r2_top, _ = rooms_y_centers[i+1]
-                start_y, end_y = r1_bottom, r2_top
+                s_y, e_y = r1_bottom, r2_top
                 
-                if start_y >= end_y:
+                if s_y >= e_y:
+                    grid[s_y][cx1] = "_"
+                    grid[s_y][cx2] = "_"
                     continue
                     
-                for y in range(start_y, end_y + 1):
-                    t = (y - start_y) / (end_y - start_y) if end_y != start_y else 0.5
+                for y in range(s_y, e_y + 1):
+                    progress = (y - s_y) / (e_y - s_y) if e_y != s_y else 0.5
                     if style == "hall":
-                        amp = 1.2
-                        center_x = int((cx1 + (cx2 - cx1) * t) + amp * math.sin(t * math.pi))
-                        center_x = max(2, min(self.width - 5, center_x))
+                        amp = max(0.5, self.width * 0.05)
+                        center_x = int((cx1 + (cx2 - cx1) * progress) + amp * math.sin(progress * math.pi))
+                        center_x = max(2, min(self.width - 4, center_x))
                         grid[y][center_x] = "_"
-                        grid[y][center_x + 1] = "_"
-                        grid[y][center_x + 2] = "_"
+                        if center_x + 1 < self.width - 1: grid[y][center_x + 1] = "_"
                     else:  # vent
-                        amp = 2.5
-                        center_x = int((cx1 + (cx2 - cx1) * t) + amp * math.sin(t * math.pi))
-                        center_x = max(1, min(self.width - 3, center_x))
+                        amp = max(1.0, self.width * 0.12)
+                        center_x = int((cx1 + (cx2 - cx1) * progress) + amp * math.sin(progress * math.pi))
+                        center_x = max(1, min(self.width - 2, center_x))
                         grid[y][center_x] = "_"
-                        if random.choice([True, False]) and center_x + 1 < self.width - 1:
-                            grid[y][center_x + 1] = "_"
 
         # -------------------------------------------------------------
-        # РАССТАНОВКА СТАРТА И ВЫХОДА (Исправленные индексы)
+        # РАССТАНОВКА СТАРТА И ВЫХОДА
         # -------------------------------------------------------------
-        if style == "lab":
-            grid[3][self.width // 2] = "S"
-            grid[self.height - 4][self.width // 2] = "E"
-        elif style == "out":
-            grid[3][self.width // 2] = "S"
-            grid[self.height - 4][self.width // 2] = "E"
+        if style in ["lab", "out"]:
+            grid[2][self.width // 2] = "S"
+            grid[self.height - 3][self.width // 2] = "E"
         else:
-            first_room_x = rooms_y_centers[0][0]
-            first_room_y = rooms_y_centers[0][1]
-            grid[first_room_y][first_room_x] = "S"
-            
-            last_room_x = rooms_y_centers[-1][0]
-            grid[self.height - 4][last_room_x] = "E"
+            if rooms_y_centers:
+                first_x, first_y = rooms_y_centers[0][0], rooms_y_centers[0][1]
+                grid[first_y][first_x] = "S"
+                last_x = rooms_y_centers[-1][0]
+                grid[self.height - 3][last_x] = "E"
+            else:
+                grid[2][self.width // 2] = "S"
+                grid[self.height - 3][self.width // 2] = "E"
 
-        # Настройки цвета под уровень
+        # Настройки палитры
         r_ceil = max(50, 180 - level_num * 15)
         g_ceil = max(30, 100 - level_num * 8)
         b_ceil = max(30, 100 - level_num * 8)
@@ -170,7 +171,7 @@ class LevelGenerator:
         g_floor = max(10, 30 - level_num * 2)
         b_floor = max(10, 30 - level_num * 2)
 
-        # Построчное параллельное горизонтальное форматирование для читаемости JSON
+        # Построчное красивое форматирование для горизонтальной матрицы JSON
         formatted_map_lines = []
         for row in grid:
             json_row = json.dumps(row, ensure_ascii=False)
@@ -203,15 +204,14 @@ class LevelGenerator:
         
         print(f"\n[Успех] Уровень {level_num} успешно сгенерирован!")
         print(f"-> Файл: {filename}")
-        print(f"-> Параметры: Сид='{seed}', Стиль='{style}', Комнат={num_rooms}\n")
+        print(f"-> Геометрия: {self.width}x{self.height}, Комнат: {num_rooms}, Стиль: {style}\n")
 
 
 if __name__ == "__main__":
-    # Если скрипт запущен вообще без аргументов, включается пошаговый интерактивный опрос
     if len(sys.argv) == 1:
         print("=== ИНТЕРАКТИВНЫЙ РЕЖИМ ГЕНЕРАТОРА ===")
         
-        # 1. Запрос номера уровня
+        # 1. Номер уровня
         while True:
             try:
                 level_num = int(input("1. Введите номер уровня (например, 1): ").strip())
@@ -219,44 +219,59 @@ if __name__ == "__main__":
             except ValueError:
                 print("Ошибка: введите целое число.")
         
-        # 2. Запрос стиля
+        # 2. Размеры карты (Ширина и Высота)
+        while True:
+            try:
+                width = int(input("2a. Укажите ШИРИНУ карты в клетках (мин. 10): ").strip())
+                height = int(input("2b. Укажите ВЫСОТУ карты в клетках (мин. 15): ").strip())
+                if width >= 10 and height >= 15:
+                    break
+                print("Ошибка: Минимальные размеры карты — 10x15.")
+            except ValueError:
+                print("Ошибка: введите целые числа.")
+
+        # 3. Количество комнат
+        while True:
+            try:
+                rooms_input = input("3. Введите количество комнат/секторов (2-30) [по умолчанию 3]: ").strip()
+                num_rooms = int(rooms_input) if rooms_input else 3
+                if 2 <= num_rooms <= 30:
+                    break
+                print("Ошибка: количество комнат должно быть от 2 до 30.")
+            except ValueError:
+                print("Ошибка: введите целое число.")
+
+        # 4. Выбор стиля
         styles = ["hall", "vent", "lab", "out"]
         while True:
-            style = input(f"2. Выберите стиль генерации {styles}: ").strip().lower()
+            style = input(f"4. Выберите стиль генерации {styles}: ").strip().lower()
             if style in styles:
                 break
             print(f"Ошибка: стиль должен быть одним из {styles}")
 
-        # 3. Запрос сида
-        seed_input = input("3. Укажите сид (нажмите Enter для случайного): ").strip()
+        # 5. Сид
+        seed_input = input("5. Укажите сид (нажмите Enter для случайного): ").strip()
         seed = seed_input if seed_input else None
 
-        # 4. Запрос количества комнат
-        while True:
-            try:
-                rooms_input = input("4. Введите количество комнат/секторов (2-5) [по умолчанию 3]: ").strip()
-                num_rooms = int(rooms_input) if rooms_input else 3
-                if 2 <= num_rooms <= 5:
-                    break
-                print("Ошибка: количество комнат должно быть от 2 до 5.")
-            except ValueError:
-                print("Ошибка: введите целое число.")
-
     else:
-        # Режим чтения стандартных флагов, если вы передаете аргументы сразу в консоли
+        # Режим чтения флагов командной строки
         parser = argparse.ArgumentParser(description="Генератор уровней")
         parser.add_argument("level_num", type=int, help="Номер уровня")
-        parser.add_argument("--seed", type=str, default=None, help="Сид")
+        parser.add_argument("--width", type=int, default=18, help="Ширина карты")
+        parser.add_argument("--height", type=int, default=48, help="Высота карты")
+        parser.add_argument("--rooms", type=int, default=3, help="Количество комнат (2-30)")
         parser.add_argument("--style", type=str, choices=["hall", "vent", "lab", "out"], default="hall", help="Стиль")
-        parser.add_argument("--rooms", type=int, default=3, help="Количество комнат (2-5)")
+        parser.add_argument("--seed", type=str, default=None, help="Сид")
         
         args = parser.parse_args()
         level_num = args.level_num
-        seed = args.seed
+        width = max(10, args.width)
+        height = max(15, args.height)
+        num_rooms = max(2, min(30, args.rooms))
         style = args.style
-        num_rooms = max(2, min(5, args.rooms))
+        seed = args.seed
 
-    # Финальный запуск сборки уровня с правильными параметрами
-    generator = LevelGenerator(width=18, height=48)
+    # Запуск генератора с полученными параметрами
+    generator = LevelGenerator(width=width, height=height)
     generator.generate_and_save(level_num, seed, style, num_rooms)
 
