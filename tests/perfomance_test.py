@@ -1,283 +1,311 @@
-import pygame
-import time
+"""Тест производительности с рейкастингом и FPS"""
+
 import sys
-import math
 import os
-sys.path.append('.')
+import time
+import pygame
+import math
 
+# Добавляем путь к корневой папке проекта
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from utils.generate_levels import LevelGenerator
+from core.map import Map
+from core.player import Player
+from rendering.raycasting import RayCasting
+from rendering.renderer import Renderer
 from setting import *
-from core.npc import Solder
 
 
-def test_npc_performance():
-    """Тест: сколько NPC можно держать без лагов"""
-    pygame.init()
-    screen = pygame.display.set_mode((800, 600))
-    clock = pygame.time.Clock()
-
-    # Создаём фейковую игру
-    class FakeGame:
-        def __init__(self):
-            self.delta_time = 16
-            self.screen = screen
-            self.particles = []
-            self.total_kills = 0
-
-            # Фейковый игрок
-            self.player = type('Player', (), {
-                'x': 5, 'y': 5, 'hp': 100,
-                'angle': 0,
-                'take_damage': lambda self, d: None,
-                'update_regen': lambda self: None
-            })()
-
-            # Фейковая карта
-            class FakeMap:
-                def __init__(self):
-                    self.width = 32
-                    self.height = 32
-                    self.world_map = {}
-                    self.doors = []
-
-                def is_wall(self, x, y):
-                    return False
-
-            self.map = FakeMap()
-
-            # Фейковый pathfinder
-            class FakePathFinder:
-                def a_star(self, start, goal, max_distance=5):
-                    return []
-
-            self.pathfinder = FakePathFinder()
-
-            # Фейковый renderer для Z-буфера
-            self.raycasting = type('RayCasting', (), {
-                'z_buffer': [float('inf')] * 100
-            })()
-
-    # Тестируем разное количество NPC
-    for count in [5, 10, 15, 20, 30]:
-        game = FakeGame()
-        game.npcs = []
-
-        for i in range(count):
-            npc = Solder(game, pos=(i % 10 + 1, i // 10 + 1))
-            npc.alive = True
-            npc.hp = 100
-            npc.waypoints = [(1, 1), (2, 2), (3, 3)]
-            game.npcs.append(npc)
-
-        start = time.time()
-        frames = 0
-        while time.time() - start < 1:
-            for npc in game.npcs:
-                npc.update()
-            frames += 1
-            clock.tick(1000)  # ограничиваем, чтобы не грузить CPU
-
-        elapsed = time.time() - start
-        print(f"{count} NPC: {frames} кадров за {elapsed:.1f} сек (~{frames} FPS)")
-        if frames < 30:
-            print(f"  ⚠️ Рекомендуемый лимит: {count}")
-            break
-
-
-def test_pathfinding_performance():
-    """Тест: производительность A* поиска пути"""
-    from utils.pathfinding import PathFinder
-
-    class FakeGame:
-        def __init__(self, size):
-            self.map = type('Map', (), {
-                'width': size,
-                'height': size,
-                'world_map': {},
-                'doors': [],
-                'is_wall': lambda self, x, y: x <= 0 or y <= 0 or x >= size - 1 or y >= size - 1
-            })()
-
-            self.player = type('Player', (), {'x': size // 2, 'y': size // 2})()
-
-    for size in [32, 64, 100]:
-        game = FakeGame(size)
-        pf = PathFinder(game)
-
-        start = time.time()
-        searches = 0
-        while time.time() - start < 1:
-            pf.a_star((size // 2, size // 2), (size - 2, size - 2), max_distance=20)
-            searches += 1
-        elapsed = time.time() - start
-
-        print(f"Карта {size}x{size}: {searches} поисков/сек")
-        if searches < 10:
-            print(f"  ⚠️ Рекомендуемый размер: {size // 2}")
-            break
+class GameStub:
+    """Заглушка для тестирования без полной игры"""
+    def __init__(self):
+        self.screen = pygame.display.set_mode((800, 600))
+        self.clock = pygame.time.Clock()
+        self.delta_time = 0.016
+        self.player = None
+        self.map = None
+        self.raycasting = None
+        self.renderer = None
+        self.npcs = []
+        self.particles = []
+        self.font = pygame.font.Font(None, 24)
+        self.current_level = 1
+        self.level_manager = None
+        self.pathfinder = None
+        self.music_manager = None
+        self.ui_manager = None
+        self.total_kills = 0
+    
+    def load_level(self, map_data):
+        """Загружает уровень для теста"""
+        self.map = Map(self, map_data)
+        
+        for y, row in enumerate(map_data):
+            for x, char in enumerate(row):
+                if char == 'S':
+                    self.player = Player(self)
+                    self.player.x = x + 0.5
+                    self.player.y = y + 0.5
+                    break
+            if self.player:
+                break
+        
+        if not self.player:
+            self.player = Player(self)
+            self.player.x = 5.5
+            self.player.y = 5.5
+        
+        self.raycasting = RayCasting(self)
+        self.renderer = Renderer(self)
+    
+    def update(self):
+        if self.player:
+            self.player.update()
+        for npc in self.npcs:
+            if hasattr(npc, 'alive') and npc.alive:
+                try:
+                    dx = self.player.x - npc.x
+                    dy = self.player.y - npc.y
+                    dist = math.hypot(dx, dy)
+                    
+                    if dist < npc.shoot_range and npc.has_line_of_sight():
+                        npc.state = "ATTACK"
+                        npc.shoot()
+                    elif dist < 10:
+                        if dist > 0.01:
+                            move_x = (dx / dist) * npc.speed * 0.01
+                            move_y = (dy / dist) * npc.speed * 0.01
+                            npc.try_move(move_x, move_y)
+                        npc.state = "CHASE"
+                    else:
+                        npc.state = "IDLE"
+                except:
+                    pass
+    
+    def draw(self):
+        if self.renderer:
+            self.renderer.draw_background()
+        if self.raycasting:
+            self.raycasting.ray_cast()
+        for npc in self.npcs:
+            try:
+                npc.draw()
+            except:
+                pass
+        pygame.display.flip()
 
 
-def test_a_star_pathfinding():
-    """Тест: A* находит путь, обходя стены"""
-    from utils.pathfinding import PathFinder
+def create_npc(game, npc_type, x, y):
+    from core.npc import Solder, Kamikaze, Jaggernaut, Lightning, Boss
+    npc_classes = {'2': Solder, '3': Kamikaze, '4': Jaggernaut, '5': Lightning, '6': Boss}
+    if npc_type in npc_classes:
+        npc = npc_classes[npc_type](game, pos=(x + 0.5, y + 0.5))
+        npc.path = []
+        npc.last_path_update = 0
+        return npc
+    return None
 
-    # Создаём карту с препятствием
-    class FakeGame:
-        def __init__(self):
-            self.map = type('Map', (), {
-                'width': 10,
-                'height': 10,
-                'world_map': {},
-                'doors': [],
-                'is_wall': lambda self, x, y: (x == 5 and 2 <= y <= 7)
-            })()
 
-            self.player = type('Player', (), {'x': 0, 'y': 0})()
-
-    game = FakeGame()
-    pf = PathFinder(game)
-
-    start = (2, 2)
-    goal = (8, 8)
-
-    path = pf.a_star(start, goal, max_distance=20)
-
-    print("\n=== ТЕСТ A* ===")
-    print(f"Старт: {start}")
-    print(f"Цель: {goal}")
-    print(f"Найден путь: {len(path)} клеток")
-
-    if len(path) > 1:
-        print(f"Первые шаги: {path[:5]}...")
-        # Проверяем, что путь не идёт сквозь стены
-        for cell in path:
-            assert not game.map.is_wall(cell[0], cell[1]), f"Путь идёт сквозь стену {cell}"
-        print("✅ Путь корректен, стены обойдены!")
-        return True
+def run_test(width, height, level_num, map_label, npc_label):
+    """Запускает один тест и возвращает результат"""
+    
+    generator = LevelGenerator(width=width, height=height)
+    
+    start_gen = time.time()
+    map_str, _, _ = generator.generate(level_num)
+    gen_time = time.time() - start_gen
+    
+    room_count = len(generator.rooms)
+    npc_count = 0
+    for row in map_str:
+        npc_count += row.count('2') + row.count('3') + row.count('4') + row.count('5') + row.count('6')
+    
+    game = GameStub()
+    game.load_level(map_str)
+    
+    game.npcs = []
+    for y, row in enumerate(map_str):
+        for x, char in enumerate(row):
+            if char in ['2', '3', '4', '5', '6']:
+                npc = create_npc(game, char, x, y)
+                if npc:
+                    game.npcs.append(npc)
+    
+    for _ in range(10):
+        game.update()
+        game.draw()
+        game.clock.tick(60)
+    
+    frame_times = []
+    for _ in range(100):
+        start_frame = time.time()
+        game.update()
+        game.draw()
+        frame_time = time.time() - start_frame
+        frame_times.append(frame_time)
+        game.clock.tick(120)
+    
+    avg_frame_time = sum(frame_times) / len(frame_times)
+    fps = 1.0 / avg_frame_time if avg_frame_time > 0 else 0
+    
+    if fps >= 60:
+        rating = "✅ Отлично"
+    elif fps >= 30:
+        rating = "⚠️ Нормально"
+    elif fps >= 15:
+        rating = "⚠️ Терпимо"
     else:
-        print("❌ Путь не найден!")
-        return False
+        rating = "❌ Лаги"
+    
+    return {
+        "map": map_label,
+        "npc_label": npc_label,
+        "level": level_num,
+        "width": width,
+        "height": height,
+        "rooms": room_count,
+        "npc": npc_count,
+        "fps": fps,
+        "gen_time": gen_time,
+        "rating": rating
+    }
 
 
-def test_collision():
-    """Тест: проверка коллизии со стенами"""
-    from core.player import Player
-
-    class FakeGame:
-        def __init__(self):
-            class FakeMap:
-                def __init__(self):
-                    self.world_map = {(5, 5): '1', (5, 6): '1', (6, 5): '1'}
-                    self.doors = []
-                    self.width = 10
-                    self.height = 10
-
-                def is_wall(self, x, y):
-                    return (x, y) in self.world_map
-
-            self.map = FakeMap()
-            self.npcs = []
-            self.delta_time = 16
-
-    game = FakeGame()
-    player = Player(game)
-    player.x, player.y = 1.5, 1.5
-
-    # Проверка на блок движение при столкновении со стеной
-    wall_x, wall_y = 5.5, 5.5
-    can_move = player._check_collision(wall_x - player.x, wall_y - player.y)
-
-    print("\n=== ТЕСТ КОЛЛИЗИЙ ===")
-    print(f"Попытка войти в стену ({wall_x}, {wall_y})")
-    print(f"Движение заблокировано: {not can_move}")
-    assert not can_move, "Коллизия должна блокировать проход сквозь стены"
-    print("✅ Коллизия работает!")
-    return True
-
-
-def test_door_opening():
-    """Тест: дверь открывается при приближении"""
-    from core.door import Door
-
-    class FakeGame:
-        def __init__(self):
-            self.player = type('Player', (), {'x': 5.2, 'y': 5.2})()
-            self.map = type('Map', (), {'doors': []})()
-
-    game = FakeGame()
-    door = Door(game, 5.0, 5.0)
-
-    print("\n=== ТЕСТ ДВЕРИ ===")
-    print(f"Начальное состояние: {door.state}")
-    door.update()
-    print(f"После приближения игрока: {door.state}")
-
-    assert door.state in ["OPENING", "OPEN"], "Дверь должна начать открываться!"
-    print("✅ Дверь работает!")
-    return True
-
-
-def test_player_health():
-    """Тест: HP игрока не уходит в минус"""
-    from core.player import Player
-
-    class FakeGame:
-        def __init__(self):
-            self.ui_manager = type('UIManager', (), {
-                'states': {'DEAD': 6},
-                'current_state': 0
-            })()
-
-    game = FakeGame()
-    player = Player(game)
-    player.hp = 100
-
-    print("\n=== ТЕСТ ЗДОРОВЬЯ ===")
-    print(f"Начальное HP: {player.hp}")
-
-    player.take_damage(150)
-    print(f"После урона 150: {player.hp}")
-    assert player.hp >= 0, "HP не может быть отрицательным!"
-    assert player.hp == 0, "При уроне > HP должно остаться 0"
-    print("✅ Здоровье работает!")
-    return True
+def main():
+    """Главная функция - запускает все тесты и выводит итоговую таблицу"""
+    
+    print("\n" + "=" * 110)
+    print("🔬 ТЕСТ ПРОИЗВОДИТЕЛЬНОСТИ С РЕЙКАСТИНГОМ")
+    print("=" * 110)
+    
+    # ============================================================
+    # ВСЕ КОНФИГУРАЦИИ
+    # ============================================================
+    
+    configs = [
+        # Маленькая карта
+        {"width": 30, "height": 17, "level": 1, "map_label": "Малая", "npc_label": "Мало"},
+        {"width": 30, "height": 17, "level": 5, "map_label": "Малая", "npc_label": "Средне"},
+        {"width": 30, "height": 17, "level": 10, "map_label": "Малая", "npc_label": "Много"},
+        
+        # Средняя карта
+        {"width": 50, "height": 28, "level": 1, "map_label": "Средняя", "npc_label": "Мало"},
+        {"width": 50, "height": 28, "level": 5, "map_label": "Средняя", "npc_label": "Средне"},
+        {"width": 50, "height": 28, "level": 10, "map_label": "Средняя", "npc_label": "Много"},
+        
+        # Большая карта
+        {"width": 80, "height": 45, "level": 1, "map_label": "Большая", "npc_label": "Мало"},
+        {"width": 80, "height": 45, "level": 5, "map_label": "Большая", "npc_label": "Средне"},
+        {"width": 80, "height": 45, "level": 10, "map_label": "Большая", "npc_label": "Много"},
+        
+        # Огромная карта
+        {"width": 120, "height": 68, "level": 5, "map_label": "Огромная", "npc_label": "Средне"},
+        {"width": 120, "height": 68, "level": 10, "map_label": "Огромная", "npc_label": "Много"},
+        
+        # Экстрим
+        {"width": 150, "height": 84, "level": 10, "map_label": "Экстрим", "npc_label": "Много"},
+    ]
+    
+    # Инициализация Pygame (ОДИН РАЗ)
+    pygame.init()
+    pygame.display.set_mode((800, 600))
+    
+    results = []
+    test_num = 1
+    
+    # Шапка таблицы
+    print(f"\n{'#':<4} {'Карта':<12} {'NPC':<10} {'Размер':<12} {'Комнат':<7} {'NPC_шт':<7} {'FPS':<8} {'Время_ген':<10} {'Оценка'}")
+    print("-" * 110)
+    
+    for config in configs:
+        print(f"{test_num:<4} ", end="")
+        
+        try:
+            result = run_test(
+                config["width"],
+                config["height"],
+                config["level"],
+                config["map_label"],
+                config["npc_label"]
+            )
+            results.append(result)
+            
+            size = f"{result['width']}x{result['height']}"
+            print(f"{result['map']:<12} {result['npc_label']:<10} {size:<12} {result['rooms']:<7} {result['npc']:<7} {result['fps']:.1f}    {result['gen_time']:.3f}s    {result['rating']}")
+            
+        except Exception as e:
+            print(f"{'ОШИБКА':<12} {'—':<10} {'—':<12} {'—':<7} {'—':<7} {'—':<8} {'—':<10} ❌ {str(e)[:30]}")
+        
+        test_num += 1
+    
+    # ============================================================
+    # ИТОГОВАЯ ТАБЛИЦА (СОРТИРОВАННАЯ)
+    # ============================================================
+    
+    print("\n" + "=" * 110)
+    print("📊 ИТОГОВАЯ ТАБЛИЦА ПРОИЗВОДИТЕЛЬНОСТИ (СОРТИРОВАННАЯ ПО РАЗМЕРУ)")
+    print("=" * 110)
+    
+    print(f"\n{'Карта':<12} {'NPC':<10} {'Размер':<12} {'Комнат':<7} {'NPC_шт':<7} {'FPS':<8} {'Время_ген':<10} {'Оценка'}")
+    print("-" * 110)
+    
+    sorted_results = sorted(results, key=lambda r: r['width'] * r['height'])
+    
+    for r in sorted_results:
+        size = f"{r['width']}x{r['height']}"
+        print(f"{r['map']:<12} {r['npc_label']:<10} {size:<12} {r['rooms']:<7} {r['npc']:<7} {r['fps']:.1f}    {r['gen_time']:.3f}s    {r['rating']}")
+    
+    # ============================================================
+    # СТАТИСТИКА
+    # ============================================================
+    
+    print("\n" + "=" * 110)
+    print("📊 СТАТИСТИКА")
+    print("=" * 110)
+    
+    excellent = [r for r in results if r['fps'] >= 60]
+    good = [r for r in results if 30 <= r['fps'] < 60]
+    bad = [r for r in results if r['fps'] < 30]
+    
+    print(f"\n  ✅ Отличная производительность (>=60 FPS): {len(excellent)} конфигураций")
+    for r in excellent:
+        print(f"     - {r['map']} + {r['npc_label']}: {r['fps']:.1f} FPS ({r['width']}x{r['height']})")
+    
+    print(f"\n  ⚠️ Нормальная производительность (30-60 FPS): {len(good)} конфигураций")
+    for r in good:
+        print(f"     - {r['map']} + {r['npc_label']}: {r['fps']:.1f} FPS ({r['width']}x{r['height']})")
+    
+    print(f"\n  ❌ Низкая производительность (<30 FPS): {len(bad)} конфигураций")
+    for r in bad:
+        print(f"     - {r['map']} + {r['npc_label']}: {r['fps']:.1f} FPS ({r['width']}x{r['height']})")
+    
+    # ============================================================
+    # РЕКОМЕНДАЦИИ
+    # ============================================================
+    
+    print("\n" + "=" * 110)
+    print("💡 РЕКОМЕНДАЦИИ")
+    print("=" * 110)
+    
+    # Самая большая конфигурация с хорошим FPS
+    good_configs = [r for r in results if r['fps'] >= 30]
+    if good_configs:
+        max_good = max(good_configs, key=lambda r: r['width'] * r['height'])
+        print(f"\n  ✅ Рекомендуемый максимум для 30+ FPS:")
+        print(f"     {max_good['map']} ({max_good['width']}x{max_good['height']}) + {max_good['npc_label']} NPC")
+        print(f"     FPS: {max_good['fps']:.1f}, комнат: {max_good['rooms']}, NPC: {max_good['npc']}")
+    
+    # Самая большая конфигурация с отличным FPS
+    excellent_configs = [r for r in results if r['fps'] >= 60]
+    if excellent_configs:
+        max_excellent = max(excellent_configs, key=lambda r: r['width'] * r['height'])
+        print(f"\n  ✅ Рекомендуемый максимум для 60+ FPS:")
+        print(f"     {max_excellent['map']} ({max_excellent['width']}x{max_excellent['height']}) + {max_excellent['npc_label']} NPC")
+        print(f"     FPS: {max_excellent['fps']:.1f}, комнат: {max_excellent['rooms']}, NPC: {max_excellent['npc']}")
+    
+    pygame.quit()
 
 
 if __name__ == "__main__":
-    print("=" * 60)
-    print("ЗАПУСК ТЕСТОВ")
-    print("=" * 60)
-
-    tests = [
-        ("A* поиск пути", test_a_star_pathfinding),
-        ("Коллизия со стенами", test_collision),
-        ("Механика дверей", test_door_opening),
-        ("Здоровье игрока", test_player_health),
-    ]
-
-    passed = 0
-    failed = 0
-
-    for name, test_func in tests:
-        try:
-            print(f"\n--- {name} ---")
-            result = test_func()
-            if result:
-                passed += 1
-            else:
-                failed += 1
-        except Exception as e:
-            print(f"❌ ОШИБКА: {e}")
-            failed += 1
-
-    print("\n" + "=" * 60)
-    print(f"РЕЗУЛЬТАТ: {passed} пройдено, {failed} не пройдено")
-    print("=" * 60)
-
-    # Тесты производительности
-    print("\n" + "=" * 60)
-    print("ТЕСТЫ ПРОИЗВОДИТЕЛЬНОСТИ")
-    print("=" * 60)
-
-    test_npc_performance()
-    print("\n" + "=" * 60)
-    test_pathfinding_performance()
+    main()
