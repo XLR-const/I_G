@@ -20,10 +20,14 @@ class MapEditor:
         self.clock = pygame.time.Clock()
         self.running = True
 
+        self.dialog_active = False
+        self.dialog_choice = None
+
         self.grid = []
         self.current_file = None
         self.selected_symbol = 'M'
         self.has_changes = False
+        self._saving = False  # защита от множественных сохранений
 
         self._setup_ui()
         self._setup_tools()
@@ -44,47 +48,65 @@ class MapEditor:
     def _setup_tools(self):
         self.brush = Brush(self)
         self.eraser = Eraser(self)
-        self.current_tool = 'brush'  # 'brush' или 'eraser'
+        self.current_tool = 'brush'
 
     def _on_change(self):
         """Вызывается при изменении карты"""
-        self.has_changes = True
-        self._auto_save()
+        if not self._saving:
+            self.has_changes = True
+            self._auto_save()
 
     def _auto_save(self):
-        """Автосохранение с бэкапом"""
-        if self.current_file and self.grid:
-            self._create_backup()
-            self.save_level(self.current_file)
+        """Пишет изменения ТОЛЬКО в бэкап, не трогая основной файл"""
+        if self._saving or not self.current_file or not self.grid or not self.has_changes:
+            return
+
+        self._saving = True
+        self._create_backup()  # Делаем резервную копию
+        # Строку self.save_level(self.current_file) ОТСЮДА УДАЛЯЕМ!
+        self._saving = False
+
 
     def _create_backup(self):
-        """Создаёт бэкап текущего уровня"""
         if not self.current_file or not self.grid:
             return
 
-        # Создаём папку для бэкапов
         backup_dir = os.path.join(os.path.dirname(self.current_file), 'levels_backup')
         os.makedirs(backup_dir, exist_ok=True)
 
-        # Имя бэкапа
         base_name = os.path.basename(self.current_file)
         name, ext = os.path.splitext(base_name)
         backup_path = os.path.join(backup_dir, f"{name}_backup{ext}")
 
         try:
-            # Загружаем текущие данные
             with open(self.current_file, 'r', encoding='utf-8') as f:
                 data = json.load(f)
 
-            # Обновляем карту
             data['map'] = self.grid
 
-            # Сохраняем бэкап
             with open(backup_path, 'w', encoding='utf-8') as f:
                 json.dump(data, f, indent=2, ensure_ascii=False)
 
         except Exception as e:
             print(f"[Бэкап] Ошибка: {e}")
+
+    def _clear_backups(self):
+        if not self.current_file:
+            return
+
+        backup_dir = os.path.join(os.path.dirname(self.current_file), 'levels_backup')
+        if not os.path.exists(backup_dir):
+            return
+
+        base_name = os.path.basename(self.current_file)
+        name, _ = os.path.splitext(base_name)
+
+        for f in os.listdir(backup_dir):
+            if f.startswith(name) and f.endswith('_backup.json'):
+                try:
+                    os.remove(os.path.join(backup_dir, f))
+                except:
+                    pass
 
     def load_level(self, file_path):
         if not os.path.exists(file_path):
@@ -132,6 +154,8 @@ class MapEditor:
                 json.dump(data, f, indent=2, ensure_ascii=False)
 
             self.has_changes = False
+            self._clear_backups()
+
             print(f"[Сохранено] {file_path}")
             return True
 
@@ -139,14 +163,83 @@ class MapEditor:
             print(f"[Ошибка] Сохранение: {e}")
             return False
 
+    def _open_dialog(self):
+        """Открывает диалог сохранения"""
+        if self.has_changes and self.current_file:
+            self.dialog_active = True
+            self.dialog_choice = None
+        else:
+            self.running = False
+
+    def _draw_dialog(self):
+        """Рисует диалог сохранения"""
+        # Затемнение
+        overlay = pygame.Surface((WINDOW_WIDTH, WINDOW_HEIGHT))
+        overlay.set_alpha(180)
+        overlay.fill((0, 0, 0))
+        self.screen.blit(overlay, (0, 0))
+
+        # Окно диалога
+        dialog_rect = pygame.Rect(
+            WINDOW_WIDTH // 2 - 220,
+            WINDOW_HEIGHT // 2 - 80,
+            440, 160
+        )
+        pygame.draw.rect(self.screen, (50, 50, 60), dialog_rect)
+        pygame.draw.rect(self.screen, (100, 100, 120), dialog_rect, 2)
+
+        font = pygame.font.Font(None, 24)
+        font_small = pygame.font.Font(None, 18)
+
+        # Заголовок
+        title = font.render("Сохранить изменения?", True, (255, 255, 255))
+        title_rect = title.get_rect(center=(dialog_rect.centerx, dialog_rect.y + 30))
+        self.screen.blit(title, title_rect)
+
+        # Кнопки
+        y = dialog_rect.y + 70
+        options = [
+            ("[Y] Да, сохранить и выйти", (dialog_rect.x + 30, y)),
+            ("[N] Нет, выйти без сохранения", (dialog_rect.x + 30, y + 25)),
+            ("[ESC] Отмена", (dialog_rect.x + 30, y + 50)),
+        ]
+
+        for text, pos in options:
+            rendered = font_small.render(text, True, (200, 200, 200))
+            self.screen.blit(rendered, pos)
+
     def _handle_events(self):
         for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                self.running = False
+            # === ДИАЛОГ ===
+            if self.dialog_active:
+                if event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_y:
+                        self.dialog_choice = 'save'
+                        self.dialog_active = False
+                    elif event.key == pygame.K_n:
+                        self.dialog_choice = 'discard'
+                        self.dialog_active = False
+                    elif event.key == pygame.K_ESCAPE:
+                        self.dialog_choice = 'cancel'
+                        self.dialog_active = False
+                continue  # Важно: пропускаем остальные события, пока открыт диалог
 
-            elif event.type == pygame.KEYDOWN:
+
+            # === ОБЫЧНЫЕ СОБЫТИЯ ===
+            if event.type == pygame.QUIT:
+                self._open_dialog()
+                continue
+
+            if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
-                    self.running = False
+                    self._open_dialog()
+                    continue
+
+                if event.key == pygame.K_s and (event.mod & pygame.KMOD_CTRL):
+                    if self.current_file:
+                        self.save_level(self.current_file)
+                    continue
+
                 if event.key == pygame.K_0 and (event.mod & pygame.KMOD_CTRL):
                     self.canvas._center_view()
                 if event.key == pygame.K_b:
@@ -159,53 +252,38 @@ class MapEditor:
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 mx, my = event.pos
 
-                # ============================================================
-                # 1. СКРОЛЛ НА ПАНЕЛИ ОБЪЕКТОВ (приоритет)
-                # ============================================================
                 if self.toolbar.rect.collidepoint(mx, my):
-                    if event.button == 4:  # Колесо вверх
+                    if event.button == 4:
                         self.toolbar.scroll(-30)
                         continue
-                    elif event.button == 5:  # Колесо вниз
+                    elif event.button == 5:
                         self.toolbar.scroll(30)
                         continue
 
-                # ============================================================
-                # 2. КЛИК ПО ПАНЕЛИ ОБЪЕКТОВ
-                # ============================================================
                 if self.toolbar.handle_click(mx, my):
                     self.selected_symbol = self.toolbar.get_selected_symbol()
                     print(f"[Выбран] '{self.selected_symbol}'")
                     continue
 
-                # ============================================================
-                # 3. ЗУМ НА КАРТЕ (если мышь над картой)
-                # ============================================================
                 if self.canvas.rect.collidepoint(mx, my):
-                    if event.button == 4:  # Колесо вверх — зум
+                    if event.button == 4:
                         self.canvas.zoom_in()
                         continue
-                    elif event.button == 5:  # Колесо вниз — зум
+                    elif event.button == 5:
                         self.canvas.zoom_out()
                         continue
 
-                # ============================================================
-                # 4. DRAG КАРТЫ
-                # ============================================================
-                if event.button == 2:  # Средняя кнопка
+                if event.button == 2:
                     self.canvas.start_drag(mx, my)
                     continue
 
-                # ============================================================
-                # 5. КИСТЬ / ЛАСТИК
-                # ============================================================
-                if event.button == 1:  # ЛКМ
+                if event.button == 1:
                     cell = self.canvas.get_cell_at(mx, my)
                     if cell:
                         x, y = cell
                         if self.current_tool == 'brush':
                             self.brush.apply(x, y)
-                elif event.button == 3:  # ПКМ
+                elif event.button == 3:
                     cell = self.canvas.get_cell_at(mx, my)
                     if cell:
                         x, y = cell
@@ -219,7 +297,6 @@ class MapEditor:
                 mx, my = event.pos
                 self.canvas.update_drag(mx, my)
 
-                # Кисть при зажатой ЛКМ
                 if pygame.mouse.get_pressed()[0]:
                     cell = self.canvas.get_cell_at(mx, my)
                     if cell:
@@ -227,14 +304,12 @@ class MapEditor:
                         if self.current_tool == 'brush':
                             self.brush.apply(x, y)
 
-                # Ластик при зажатой ПКМ
                 if pygame.mouse.get_pressed()[2]:
                     cell = self.canvas.get_cell_at(mx, my)
                     if cell:
                         x, y = cell
                         self.eraser.apply(x, y)
 
-                # Обновляем информацию
                 cell = self.canvas.get_cell_at(mx, my)
                 symbol = None
                 if cell:
@@ -251,7 +326,7 @@ class MapEditor:
         self.info_panel.draw(self.screen)
         self.toolbar.draw(self.screen)
 
-        # Информация в заголовке
+        # Информация внизу
         font_small = pygame.font.Font(None, 12)
         tool_name = "Кисть" if self.current_tool == 'brush' else "Ластик"
         info = f"Инструмент: {tool_name}  |  Объект: '{self.selected_symbol}'"
@@ -259,13 +334,29 @@ class MapEditor:
             info += "  |  * (изменено)"
 
         text = font_small.render(info, True, COLORS['text_dim'])
-        self.screen.blit(text, (10, WINDOW_HEIGHT - 25))  # ← ИСПРАВЛЕНО
+        self.screen.blit(text, (10, WINDOW_HEIGHT - 25))
+
+        # Диалог поверх всего
+        if self.dialog_active:
+            self._draw_dialog()
 
         pygame.display.flip()
 
     def run(self):
         while self.running:
             self._handle_events()
+
+            # Обрабатываем результат диалога
+            if not self.dialog_active and self.dialog_choice is not None:
+                if self.dialog_choice == 'save':
+                    if self.current_file:
+                        self.save_level(self.current_file)
+                    self.running = False
+                elif self.dialog_choice == 'discard':
+                    self.running = False
+                elif self.dialog_choice == 'cancel':
+                    self.dialog_choice = None  # Сбрасываем выбор и продолжаем работу
+
             self._draw()
             self.clock.tick(60)
 
