@@ -149,7 +149,6 @@ class MapEditor:
                     self.running = False
                 if event.key == pygame.K_0 and (event.mod & pygame.KMOD_CTRL):
                     self.canvas._center_view()
-                # Переключение инструментов
                 if event.key == pygame.K_b:
                     self.current_tool = 'brush'
                     print("[Инструмент] Кисть")
@@ -160,34 +159,53 @@ class MapEditor:
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 mx, my = event.pos
 
-                # Клик по панели объектов
+                # ============================================================
+                # 1. СКРОЛЛ НА ПАНЕЛИ ОБЪЕКТОВ (приоритет)
+                # ============================================================
+                if self.toolbar.rect.collidepoint(mx, my):
+                    if event.button == 4:  # Колесо вверх
+                        self.toolbar.scroll(-30)
+                        continue
+                    elif event.button == 5:  # Колесо вниз
+                        self.toolbar.scroll(30)
+                        continue
+
+                # ============================================================
+                # 2. КЛИК ПО ПАНЕЛИ ОБЪЕКТОВ
+                # ============================================================
                 if self.toolbar.handle_click(mx, my):
                     self.selected_symbol = self.toolbar.get_selected_symbol()
                     print(f"[Выбран] '{self.selected_symbol}'")
                     continue
 
-                # Колесо мыши на панели
-                if self.toolbar.rect.collidepoint(mx, my):
-                    if event.button == 4:  # Вверх
-                        self.toolbar.scroll(-20)
-                    elif event.button == 5:  # Вниз
-                        self.toolbar.scroll(20)
+                # ============================================================
+                # 3. ЗУМ НА КАРТЕ (если мышь над картой)
+                # ============================================================
+                if self.canvas.rect.collidepoint(mx, my):
+                    if event.button == 4:  # Колесо вверх — зум
+                        self.canvas.zoom_in()
+                        continue
+                    elif event.button == 5:  # Колесо вниз — зум
+                        self.canvas.zoom_out()
+                        continue
+
+                # ============================================================
+                # 4. DRAG КАРТЫ
+                # ============================================================
+                if event.button == 2:  # Средняя кнопка
+                    self.canvas.start_drag(mx, my)
                     continue
 
-                # Работа с картой
-                if event.button == 4:  # Зум
-                    self.canvas.zoom_in()
-                elif event.button == 5:  # Зум
-                    self.canvas.zoom_out()
-                elif event.button == 2:  # Drag
-                    self.canvas.start_drag(mx, my)
-                elif event.button == 1:  # ЛКМ — кисть
+                # ============================================================
+                # 5. КИСТЬ / ЛАСТИК
+                # ============================================================
+                if event.button == 1:  # ЛКМ
                     cell = self.canvas.get_cell_at(mx, my)
                     if cell:
                         x, y = cell
                         if self.current_tool == 'brush':
                             self.brush.apply(x, y)
-                elif event.button == 3:  # ПКМ — ластик
+                elif event.button == 3:  # ПКМ
                     cell = self.canvas.get_cell_at(mx, my)
                     if cell:
                         x, y = cell
@@ -201,7 +219,7 @@ class MapEditor:
                 mx, my = event.pos
                 self.canvas.update_drag(mx, my)
 
-                # Если зажата ЛКМ — рисуем кистью
+                # Кисть при зажатой ЛКМ
                 if pygame.mouse.get_pressed()[0]:
                     cell = self.canvas.get_cell_at(mx, my)
                     if cell:
@@ -209,13 +227,14 @@ class MapEditor:
                         if self.current_tool == 'brush':
                             self.brush.apply(x, y)
 
-                # Если зажата ПКМ — стираем
+                # Ластик при зажатой ПКМ
                 if pygame.mouse.get_pressed()[2]:
                     cell = self.canvas.get_cell_at(mx, my)
                     if cell:
                         x, y = cell
                         self.eraser.apply(x, y)
 
+                # Обновляем информацию
                 cell = self.canvas.get_cell_at(mx, my)
                 symbol = None
                 if cell:
