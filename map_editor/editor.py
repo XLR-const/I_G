@@ -341,18 +341,16 @@ class MapEditor:
         if self.current_tool == 'select':
             self.selection.draw(self.screen)
 
+        # Обновляем статус в info_panel
+        self.info_panel.update_status(
+            self.current_tool,
+            self.selected_symbol,
+            self.has_changes
+        )
+
         self.info_panel.draw(self.screen)
         self.toolbar.draw(self.screen)
         self.tools_panel.draw(self.screen)
-
-        font_small = pygame.font.Font(None, 12)
-        tool_name = self.current_tool.upper()
-        info = f"Инструмент: {tool_name}  |  Объект: '{self.selected_symbol}'"
-        if self.has_changes:
-            info += "  |  * (изменено)"
-
-        text = font_small.render(info, True, COLORS['text_dim'])
-        self.screen.blit(text, (10, WINDOW_HEIGHT - 25))
 
         if self.dialog_active:
             self._draw_dialog()
