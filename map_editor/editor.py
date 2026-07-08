@@ -6,7 +6,9 @@ import pygame
 from .config import *
 from .ui import Canvas, InfoPanel
 from .ui.toolbar import Toolbar
+from .ui.tools_panel import ToolsPanel
 from .tools import Brush, Eraser
+from .tools.selection import Selection
 
 
 class MapEditor:
@@ -27,7 +29,7 @@ class MapEditor:
         self.current_file = None
         self.selected_symbol = 'M'
         self.has_changes = False
-        self._saving = False  # защита от множественных сохранений
+        self._saving = False
 
         self._setup_ui()
         self._setup_tools()
@@ -36,36 +38,40 @@ class MapEditor:
             self.load_level(level_file)
 
     def _setup_ui(self):
-        canvas_rect = pygame.Rect(0, 0, WINDOW_WIDTH - 250, WINDOW_HEIGHT - 60)
+        # ПАНЕЛЬ ИНСТРУМЕНТОВ (сверху) - ВЫСОТА 50px
+        tools_rect = pygame.Rect(0, 0, WINDOW_WIDTH - 250, 50)
+        self.tools_panel = ToolsPanel(tools_rect)
+
+        # КАНВАС (под панелью инструментов)
+        canvas_rect = pygame.Rect(0, 50, WINDOW_WIDTH - 250, WINDOW_HEIGHT - 50 - 60)
         self.canvas = Canvas(canvas_rect)
 
+        # ИНФОРМАЦИЯ (внизу)
         info_rect = pygame.Rect(0, WINDOW_HEIGHT - 60, WINDOW_WIDTH - 250, 60)
         self.info_panel = InfoPanel(info_rect)
 
-        toolbar_rect = pygame.Rect(WINDOW_WIDTH - 250, 0, 250, WINDOW_HEIGHT - 60)
+        # ЛЕГЕНДА (справа)
+        toolbar_rect = pygame.Rect(WINDOW_WIDTH - 250, 0, 250, WINDOW_HEIGHT)
         self.toolbar = Toolbar(toolbar_rect)
 
     def _setup_tools(self):
         self.brush = Brush(self)
         self.eraser = Eraser(self)
+        self.selection = Selection(self)
         self.current_tool = 'brush'
 
     def _on_change(self):
-        """Вызывается при изменении карты"""
         if not self._saving:
             self.has_changes = True
             self._auto_save()
 
     def _auto_save(self):
-        """Пишет изменения ТОЛЬКО в бэкап, не трогая основной файл"""
         if self._saving or not self.current_file or not self.grid or not self.has_changes:
             return
 
         self._saving = True
-        self._create_backup()  # Делаем резервную копию
-        # Строку self.save_level(self.current_file) ОТСЮДА УДАЛЯЕМ!
+        self._create_backup()
         self._saving = False
-
 
     def _create_backup(self):
         if not self.current_file or not self.grid:
@@ -164,7 +170,6 @@ class MapEditor:
             return False
 
     def _open_dialog(self):
-        """Открывает диалог сохранения"""
         if self.has_changes and self.current_file:
             self.dialog_active = True
             self.dialog_choice = None
@@ -172,14 +177,11 @@ class MapEditor:
             self.running = False
 
     def _draw_dialog(self):
-        """Рисует диалог сохранения"""
-        # Затемнение
         overlay = pygame.Surface((WINDOW_WIDTH, WINDOW_HEIGHT))
         overlay.set_alpha(180)
         overlay.fill((0, 0, 0))
         self.screen.blit(overlay, (0, 0))
 
-        # Окно диалога
         dialog_rect = pygame.Rect(
             WINDOW_WIDTH // 2 - 220,
             WINDOW_HEIGHT // 2 - 80,
@@ -191,12 +193,10 @@ class MapEditor:
         font = pygame.font.Font(None, 24)
         font_small = pygame.font.Font(None, 18)
 
-        # Заголовок
         title = font.render("Сохранить изменения?", True, (255, 255, 255))
         title_rect = title.get_rect(center=(dialog_rect.centerx, dialog_rect.y + 30))
         self.screen.blit(title, title_rect)
 
-        # Кнопки
         y = dialog_rect.y + 70
         options = [
             ("[Y] Да, сохранить и выйти", (dialog_rect.x + 30, y)),
@@ -210,7 +210,6 @@ class MapEditor:
 
     def _handle_events(self):
         for event in pygame.event.get():
-            # === ДИАЛОГ ===
             if self.dialog_active:
                 if event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_y:
@@ -222,13 +221,23 @@ class MapEditor:
                     elif event.key == pygame.K_ESCAPE:
                         self.dialog_choice = 'cancel'
                         self.dialog_active = False
-                continue  # Важно: пропускаем остальные события, пока открыт диалог
+                continue
 
-
-            # === ОБЫЧНЫЕ СОБЫТИЯ ===
             if event.type == pygame.QUIT:
                 self._open_dialog()
                 continue
+
+            # ПАНЕЛЬ ИНСТРУМЕНТОВ
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                mx, my = event.pos
+                if self.tools_panel.handle_click(mx, my):
+                    self.current_tool = self.tools_panel.get_selected_tool()
+                    if self.current_tool != 'select':
+                        self.selection.start_x = None
+                        self.selection.start_y = None
+                        self.selection.end_x = None
+                        self.selection.end_y = None
+                    continue
 
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
@@ -242,12 +251,10 @@ class MapEditor:
 
                 if event.key == pygame.K_0 and (event.mod & pygame.KMOD_CTRL):
                     self.canvas._center_view()
-                if event.key == pygame.K_b:
-                    self.current_tool = 'brush'
-                    print("[Инструмент] Кисть")
-                if event.key == pygame.K_e:
-                    self.current_tool = 'eraser'
-                    print("[Инструмент] Ластик")
+
+                if event.key == pygame.K_DELETE:
+                    if self.current_tool == 'select' and self.selection.get_selection():
+                        self.selection.clear()
 
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 mx, my = event.pos
@@ -261,8 +268,10 @@ class MapEditor:
                         continue
 
                 if self.toolbar.handle_click(mx, my):
-                    self.selected_symbol = self.toolbar.get_selected_symbol()
-                    print(f"[Выбран] '{self.selected_symbol}'")
+                    symbol = self.toolbar.get_selected_symbol()
+                    self.selected_symbol = symbol
+                    if self.current_tool == 'select' and self.selection.get_selection():
+                        self.selection.fill(symbol)
                     continue
 
                 if self.canvas.rect.collidepoint(mx, my):
@@ -277,40 +286,45 @@ class MapEditor:
                     self.canvas.start_drag(mx, my)
                     continue
 
-                if event.button == 1:
-                    cell = self.canvas.get_cell_at(mx, my)
-                    if cell:
-                        x, y = cell
-                        if self.current_tool == 'brush':
-                            self.brush.apply(x, y)
-                elif event.button == 3:
-                    cell = self.canvas.get_cell_at(mx, my)
-                    if cell:
-                        x, y = cell
-                        self.eraser.apply(x, y)
+                cell = self.canvas.get_cell_at(mx, my)
+                if not cell:
+                    continue
+
+                x, y = cell
+
+                if self.current_tool == 'brush' and event.button == 1:
+                    self.brush.apply(x, y)
+                elif self.current_tool == 'eraser' and event.button == 1:
+                    self.eraser.apply(x, y)
+                elif self.current_tool == 'select' and event.button == 1:
+                    self.selection.start(x, y)
 
             elif event.type == pygame.MOUSEBUTTONUP:
                 if event.button == 2:
                     self.canvas.end_drag()
 
+                if self.current_tool == 'select' and event.button == 1:
+                    self.selection.end()
+
             elif event.type == pygame.MOUSEMOTION:
                 mx, my = event.pos
                 self.canvas.update_drag(mx, my)
 
-                if pygame.mouse.get_pressed()[0]:
-                    cell = self.canvas.get_cell_at(mx, my)
-                    if cell:
-                        x, y = cell
-                        if self.current_tool == 'brush':
-                            self.brush.apply(x, y)
-
-                if pygame.mouse.get_pressed()[2]:
-                    cell = self.canvas.get_cell_at(mx, my)
-                    if cell:
-                        x, y = cell
-                        self.eraser.apply(x, y)
-
                 cell = self.canvas.get_cell_at(mx, my)
+
+                if pygame.mouse.get_pressed()[0] and cell:
+                    x, y = cell
+                    if self.current_tool == 'brush':
+                        self.brush.apply(x, y)
+                    elif self.current_tool == 'eraser':
+                        self.eraser.apply(x, y)
+                    elif self.current_tool == 'select':
+                        self.selection.update(x, y)
+
+                if pygame.mouse.get_pressed()[2] and cell:
+                    x, y = cell
+                    self.eraser.apply(x, y)
+
                 symbol = None
                 if cell:
                     x, y = cell
@@ -323,12 +337,16 @@ class MapEditor:
         self.screen.fill(COLORS['background'])
 
         self.canvas.draw(self.screen)
+
+        if self.current_tool == 'select':
+            self.selection.draw(self.screen)
+
         self.info_panel.draw(self.screen)
         self.toolbar.draw(self.screen)
+        self.tools_panel.draw(self.screen)
 
-        # Информация внизу
         font_small = pygame.font.Font(None, 12)
-        tool_name = "Кисть" if self.current_tool == 'brush' else "Ластик"
+        tool_name = self.current_tool.upper()
         info = f"Инструмент: {tool_name}  |  Объект: '{self.selected_symbol}'"
         if self.has_changes:
             info += "  |  * (изменено)"
@@ -336,7 +354,6 @@ class MapEditor:
         text = font_small.render(info, True, COLORS['text_dim'])
         self.screen.blit(text, (10, WINDOW_HEIGHT - 25))
 
-        # Диалог поверх всего
         if self.dialog_active:
             self._draw_dialog()
 
@@ -346,7 +363,6 @@ class MapEditor:
         while self.running:
             self._handle_events()
 
-            # Обрабатываем результат диалога
             if not self.dialog_active and self.dialog_choice is not None:
                 if self.dialog_choice == 'save':
                     if self.current_file:
@@ -355,7 +371,7 @@ class MapEditor:
                 elif self.dialog_choice == 'discard':
                     self.running = False
                 elif self.dialog_choice == 'cancel':
-                    self.dialog_choice = None  # Сбрасываем выбор и продолжаем работу
+                    self.dialog_choice = None
 
             self._draw()
             self.clock.tick(60)
