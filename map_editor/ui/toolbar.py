@@ -3,10 +3,15 @@
 import os
 import sys
 import pygame
-from ..config import COLORS, TEXTURES_DIR, NPC_DIR
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-from config.game_data import SYMBOLS_CONFIG, NPC_CONFIG
+# СНАЧАЛА добавляем путь к корню
+ROOT_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+if ROOT_DIR not in sys.path:
+    sys.path.insert(0, ROOT_DIR)
+
+# ПОТОМ импортируем всё остальное
+from .game_data import SYMBOLS_CONFIG, NPC_CONFIG
+from ..config import COLORS, TEXTURES_DIR, NPC_DIR
 
 
 class Toolbar:

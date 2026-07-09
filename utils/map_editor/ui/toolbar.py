@@ -50,7 +50,7 @@ class Toolbar:
                 'sub': 'стена'
             })
 
-        # 2. Объекты
+                # 2. Объекты
         self.items.append({'type': 'separator', 'label': 'ОБЪЕКТЫ'})
 
         for symbol, config in SYMBOLS_CONFIG.items():
@@ -64,9 +64,15 @@ class Toolbar:
                     'sub': 'дверь'
                 })
 
+        # ИМПОРТИРУЙТЕ SYMBOL_COLORS в начале ui/toolbar.py, если его там нет
+        # и замените жесткие цвета на динамические из конфига:
         for symbol, config in SYMBOLS_CONFIG.items():
             if config.get('type') == 'exit':
-                surf = self._create_surface(symbol, (0, 100, 0))
+                # Берем цвет из SYMBOL_COLORS. Если это 'N' — он будет серым, если 'E' — зеленым!
+                from ..config import SYMBOL_COLORS, COLORS 
+                current_color = SYMBOL_COLORS.get(symbol, COLORS['exit'])
+                
+                surf = self._create_surface(symbol, current_color)
                 self.items.append({
                     'type': 'item',
                     'symbol': symbol,
@@ -77,7 +83,10 @@ class Toolbar:
 
         for symbol, config in SYMBOLS_CONFIG.items():
             if config.get('type') == 'player_spawn':
-                surf = self._create_surface(symbol, (120, 100, 0))
+                from ..config import SYMBOL_COLORS, COLORS
+                current_color = SYMBOL_COLORS.get(symbol, COLORS['start'])
+                
+                surf = self._create_surface(symbol, current_color)
                 self.items.append({
                     'type': 'item',
                     'symbol': symbol,
@@ -86,14 +95,6 @@ class Toolbar:
                     'sub': 'спавн'
                 })
 
-        surf = self._create_surface('_', (30, 30, 35))
-        self.items.append({
-            'type': 'item',
-            'symbol': '_',
-            'surface': surf,
-            'label': '_',
-            'sub': 'пустота'
-        })
 
         # 3. NPC
         self.items.append({'type': 'separator', 'label': 'NPC'})
