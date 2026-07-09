@@ -10,7 +10,7 @@ if ROOT_DIR not in sys.path:
     sys.path.insert(0, ROOT_DIR)
 
 # ПОТОМ импортируем всё остальное
-from .game_data import SYMBOLS_CONFIG, NPC_CONFIG
+from ..config_loader import SYMBOLS_CONFIG, NPC_CONFIG
 from ..config import COLORS, TEXTURES_DIR, NPC_DIR
 
 

@@ -151,19 +151,19 @@ def list_levels():
     input("\nНажмите Enter для возврата в меню...")
 
 
-def run_game():
-    """Запускает игру в DEV MODE"""
+def run_dev_mode():
+    """Запускает dev_mode.py"""
     print("\n" + "=" * 60)
-    print("  🎮 ЗАПУСК ИГРЫ (DEV MODE)")
+    print("  🛠️  ЗАПУСК РЕЖИМА РАЗРАБОТКИ")
     print("=" * 60)
-    print("\n  Запускается игра в режиме разработчика...")
-    print("  (без меню, сразу в игру)")
-    
+    print("\n  Запускается dev_mode.py")
+    print("  По умолчанию: без UI и без музыки (быстрый запуск)")
+    print("  Будет предложено настроить компоненты.")
+
     input("\nНажмите Enter для запуска...")
-    
-    # Запускаем игру
-    subprocess.run([sys.executable, "main.py"])
-    
+
+    subprocess.run([sys.executable, "dev_mode.py"])
+
     input("\nНажмите Enter для возврата в меню...")
 
 
@@ -183,7 +183,7 @@ def main():
         elif choice == '3':
             list_levels()
         elif choice == '4':
-            run_game()
+            run_dev_mode()
         elif choice == '0':
             print("\n  👋 До свидания!")
             sys.exit(0)
