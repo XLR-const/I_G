@@ -123,7 +123,14 @@ class MapEditor:
             with open(file_path, 'r', encoding='utf-8') as f:
                 data = json.load(f)
 
-            self.grid = data.get('map', [])
+            map_data = data.get('map', [])
+            
+            # Если map_data — список строк, превращаем в список списков
+            if map_data and isinstance(map_data[0], str):
+                self.grid = [list(row) for row in map_data]
+            else:
+                self.grid = map_data
+
             self.current_file = file_path
             self.has_changes = False
 
@@ -149,15 +156,34 @@ class MapEditor:
             return False
 
         try:
+            # Загружаем существующие данные
             data = {}
             if os.path.exists(file_path):
                 with open(file_path, 'r', encoding='utf-8') as f:
                     data = json.load(f)
 
+            # Обновляем карту
             data['map'] = self.grid
 
+            # ============================================================
+            # РУЧНОЕ ФОРМАТИРОВАНИЕ
+            # ============================================================
+            # Форматируем map вручную
+            map_lines = []
+            for row in self.grid:
+                json_row = json.dumps(row, ensure_ascii=False)
+                map_lines.append(f"    {json_row}")
+            map_json = "[\n" + ",\n".join(map_lines) + "\n  ]"
+
+            # Форматируем остальные данные
+            meta_data = {k: v for k, v in data.items() if k != 'map'}
+            meta_json = json.dumps(meta_data, indent=4, ensure_ascii=False)
+
+            # Собираем финальный JSON
+            final_json = "{\n" + f'  "map": {map_json},\n' + meta_json[2:]
+
             with open(file_path, 'w', encoding='utf-8') as f:
-                json.dump(data, f, indent=2, ensure_ascii=False)
+                f.write(final_json)
 
             self.has_changes = False
             self._clear_backups()
