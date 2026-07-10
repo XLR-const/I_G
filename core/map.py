@@ -73,7 +73,9 @@ class Map:
                     elif symbol_type == 'item':
                         item_type = SYMBOLS_CONFIG[char].get('item_type')
                         amount = SYMBOLS_CONFIG[char].get('amount', 0)
-                        self.item_positions.append((i, j, item_type, amount))
+                        weapon_name = SYMBOLS_CONFIG[char].get('weapon_name', '')
+                        ammo = SYMBOLS_CONFIG[char].get('ammo', 0)
+                        self.item_positions.append((i, j, item_type, amount, weapon_name, ammo))
 
                 elif char in NPC_CONFIG:
                     self.npc_positions.append((i, j, char))

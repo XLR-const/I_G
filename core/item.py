@@ -184,7 +184,7 @@ class ArmorItem(Item):
 
 
 class WeaponItem(Item):
-    """Оружие на полу (заготовка)"""
+    """Оружие на полу"""
 
     def __init__(self, game, x, y, weapon_name, ammo=0):
         self.weapon_name = weapon_name
@@ -193,17 +193,26 @@ class WeaponItem(Item):
 
     def _load_sprite(self):
         """Загружает спрайт оружия"""
-        try:
-            # Пока используем заглушку
-            self.sprite = pygame.Surface((32, 32))
-            self.sprite.fill((200, 200, 0))
-            pygame.draw.rect(self.sprite, (150, 150, 0), (4, 4, 24, 24))
-            self.sprite_width, self.sprite_height = self.sprite.get_size()
-            self.sprite_ratio = self.sprite_width / self.sprite_height
-        except:
-            self._create_fallback_sprite()
+        # Ищем спрайт в SYMBOLS_CONFIG
+        for symbol, config in SYMBOLS_CONFIG.items():
+            if config.get('type') == 'item':
+                if config.get('weapon_name') == self.weapon_name:
+                    sprite_path = config.get('sprite')
+                    if sprite_path:
+                        try:
+                            self.sprite = pygame.image.load(sprite_path).convert_alpha()
+                            self.sprite = pygame.transform.scale(self.sprite, (32, 32))
+                            self.sprite_width, self.sprite_height = self.sprite.get_size()
+                            self.sprite_ratio = self.sprite_width / self.sprite_height
+                            return
+                        except Exception as e:
+                            print(f"[WeaponItem] Ошибка загрузки: {e}")
+                    break
+
+        self._create_fallback_sprite()
 
     def _create_fallback_sprite(self):
+        """Заглушка для оружия"""
         self.sprite = pygame.Surface((32, 32))
         self.sprite.fill((200, 200, 0))
         pygame.draw.rect(self.sprite, (150, 150, 0), (4, 4, 24, 24))
@@ -214,11 +223,47 @@ class WeaponItem(Item):
         if not self.alive:
             return False
 
-        # TODO: логика добавления оружия в инвентарь
-        # Проверяем, есть ли уже такое оружие
-        # Если есть — добавляем патроны
-        # Если нет — добавляем в инвентарь
+        # Получаем инвентарь из level_manager
+        inventory = self.game.level_manager.inventory
+        if inventory is None:
+            print("[Оружие] Ошибка: инвентарь не найден")
+            return False
 
-        self.alive = False
-        print(f"[Оружие] Подобрано: {self.weapon_name} (+{self.ammo} патронов)")
-        return True
+        # Проверяем, есть ли уже такое оружие в инвентаре
+        weapon_found = None
+        for weapon in inventory:
+            if weapon.name == self.weapon_name:
+                weapon_found = weapon
+                break
+
+        if weapon_found:
+            # Оружие уже есть → добавляем патроны
+            weapon_found.ammo += self.ammo
+            self.alive = False
+            print(f"[Оружие] +{self.ammo} патронов для {self.weapon_name}")
+            return True
+        else:
+            # Оружия нет → добавляем в инвентарь
+            from core.weapon import Pistol, Shotgun, MachineGun, PlasmaGun
+            weapon_classes = {
+                'Pistol': Pistol,
+                'Shotgun': Shotgun,
+                'Machine Gun': MachineGun,
+                'Plasma Gun': PlasmaGun,
+            }
+
+            if self.weapon_name in weapon_classes:
+                new_weapon = weapon_classes[self.weapon_name](self.game)
+                new_weapon.ammo = self.ammo
+                inventory.append(new_weapon)
+                
+                # Если это первое оружие в инвентаре — делаем его активным
+                if len(inventory) == 1:
+                    self.game.weapon = new_weapon
+                    self.game.level_manager.current_weapon_index = 0
+
+                self.alive = False
+                print(f"[Оружие] Получено: {self.weapon_name} (+{self.ammo} патронов)")
+                return True
+
+        return False

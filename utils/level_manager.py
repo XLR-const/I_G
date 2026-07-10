@@ -90,14 +90,13 @@ class LevelManager:
         self.map = Map(self.game, level_data['map'])
 
         # Items
-        for x, y, item_type, amount in self.map.item_positions:
+        for x, y, item_type, amount, weapon_name, ammo in self.map.item_positions:
             if item_type == 'health':
                 item = HealthItem(self.game, x, y, amount)
             elif item_type == 'armor':
                 item = ArmorItem(self.game, x, y, amount)
             elif item_type == 'weapon':
-                # TODO: пока заглушка
-                item = WeaponItem(self.game, x, y, 'Pistol', 20)
+                item = WeaponItem(self.game, x, y, weapon_name, ammo)
             else:
                 continue
             self.items.append(item)
