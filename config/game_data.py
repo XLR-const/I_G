@@ -23,6 +23,15 @@ SYMBOLS_CONFIG = {
     'I': {'type': 'wall', 'texture': 'resources/textures/I.png'},
     'N': {'type': 'wall', 'texture': 'resources/textures/N.png'},
     
+    # Предметы
+    'h': {
+        'type': 'item',
+        'item_type': 'health',
+        'amount': 25,
+        'sprite': 'resources/items/health.png',
+        'description': 'Аптечка (+25 HP)'
+    },
+    
     # Дверь
     'D': {'type': 'door', 'texture': 'resources/textures/D.png'},
     

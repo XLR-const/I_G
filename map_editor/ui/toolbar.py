@@ -100,6 +100,19 @@ class Toolbar:
             'sub': 'пустота'
         })
 
+        # Items
+        self.items.append({'type': 'separator', 'label': 'ПРЕДМЕТЫ'})
+
+        # Аптечка
+        surf = self._create_surface('h', (200, 0, 0))
+        self.items.append({
+            'type': 'item',
+            'symbol': 'h',
+            'surface': surf,
+            'label': 'h',
+            'sub': 'аптечка +25 HP'
+        })
+
         # 3. NPC
         self.items.append({'type': 'separator', 'label': 'NPC'})
 

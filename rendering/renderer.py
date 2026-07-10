@@ -29,6 +29,7 @@ class Renderer:
         self.floor_color = (30, 30, 40)
         self.ceiling_texture = None
         self.floor_texture = None
+        self.notifications = []
 
         try:
             self.nice_hp = pygame.image.load('resources/player/nice_hp.png').convert_alpha()
@@ -351,4 +352,3 @@ class Renderer:
             color = (255, 0, 0)
         
         pygame.draw.rect(self.game.screen, color, (bar_x, bar_y, hp_width, bar_height))
-

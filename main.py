@@ -104,6 +104,7 @@ class Game:
         self.total_kills = self.level_manager.total_kills
         self.current_level = self.level_manager.current_level
         self.level_start_time = self.level_manager.level_start_time
+        self.items = self.level_manager.items
 
     def update(self):
         """Обновляет состояние игры"""
@@ -120,6 +121,11 @@ class Game:
 
         for npc in self.npcs:
             npc.update()
+        
+        for item in self.items[:]:
+            item.update(self.player)
+        # Удаляем собранные предметы
+        self.items = [item for item in self.items if item.alive]
 
         self.weapon.update_animation()
 
@@ -138,25 +144,41 @@ class Game:
         self.raycasting.ray_cast()
         self.renderer.draw_fps()
 
-        self.npcs.sort(key=lambda npc: math.hypot(
-            npc.x - self.player.x, npc.y - self.player.y), reverse=True)
-        for npc in self.npcs:
-            npc.draw()
-            if npc.alive:
-                if not getattr(npc, 'is_boss', False):
-                    self.renderer.draw_npc_health(npc)
-                else:
-                    npc.draw_boss_hud()
+        # 1. Объединяем все трехмерные игровые объекты и эффекты в один плоский список
+        render_queue = []
+        render_queue.extend(self.npcs)
+        render_queue.extend(self.items)
+        render_queue.extend(self.particles)
 
-        for p in self.particles:
-            p.draw()
+        # 2. Сортируем ВСЮ очередь один раз: от самых дальних объектов к самым близким
+        render_queue.sort(
+            key=lambda obj: math.hypot(obj.x - self.player.x, obj.y - self.player.y), 
+            reverse=True
+        )
 
+        # 3. Отрисовываем объекты в правильном порядке
+        for obj in render_queue:
+            obj.draw()
+
+        # 4. Интерфейс над NPC рисуем ПОСЛЕ отрисовки мира (чтобы полоски HP не перекрывались стенами/спрайтами)
+        # Сортируем живых NPC от ближних к дальним, чтобы интерфейс ближних не перекрывался дальними
+        visible_npcs = [npc for npc in self.npcs if npc.alive]
+        visible_npcs.sort(key=lambda npc: math.hypot(npc.x - self.player.x, npc.y - self.player.y))
+        
+        for npc in visible_npcs:
+            if not getattr(npc, 'is_boss', False):
+                self.renderer.draw_npc_health(npc)
+            else:
+                npc.draw_boss_hud()
+
+        # Отрисовка оружия и UI
         self.weapon.draw()
         self.renderer.draw_interface()
         self.renderer.draw_crosshair()
         self.console.draw(self.screen)
 
         pygame.display.flip()
+
 
     def handle_events(self):
         """Обрабатывает события pygame"""
