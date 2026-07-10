@@ -8,7 +8,7 @@ from core.player import Player
 from core.npc import Solder, Kamikaze, Jaggernaut, Lightning, Boss
 from core.weapon import Pistol, Shotgun, MachineGun, PlasmaGun
 from config.game_data import NPC_CONFIG, WEAPON_CONFIG
-from core.item import Item
+from core.item import *
 
 class LevelManager:
     """Менеджер загрузки уровней
@@ -91,7 +91,15 @@ class LevelManager:
 
         # Items
         for x, y, item_type, amount in self.map.item_positions:
-            item = Item(self.game, x, y, item_type, amount)
+            if item_type == 'health':
+                item = HealthItem(self.game, x, y, amount)
+            elif item_type == 'armor':
+                item = ArmorItem(self.game, x, y, amount)
+            elif item_type == 'weapon':
+                # TODO: пока заглушка
+                item = WeaponItem(self.game, x, y, 'Pistol', 20)
+            else:
+                continue
             self.items.append(item)
 
         background = level_data.get('background', {})

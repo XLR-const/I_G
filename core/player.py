@@ -54,18 +54,23 @@ class Player:
         return self.hp - old_hp
 
     def take_damage(self, damage):
-        """Наносит урон игроку
+            """Наносит урон игроку (с учётом брони)"""
+            # Сначала урон по броне
+            if self.armor > 0:
+                armor_damage = min(self.armor, damage)
+                self.armor -= armor_damage
+                damage -= armor_damage
 
-        Args:
-            damage: Количество урона
-        """
-        self.hp -= damage
-        self.last_damage_time = pygame.time.get_ticks()
+            # Остаток урона по HP
+            if damage > 0:
+                self.hp -= damage
 
-        if self.hp <= 0:
-            self.hp = 0
-            self.death_sound.play()
-            self.game.ui_manager.current_state = self.game.ui_manager.states['DEAD']
+            self.last_damage_time = pygame.time.get_ticks()
+
+            if self.hp <= 0:
+                self.hp = 0
+                self.death_sound.play()
+                self.game.ui_manager.current_state = self.game.ui_manager.states['DEAD']
 
     def movement(self):
         """Обрабатывает движение WASD"""

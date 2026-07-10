@@ -31,6 +31,13 @@ SYMBOLS_CONFIG = {
         'sprite': 'resources/items/health.png',
         'description': 'Аптечка (+25 HP)'
     },
+    'a': {
+        'type': 'item',
+        'item_type': 'armor',
+        'amount': 25,
+        'sprite': 'resources/items/armor.png',
+        'description': 'Броня (+25 Armor)'
+    },
     
     # Дверь
     'D': {'type': 'door', 'texture': 'resources/textures/D.png'},
