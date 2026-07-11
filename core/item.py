@@ -144,10 +144,10 @@ class HealthItem(Item):
 
         if healed > 0:
             self.alive = False
-            print(f"[Аптечка] +{healed} HP")
+            #print(f"[Аптечка] +{healed} HP")
             return True
 
-        print("[Аптечка] HP полное")
+        #print("[Аптечка] HP полное")
         return False
 
 
@@ -176,10 +176,10 @@ class ArmorItem(Item):
 
         if added > 0:
             self.alive = False
-            print(f"[Броня] +{added} Armor")
+            #print(f"[Броня] +{added} Armor")
             return True
 
-        print("[Броня] Armor полное")
+        #print("[Броня] Armor полное")
         return False
 
 
@@ -226,7 +226,7 @@ class WeaponItem(Item):
         # Получаем инвентарь из level_manager
         inventory = self.game.level_manager.inventory
         if inventory is None:
-            print("[Оружие] Ошибка: инвентарь не найден")
+            #print("[Оружие] Ошибка: инвентарь не найден")
             return False
 
         # Проверяем, есть ли уже такое оружие в инвентаре
@@ -240,7 +240,7 @@ class WeaponItem(Item):
             # Оружие уже есть → добавляем патроны
             weapon_found.ammo += self.ammo
             self.alive = False
-            print(f"[Оружие] +{self.ammo} патронов для {self.weapon_name}")
+            #print(f"[Оружие] +{self.ammo} патронов для {self.weapon_name}")
             return True
         else:
             # Оружия нет → добавляем в инвентарь
@@ -263,7 +263,7 @@ class WeaponItem(Item):
                     self.game.level_manager.current_weapon_index = 0
 
                 self.alive = False
-                print(f"[Оружие] Получено: {self.weapon_name} (+{self.ammo} патронов)")
+                #print(f"[Оружие] Получено: {self.weapon_name} (+{self.ammo} патронов)")
                 return True
 
         return False

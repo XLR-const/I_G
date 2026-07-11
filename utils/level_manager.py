@@ -7,8 +7,9 @@ from core.map import Map
 from core.player import Player
 from core.npc import Solder, Kamikaze, Jaggernaut, Lightning, Boss
 from core.weapon import Pistol, Shotgun, MachineGun, PlasmaGun
-from config.game_data import NPC_CONFIG, WEAPON_CONFIG
+from config.game_data import NPC_CONFIG, WEAPON_CONFIG, SYMBOLS_CONFIG
 from core.item import *
+import numpy as np
 
 class LevelManager:
     """Менеджер загрузки уровней
