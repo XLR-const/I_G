@@ -194,19 +194,20 @@ class LevelManager:
 
         if hasattr(self.game, 'raycasting'):
             self.game.raycasting.id_to_char = id_to_char
+            # Передаем ID двери в рейкастинг (например, число 10)
+            self.game.raycasting.door_id = char_to_id.get('D', -1)
 
         string_grid = level_data['map']
         height = len(string_grid)
-        
-        # Находим максимальную длину строки на карте, чтобы матрица была ровной
         width = max(len(row) for row in string_grid) if height > 0 else 0
         
         numeric_grid = np.zeros((height, width), dtype=np.int32)
+        # Создаем матрицу float32 для плавного открытия дверей
+        door_states = np.zeros((height, width), dtype=np.float32)
+        
         for y in range(height):
-            # Проверяем реальную длину текущей строки
             current_row_len = len(string_grid[y])
             for x in range(width):
-                # Если строка оказалась короче максимальной — считаем это пустотой (0)
                 if x < current_row_len:
                     symbol = string_grid[y][x]
                     numeric_grid[y][x] = char_to_id.get(symbol, 0)
@@ -214,6 +215,8 @@ class LevelManager:
                     numeric_grid[y][x] = 0
                 
         self.map.numeric_grid = numeric_grid
+        # Сохраняем пустую матрицу состояний в карту
+        self.map.door_states = door_states
         # ============================================================
 
         
