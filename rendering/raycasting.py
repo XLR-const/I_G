@@ -7,6 +7,119 @@ import pygame
 import math
 from setting import *
 from config.game_data import SYMBOLS_CONFIG
+import numpy as np
+from numba import njit
+
+@njit(fastmath=True)
+def run_dda_numba(ox, oy, player_angle, numeric_grid, num_rays, 
+                half_fov, delta_angle, screen_dist, texture_size):
+    """
+    Супербыстрое математическое ядро рейкастинга на Numba.
+    Возвращает:
+    - z_buffer: массив расстояний для отрисовки спрайтов
+    - render_data: матрица [num_rays, 5] с параметрами для блэйдинга:
+    [wall_char_id, side, screen_y, proj_height, tex_x]
+    """
+    z_buffer = np.zeros(num_rays, dtype=np.float32)
+    # Массив для хранения графических параметров каждого луча
+    render_data = np.zeros((num_rays, 5), dtype=np.int32)
+    
+    map_height, map_width = numeric_grid.shape
+
+    for i in range(num_rays):
+        ray_angle = player_angle - half_fov + i * delta_angle
+        sin_a = math.sin(ray_angle)
+        cos_a = math.cos(ray_angle)
+
+        x_map, y_map = int(ox), int(oy)
+
+        delta_dist_x = abs(1.0 / cos_a) if cos_a != 0.0 else 1e30
+        delta_dist_y = abs(1.0 / sin_a) if sin_a != 0.0 else 1e30
+
+        if cos_a < 0.0:
+            step_x = -1
+            side_dist_x = (ox - x_map) * delta_dist_x
+        else:
+            step_x = 1
+            side_dist_x = (x_map + 1.0 - ox) * delta_dist_x
+
+        if sin_a < 0.0:
+            step_y = -1
+            side_dist_y = (oy - y_map) * delta_dist_y
+        else:
+            step_y = 1
+            side_dist_y = (y_map + 1.0 - oy) * delta_dist_y
+
+        wall_hit = False
+        side = 0
+        wall_char_id = 0
+
+        # ОСНОВНОЙ ЦИКЛ DDA (Теперь выполняется со скоростью C++)
+        while not wall_hit:
+            if side_dist_x < side_dist_y:
+                side_dist_x += delta_dist_x
+                x_map += step_x
+                side = 0
+            else:
+                side_dist_y += delta_dist_y
+                y_map += step_y
+                side = 1
+
+            # Быстрая проверка границ карты без выброса исключений
+            if 0 <= x_map < map_width and 0 <= y_map < map_height:
+                cell_value = numeric_grid[y_map, x_map]
+                if cell_value > 0:
+                    wall_hit = True
+                    wall_char_id = cell_value
+            else:
+                # Луч улетел за карту
+                wall_hit = True
+                wall_char_id = 1 # Дефолтная стена
+
+        # Расчет дистанции
+        if side == 0:
+            dist = side_dist_x - delta_dist_x
+        else:
+            dist = side_dist_y - delta_dist_y
+
+        if dist < 0.2:
+            dist = 0.2
+
+        z_buffer[i] = dist
+
+        # Убираем эффект «рыбьего глаза»
+        dist *= math.cos(player_angle - ray_angle)
+        if dist < 0.2:
+            dist = 0.2
+
+        proj_height = screen_dist / (dist + 0.0001)
+
+        # Расчет текстурных координат
+        if side == 0:
+            hit_y = oy + dist * sin_a
+            tex_x = hit_y % 1.0
+        else:
+            hit_x = ox + dist * cos_a
+            tex_x = hit_x % 1.0
+
+        # Если смотрим в противоположные стороны, зеркалим текстуру для правильного маппинга
+        if (side == 0 and cos_a > 0) or (side == 1 and sin_a < 0):
+            tex_x = 1.0 - tex_x
+
+        tex_x_pixel = int(tex_x * texture_size)
+        tex_x_pixel = max(0, min(tex_x_pixel, texture_size - 1))
+
+        # Вычисляем экранную координату Y
+        screen_y = int(400 - proj_height // 2) # Предполагается HEIGHT = 800 (400 - это HALF_HEIGHT)
+
+        # Сохраняем результаты расчета луча
+        render_data[i, 0] = wall_char_id
+        render_data[i, 1] = side
+        render_data[i, 2] = screen_y
+        render_data[i, 3] = int(proj_height)
+        render_data[i, 4] = tex_x_pixel
+
+    return z_buffer, render_data
 
 class RayCasting:
     """Класс для рейкастинга и отрисовки стен
@@ -68,8 +181,58 @@ class RayCasting:
         self.texture_cache[cache_key] = scaled
 
         return scaled
-
+    
     def ray_cast(self):
+        """Выполняет DDA рейкастинг через Numba и мгновенно отрисовывает текстуры"""
+        if not hasattr(self.game.map, 'numeric_grid'):
+            return
+
+        ox, oy = self.game.player.x, self.game.player.y
+
+        # Запускаем ядро Numba
+        z_buffer_numba, render_data = run_dda_numba(
+            ox, oy, self.game.player.angle, self.game.map.numeric_grid,
+            NUM_RAYS, HALF_FOV, DELTA_ANGLE, SCREEN_DIST, TEXTURE_SIZE
+        )
+
+        for i in range(NUM_RAYS):
+            self.z_buffer[i] = z_buffer_numba[i]
+
+        # ИСПРАВЛЕНИЕ: Берем динамический словарь, созданный при загрузке карты
+        # Если его почему-то нет (например, первый кадр до загрузки), берем пустой
+        id_to_char = getattr(self, 'id_to_char', {})
+
+        # Отрисовка на экране результатов
+        for i in range(NUM_RAYS):
+            wall_char_id, side, y, h, tex_x = render_data[i]
+            # Получаем символ стены по ID. Если ID нет в словаре, ставим '1' (дефолт)
+            wall_char = id_to_char.get(wall_char_id, '1')
+
+            if h > HEIGHT * 2:
+                h = HEIGHT * 2
+                y = int(HALF_HEIGHT - h // 2)
+
+            x = int(i * SCALE)
+
+            texture = self.textures.get(wall_char)
+            if texture is not None:
+                texture_slice = self.get_texture_slice(texture, tex_x, h)
+                if texture_slice is not None:
+                    self.game.screen.blit(texture_slice, (x, y))
+                    if side == 1:
+                        dark_surface = pygame.Surface((SCALE, h))
+                        dark_surface.set_alpha(80)
+                        dark_surface.fill((0, 0, 0))
+                        self.game.screen.blit(dark_surface, (x, y))
+            else:
+                color = WALL_COLORS.get(wall_char, (200, 200, 200))
+                if side == 1:
+                    color = (int(color[0] * 0.7), int(color[1] * 0.7), int(color[2] * 0.7))
+                pygame.draw.rect(self.game.screen, color, (x, y, SCALE, h))
+
+
+
+    def ray_cast_non_optimized(self):
         """Выполняет DDA рейкастинг и отрисовывает стены"""
         ox, oy = self.game.player.x, self.game.player.y
         x_map, y_map = int(ox), int(oy)

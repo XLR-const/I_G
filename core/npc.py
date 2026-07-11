@@ -340,27 +340,45 @@ class NPC:
         waypoints = []
         directions = [(1, 0), (-1, 0), (0, 1), (0, -1)]
 
+        # 1. Сначала ищем надежные точки по четырем направлениям
         for dx, dy in directions:
             for dist in range(2, 6):
                 check_x = int(self.x) + dx * dist
                 check_y = int(self.y) + dy * dist
                 if (0 <= check_x < self.game.level_manager.map.width and
                         0 <= check_y < self.game.level_manager.map.height):
-                    if not self.game.map.is_wall(check_x, check_y):
-                        waypoints.append((check_x + 0.5, check_y + 0.5))
-                        break
+                    # Проверяем на стену (добавлена базовая проверка на None на случай сбоев в is_wall)
+                    try:
+                        if not self.game.level_manager.map.is_wall(check_x, check_y):
+                            waypoints.append((check_x + 0.5, check_y + 0.5))
+                            break
+                    except:
+                        pass
 
+        # 2. Если точек не хватило, генерируем случайные вокруг NPC
         max_attempts = 100
         attempts = 0
+        
         while len(waypoints) < num_points and attempts < max_attempts:
             attempts += 1
             rand_x = self.x + uniform(-3, 3)
             rand_y = self.y + uniform(-3, 3)
-            if 1 < rand_x < self.game.map.width - 1 and 1 < rand_y < self.game.map.height - 1:
-                if not self.game.level_manager.map.is_wall(check_x, check_y):
-                    waypoints.append((rand_x, rand_y))
+            
+            # Проверяем границы карты
+            if 1 < rand_x < self.game.level_manager.map.width - 1 and 1 < rand_y < self.game.level_manager.map.height - 1:
+                # ИСПРАВЛЕНИЕ: Переводим случайные float-координаты в int для проверки сетки стен
+                w_x = int(rand_x)
+                w_y = int(rand_y)
+                
+                try:
+                    # ИСПРАВЛЕНИЕ: Проверяем именно сгенерированную клетку (w_x, w_y), а не старую check_x
+                    if not self.game.level_manager.map.is_wall(w_x, w_y):
+                        waypoints.append((rand_x, rand_y))
+                except:
+                    pass
 
         self.waypoints = waypoints[:num_points]
+
 
     def update_state(self, dt):
         """Конечный автомат NPC

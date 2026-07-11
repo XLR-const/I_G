@@ -59,6 +59,19 @@ class LevelManager:
         self.particles = []
 
         self.levels_folder = "resources/levels"
+        
+    @staticmethod
+    def get_auto_char_to_id():
+        """Автоматически создает словарь соответствия символов стен числовым ID"""
+        char_to_id = {}
+        current_id = 1
+        
+        for symbol, config in SYMBOLS_CONFIG.items():
+            if config.get('type') in ('wall', 'door'):
+                char_to_id[symbol] = current_id
+                current_id += 1
+                
+        return char_to_id
 
     def load_level(self, level_num):
         """Загружает уровень из JSON
@@ -166,6 +179,44 @@ class LevelManager:
                 npc.waypoints = []
                 npc.state = "IDLE"
 
+        # =================
+        # АВТОМАТИЧЕСКАЯ ОПТИМИЗАЦИЯ NUMBA
+        # =================
+        char_to_id = {}
+        id_to_char = {}
+        current_id = 1
+        
+        for symbol, config in SYMBOLS_CONFIG.items():
+            if config.get('type') in ('wall', 'door'):
+                char_to_id[symbol] = current_id
+                id_to_char[current_id] = symbol
+                current_id += 1
+
+        if hasattr(self.game, 'raycasting'):
+            self.game.raycasting.id_to_char = id_to_char
+
+        string_grid = level_data['map']
+        height = len(string_grid)
+        
+        # Находим максимальную длину строки на карте, чтобы матрица была ровной
+        width = max(len(row) for row in string_grid) if height > 0 else 0
+        
+        numeric_grid = np.zeros((height, width), dtype=np.int32)
+        for y in range(height):
+            # Проверяем реальную длину текущей строки
+            current_row_len = len(string_grid[y])
+            for x in range(width):
+                # Если строка оказалась короче максимальной — считаем это пустотой (0)
+                if x < current_row_len:
+                    symbol = string_grid[y][x]
+                    numeric_grid[y][x] = char_to_id.get(symbol, 0)
+                else:
+                    numeric_grid[y][x] = 0
+                
+        self.map.numeric_grid = numeric_grid
+        # ============================================================
+
+        
         print(f"Уровень {level_num} загружен: {len(self.npcs)} NPC, {len(self.inventory)} оружия")
         return True
 
