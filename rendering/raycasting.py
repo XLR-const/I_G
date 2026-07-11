@@ -157,46 +157,58 @@ class RayCasting:
                     self.textures[symbol] = None
 
     def get_texture_slice(self, texture, tex_x, height):
-        """Возвращает вертикальную полоску текстуры с оптимизацией кэша"""
+        """Возвращает сглаженную вертикальную полоску текстуры из кэша"""
         if texture is None or not USE_TEXTURES:
             return None
 
-        # ИСПРАВЛЕНИЕ: Округляем высоту до ближайшего четного числа (шаг 2 пикселя)
-        # Это уменьшит количество уникальных ключей в кэше в 2 раза и уберет микро-дёрганья
+        # 1. Округляем высоту до четного числа (шаг 2 пикселя)
+        # Это защищает кэш от переполнения и убирает микро-дёрганья
         height = (height // 2) * 2
-        if height < 2:  # Защита от нулевой высоты
+        if height < 2:
             height = 2
 
+        # 2. Проверяем наличие полоски в кэше
         cache_key = (id(texture), tex_x, height)
         if cache_key in self.texture_cache:
             return self.texture_cache[cache_key]
 
-        # Защита от вылета, если Numba из-за float-погрешности передала tex_x за пределами текстуры
+        # Защита координат
         if not (0 <= tex_x < TEXTURE_SIZE):
             tex_x = max(0, min(tex_x, TEXTURE_SIZE - 1))
 
         try:
+            # Вырезаем оригинальный срез
             slice_surface = texture.subsurface((tex_x, 0, 1, TEXTURE_SIZE))
-            scaled = pygame.transform.scale(slice_surface, (SCALE, height))
             
-            # Чтобы кэш не разрастался до бесконечности и не ел гигабайты ОЗУ,
-            # очищаем его, если в нем скопилось слишком много элементов (например, больше 5000)
-            if len(self.texture_cache) > 5000:
+            # 3. Применяем качественное сглаживание
+            scaled = pygame.transform.smoothscale(slice_surface, (SCALE, height))
+            
+            # Ограничиваем размер кэша в оперативной памяти
+            if len(self.texture_cache) > 4000:
                 self.texture_cache.clear()
                 
+            # Сохраняем в кэш
             self.texture_cache[cache_key] = scaled
             return scaled
         except:
-            return None
+            # Откат на быстрый scale, если smoothscale выдал ошибку на гигантской высоте
+            try:
+                scaled = pygame.transform.scale(slice_surface, (SCALE, height))
+                self.texture_cache[cache_key] = scaled
+                return scaled
+            except:
+                return None
+
 
     
     def ray_cast(self):
-        """Выполняет DDA рейкастинг через Numba и отрисовывает стены без искажений"""
+        """Выполняет DDA рейкастинг через Numba с пикселизацией вблизи и кэшем"""
         if not hasattr(self.game.map, 'numeric_grid'):
             return
 
         ox, oy = self.game.player.x, self.game.player.y
 
+        # Запускаем стабильное ядро Numba
         z_buffer_numba, render_data = run_dda_numba(
             ox, oy, self.game.player.angle, self.game.map.numeric_grid,
             NUM_RAYS, HALF_FOV, DELTA_ANGLE, SCREEN_DIST, TEXTURE_SIZE
@@ -207,14 +219,13 @@ class RayCasting:
 
         id_to_char = getattr(self, 'id_to_char', {})
         
-        # Параметры экрана (убедитесь, что они совпадают с вашим config.py)
-        screen_height = HEIGHT  # Обычно 800
-        half_screen_height = HALF_HEIGHT # Обычно 400
+        # Настраиваем клиппинг под размеры игрового окна
+        original_clip = self.game.screen.get_clip()
+        self.game.screen.set_clip(pygame.Rect(0, 0, WIDTH, HEIGHT))
 
         for i in range(NUM_RAYS):
             wall_char_id, side, _, proj_height, tex_x = render_data[i]
             
-            # ИСПРАВЛЕНИЕ БАГА С НЕБОМ: Если стены на линии луча нет — просто ничего не рисуем!
             if wall_char_id == 0 or proj_height <= 0:
                 continue
 
@@ -222,60 +233,89 @@ class RayCasting:
             wall_char = id_to_char.get(wall_char_id, '1')
             texture = self.textures.get(wall_char)
 
-            # ИСПРАВЛЕНИЕ ДЛЯ БЛИЖНИХ СТЕН (Спасает FPS и убирает черные полосы)
-            # Если стена выше экрана, мы не масштабируем её целиком. 
-            # Мы вырезаем только ту часть текстуры, которая физически видна на экране.
-            if proj_height > screen_height:
-                # Вычисляем, какая доля стены видна на экране
-                visible_ratio = screen_height / proj_height
-                # Соответственно, берем не всю высоту текстуры (TEXTURE_SIZE), а только её часть
-                tex_h = int(TEXTURE_SIZE * visible_ratio)
+            # --- ИСПРАВЛЕННЫЙ ИДЕАЛЬНЫЙ РАСЧЁТ ДЛЯ ПИКСЕЛИЗАЦИИ БЕЗ ВОЛН ---
+            h = int(proj_height)
+            
+            if h > HEIGHT:
+                # Если стена выше экрана, вычисляем точный шаг пикселя текстуры на один пиксель экрана
+                # Это гарантирует, что рисунок зафиксируется на месте и волны исчезнут
+                tex_step = TEXTURE_SIZE / h
+                
+                # Сколько пикселей текстуры физически помещается в высоту нашего экрана (HEIGHT)
+                tex_h = int(HEIGHT * tex_step)
                 tex_h = max(1, min(tex_h, TEXTURE_SIZE))
                 
-                # Центрируем срез по вертикали оригинальной текстуры
-                tex_y = (TEXTURE_SIZE - tex_h) // 2
+                # Точно находим верхнюю точку обрезки текстуры без дробных погрешностей
+                tex_y = int((TEXTURE_SIZE - tex_h) / 2)
                 
-                # Координаты отрисовки на весь экран
+                # Насильно ставим высоту полосы равной высоте экрана
+                h_render = HEIGHT
                 y = 0
-                h = screen_height
                 
-                # Вырезаем только видимый кусочек полоски из текстуры
+                # Извлекаем ровный кусок и используем ОБЫЧНЫЙ scale для жестких пикселей
                 if texture is not None:
                     try:
-                        slice_surface = texture.subsurface((tex_x, tex_y, 1, tex_h))
-                        texture_slice = pygame.transform.scale(slice_surface, (SCALE, h))
+                        # Округляем высоту для стабильной работы кэша
+                        h_cache = (h_render // 2) * 2
+                        cache_key = (id(texture), tex_x, h_cache, tex_y, tex_h)
+                        
+                        if cache_key in self.texture_cache:
+                            texture_slice = self.texture_cache[cache_key]
+                        else:
+                            slice_surface = texture.subsurface((tex_x, tex_y, 1, tex_h))
+                            texture_slice = pygame.transform.scale(slice_surface, (SCALE, h_render))
+                            
+                            if len(self.texture_cache) > 4000:
+                                self.texture_cache.clear()
+                            self.texture_cache[cache_key] = texture_slice
                     except:
                         texture_slice = None
                 else:
                     texture_slice = None
             else:
                 # Обычная стена вдалеке (меньше высоты экрана)
-                y = int(half_screen_height - proj_height // 2)
-                h = int(proj_height)
+                y = int(HALF_HEIGHT - h // 2)
                 
                 if texture is not None:
                     try:
-                        slice_surface = texture.subsurface((tex_x, 0, 1, TEXTURE_SIZE))
-                        texture_slice = pygame.transform.scale(slice_surface, (SCALE, h))
+                        h_cache = (h // 2) * 2
+                        cache_key = (id(texture), tex_x, h_cache, 0, TEXTURE_SIZE)
+                        
+                        if cache_key in self.texture_cache:
+                            texture_slice = self.texture_cache[cache_key]
+                        else:
+                            slice_surface = texture.subsurface((tex_x, 0, 1, TEXTURE_SIZE))
+                            texture_slice = pygame.transform.scale(slice_surface, (SCALE, h_cache))
+                            
+                            if len(self.texture_cache) > 4000:
+                                self.texture_cache.clear()
+                            self.texture_cache[cache_key] = texture_slice
                     except:
                         texture_slice = None
                 else:
                     texture_slice = None
 
-            # Отрисовка полосы на экран
+            # Отрисовка
             if texture_slice is not None:
                 self.game.screen.blit(texture_slice, (x, y))
                 if side == 1:
-                    dark_surface = pygame.Surface((SCALE, h))
+                    dark_surface = pygame.Surface((SCALE, texture_slice.get_height()))
                     dark_surface.set_alpha(80)
                     dark_surface.fill((0, 0, 0))
                     self.game.screen.blit(dark_surface, (x, y))
             else:
-                # Отрисовка сплошным цветом, если текстура не загрузилась
+                # Отрезаем цвета по высоте экрана для корректного draw.rect
+                rect_y = max(0, y)
+                rect_h = min(HEIGHT, h)
                 color = WALL_COLORS.get(wall_char, (200, 200, 200))
                 if side == 1:
                     color = (int(color[0] * 0.7), int(color[1] * 0.7), int(color[2] * 0.7))
-                pygame.draw.rect(self.game.screen, color, (x, y, SCALE, h))
+                pygame.draw.rect(self.game.screen, color, (x, rect_y, SCALE, rect_h))
+
+        # Восстанавливаем оригинальный клиппинг
+        self.game.screen.set_clip(original_clip)
+
+
 
 
 
