@@ -23,6 +23,54 @@ SYMBOLS_CONFIG = {
     'I': {'type': 'wall', 'texture': 'resources/textures/I.png'},
     'N': {'type': 'wall', 'texture': 'resources/textures/N.png'},
     
+    # Предметы
+    'h': {
+        'type': 'item',
+        'item_type': 'health',
+        'amount': 25,
+        'sprite': 'resources/items/health.png',
+        'description': 'Аптечка (+25 HP)'
+    },
+    'a': {
+        'type': 'item',
+        'item_type': 'armor',
+        'amount': 25,
+        'sprite': 'resources/items/armor.png',
+        'description': 'Броня (+25 Armor)'
+    },
+        'p': {
+        'type': 'item',
+        'item_type': 'weapon',
+        'weapon_name': 'Pistol',
+        'ammo': 8,
+        'sprite': 'resources/items/pistol.png',
+        'description': 'Пистолет (+20 патронов)'
+    },
+    's': {
+        'type': 'item',
+        'item_type': 'weapon',
+        'weapon_name': 'Shotgun',
+        'ammo': 4,
+        'sprite': 'resources/items/shotgun.png',
+        'description': 'Дробовик (+10 патронов)'
+    },
+    'm': {
+        'type': 'item',
+        'item_type': 'weapon',
+        'weapon_name': 'Machine Gun',
+        'ammo': 50,
+        'sprite': 'resources/items/machine_gun.png',
+        'description': 'Автомат (+150 патронов)'
+    },
+    'g': {
+        'type': 'item',
+        'item_type': 'weapon',
+        'weapon_name': 'Plasma Gun',
+        'ammo': 1,
+        'sprite': 'resources/items/plasma_gun.png',
+        'description': 'Плазмаган (+4 патрона)'
+    },
+    
     # Дверь
     'D': {'type': 'door', 'texture': 'resources/textures/D.png'},
     

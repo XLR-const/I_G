@@ -29,6 +29,7 @@ class Renderer:
         self.floor_color = (30, 30, 40)
         self.ceiling_texture = None
         self.floor_texture = None
+        self.notifications = []
 
         try:
             self.nice_hp = pygame.image.load('resources/player/nice_hp.png').convert_alpha()
@@ -225,6 +226,20 @@ class Renderer:
 
         if health_bar_progress > 6 * CELL_W:
             health_bar_progress = 6 * CELL_W
+        
+        armor = self.game.player.armor
+        armor_bar_pos = grid_to_pixel(1, 17)
+        armor_bar_width = 6 * CELL_W
+        armor_bar_height = 1 * CELL_H
+
+        # Фон полоски брони
+        pygame.draw.rect(self.game.screen, (50, 50, 60),
+                        (armor_bar_pos[0], armor_bar_pos[1], armor_bar_width, armor_bar_height))
+        
+        # Заполнение полоски брони
+        armor_bar_progress = (armor / 100) * armor_bar_width
+        pygame.draw.rect(self.game.screen, (0, 100, 200),  # Синий цвет
+                        (armor_bar_pos[0], armor_bar_pos[1], armor_bar_progress, armor_bar_height))
 
         weapon_name_pos = grid_to_pixel(25, 15)
         weapon_ammo_pos = grid_to_pixel(25, 16)
@@ -351,4 +366,3 @@ class Renderer:
             color = (255, 0, 0)
         
         pygame.draw.rect(self.game.screen, color, (bar_x, bar_y, hp_width, bar_height))
-

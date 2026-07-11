@@ -37,7 +37,9 @@ class Toolbar:
         """Собирает все объекты в плоский список"""
         self.items = []
 
-        # 1. Стены
+        # ============================================================
+        # 1. СТЕНЫ
+        # ============================================================
         wall_symbols = []
         for symbol, config in SYMBOLS_CONFIG.items():
             if config.get('type') == 'wall':
@@ -55,7 +57,9 @@ class Toolbar:
                 'sub': 'стена'
             })
 
-        # 2. Объекты
+        # ============================================================
+        # 2. ОБЪЕКТЫ
+        # ============================================================
         self.items.append({'type': 'separator', 'label': 'ОБЪЕКТЫ'})
 
         for symbol, config in SYMBOLS_CONFIG.items():
@@ -100,7 +104,45 @@ class Toolbar:
             'sub': 'пустота'
         })
 
-        # 3. NPC
+        # ============================================================
+        # 3. ПРЕДМЕТЫ (с загрузкой текстур из конфига)
+        # ============================================================
+        self.items.append({'type': 'separator', 'label': 'ПРЕДМЕТЫ'})
+
+        for symbol, config in SYMBOLS_CONFIG.items():
+            if config.get('type') == 'item':
+                item_type = config.get('item_type', '')
+                
+                # Загружаем текстуру предмета
+                surf = self._load_item_texture(symbol)
+                
+                # Название для подписи
+                if item_type == 'health':
+                    label = 'h'
+                    sub = 'аптечка +25 HP'
+                elif item_type == 'armor':
+                    label = 'a'
+                    sub = 'броня +25 Armor'
+                elif item_type == 'weapon':
+                    weapon_name = config.get('weapon_name', '')
+                    ammo = config.get('ammo', 0)
+                    label = symbol
+                    sub = f'{weapon_name} (+{ammo} патр.)'
+                else:
+                    label = symbol
+                    sub = 'предмет'
+                
+                self.items.append({
+                    'type': 'item',
+                    'symbol': symbol,
+                    'surface': surf,
+                    'label': label,
+                    'sub': sub
+                })
+
+        # ============================================================
+        # 4. NPC
+        # ============================================================
         self.items.append({'type': 'separator', 'label': 'NPC'})
 
         for symbol, config in NPC_CONFIG.items():
@@ -137,6 +179,32 @@ class Toolbar:
         except:
             pass
         return None
+    
+    def _load_item_texture(self, symbol):
+        """Загружает текстуру предмета из SYMBOLS_CONFIG"""
+        config = SYMBOLS_CONFIG.get(symbol, {})
+        sprite_path = config.get('sprite')
+        
+        if sprite_path:
+            try:
+                # Путь относительно корня проекта
+                full_path = os.path.join(ROOT_DIR, sprite_path)
+                if os.path.exists(full_path):
+                    surf = pygame.image.load(full_path).convert_alpha()
+                    size = 34
+                    return pygame.transform.scale(surf, (size, size))
+            except Exception as e:
+                print(f"[Toolbar] Ошибка загрузки {sprite_path}: {e}")
+        
+        # Если не загрузилось — цветной квадрат
+        if config.get('item_type') == 'health':
+            return self._create_surface(symbol, (200, 0, 0))
+        elif config.get('item_type') == 'armor':
+            return self._create_surface(symbol, (0, 100, 200))
+        elif config.get('item_type') == 'weapon':
+            return self._create_surface(symbol, (200, 200, 0))
+        else:
+            return self._create_surface(symbol, (150, 150, 150))
 
     def _create_surface(self, symbol, color):
         size = 32

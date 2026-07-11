@@ -33,6 +33,7 @@ class Map:
         self.world_map = {}
         self.npc_positions = []
         self.weapon_positions = []
+        self.item_positions = []
         self.exit_pos = None
         self.player_spawn_pos = None
 
@@ -46,6 +47,7 @@ class Map:
         """Разбирает текстовую карту по символам из конфига"""
         self.npc_positions = []
         self.weapon_positions = []
+        self.item_positions = []
         self.exit_pos = None
         self.player_spawn_pos = None
         self.doors = []
@@ -68,6 +70,12 @@ class Map:
                         self.exit_pos = (i + 0.5, j + 0.5)
                     elif symbol_type == 'player_spawn':
                         self.player_spawn_pos = (i + 0.5, j + 0.5)
+                    elif symbol_type == 'item':
+                        item_type = SYMBOLS_CONFIG[char].get('item_type')
+                        amount = SYMBOLS_CONFIG[char].get('amount', 0)
+                        weapon_name = SYMBOLS_CONFIG[char].get('weapon_name', '')
+                        ammo = SYMBOLS_CONFIG[char].get('ammo', 0)
+                        self.item_positions.append((i, j, item_type, amount, weapon_name, ammo))
 
                 elif char in NPC_CONFIG:
                     self.npc_positions.append((i, j, char))

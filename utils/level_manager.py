@@ -7,8 +7,9 @@ from core.map import Map
 from core.player import Player
 from core.npc import Solder, Kamikaze, Jaggernaut, Lightning, Boss
 from core.weapon import Pistol, Shotgun, MachineGun, PlasmaGun
-from config.game_data import NPC_CONFIG, WEAPON_CONFIG
-
+from config.game_data import NPC_CONFIG, WEAPON_CONFIG, SYMBOLS_CONFIG
+from core.item import *
+import numpy as np
 
 class LevelManager:
     """Менеджер загрузки уровней
@@ -26,6 +27,7 @@ class LevelManager:
         player: Объект игрока
         map: Объект карты
         npcs: Список NPC
+        items: Список предметов
         inventory: Инвентарь игрока
         weapon: Текущее оружие
         current_weapon_index: Индекс текущего оружия
@@ -50,6 +52,7 @@ class LevelManager:
         self.player = None
         self.map = None
         self.npcs = []
+        self.items = []
         self.inventory = []
         self.weapon = None
         self.current_weapon_index = 0
@@ -86,6 +89,18 @@ class LevelManager:
         self.npcs = []
 
         self.map = Map(self.game, level_data['map'])
+
+        # Items
+        for x, y, item_type, amount, weapon_name, ammo in self.map.item_positions:
+            if item_type == 'health':
+                item = HealthItem(self.game, x, y, amount)
+            elif item_type == 'armor':
+                item = ArmorItem(self.game, x, y, amount)
+            elif item_type == 'weapon':
+                item = WeaponItem(self.game, x, y, weapon_name, ammo)
+            else:
+                continue
+            self.items.append(item)
 
         background = level_data.get('background', {})
         self.game.renderer.set_background(background)

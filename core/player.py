@@ -23,6 +23,9 @@ class Player:
         self.x, self.y = PLAYER_POS
         self.angle = PLAYER_ANGLE
         self.hp = 100
+        self.armor = 0
+        self.max_hp = 100
+        self.max_armor = 100
         self.last_damage_time = 0
         self.regen_delay = 10000
         self.regen_speed = 10
@@ -39,24 +42,35 @@ class Player:
         current_time = pygame.time.get_ticks()
 
         if current_time - self.last_damage_time > self.regen_delay:
-            if self.hp < 100:
+            if self.hp < self.max_hp:
                 self.hp += self.regen_speed * self.game.delta_time / 1000
-                if self.hp > 100:
-                    self.hp = 100
+                if self.hp > self.max_hp:
+                    self.hp = self.max_hp
+                    
+    def heal(self, amount):
+        """Лечит игрока из аптечек"""
+        old_hp = self.hp
+        self.hp = min(self.max_hp, self.hp + amount)
+        return self.hp - old_hp
 
     def take_damage(self, damage):
-        """Наносит урон игроку
+            """Наносит урон игроку (с учётом брони)"""
+            # Сначала урон по броне
+            if self.armor > 0:
+                armor_damage = min(self.armor, damage)
+                self.armor -= armor_damage
+                damage -= armor_damage
 
-        Args:
-            damage: Количество урона
-        """
-        self.hp -= damage
-        self.last_damage_time = pygame.time.get_ticks()
+            # Остаток урона по HP
+            if damage > 0:
+                self.hp -= damage
 
-        if self.hp <= 0:
-            self.hp = 0
-            self.death_sound.play()
-            self.game.ui_manager.current_state = self.game.ui_manager.states['DEAD']
+            self.last_damage_time = pygame.time.get_ticks()
+
+            if self.hp <= 0:
+                self.hp = 0
+                self.death_sound.play()
+                self.game.ui_manager.current_state = self.game.ui_manager.states['DEAD']
 
     def movement(self):
         """Обрабатывает движение WASD"""
