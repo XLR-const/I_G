@@ -5,6 +5,7 @@ import sys
 import os
 import pygame
 import math
+import numpy as np
 from setting import *
 from rendering.raycasting import RayCasting
 from rendering.renderer import Renderer
@@ -21,6 +22,10 @@ class DevGame:
     """Игра в режиме разработки с гибкими настройками"""
 
     def __init__(self, config):
+        """
+        Args:
+            config: dict с настройками компонентов
+        """
         self.config = config
         
         pygame.mouse.set_visible(False)
@@ -45,18 +50,22 @@ class DevGame:
         else:
             print("[DevMode] UI Manager отключён — игра без меню")
         
-        # КОНСОЛЬ — ВСЕГДА ВКЛЮЧЕНА (если не отключена явно)
+        # Консоль
         self.console = DevConsole(self) if config.get('console', True) else None
         if self.console:
             print("[DevMode] Консоль включена (~ для открытия)")
 
+        # Музыка
         self.music_manager = MusicManager() if config.get('music_manager', False) else None
+        
+        # Level Manager
         self.level_manager = LevelManager(self) if config.get('level_manager', True) else None
 
         # Игровые объекты
         self.player = None
         self.map = None
         self.npcs = []
+        self.items = []
         self.inventory = []
         self.weapon = None
         self.particles = []
@@ -65,13 +74,17 @@ class DevGame:
         self.current_level = 1
         self.level_start_time = 0
 
+        # Катсцена — всегда выключена
         self.intro_player = None
 
-        self.load_level(self.current_level)
+        # Загружаем уровень
+        if self.level_manager:
+            self.load_level(self.current_level)
 
         self._print_status()
 
     def _print_status(self):
+        """Печатает статус запуска"""
         print("\n" + "=" * 60)
         print("  🛠️  РЕЖИМ РАЗРАБОТКИ")
         print("=" * 60)
@@ -92,6 +105,7 @@ class DevGame:
         print("=" * 60 + "\n")
 
     def load_level(self, level_num):
+        """Загружает уровень через LevelManager"""
         if not self.level_manager:
             print("[Ошибка] LevelManager отключён!")
             return
@@ -101,15 +115,17 @@ class DevGame:
         self.player = self.level_manager.player
         self.map = self.level_manager.map
         self.npcs = self.level_manager.npcs
+        self.items = self.level_manager.items
         self.inventory = self.level_manager.inventory
         self.weapon = self.level_manager.weapon
         self.particles = self.level_manager.particles
         self.exit_pos = self.level_manager.exit_pos
         self.total_kills = self.level_manager.total_kills
         self.current_level = self.level_manager.current_level
-        self.level_start_time = self.level_manager.level_start_time
+
 
     def update(self):
+        """Обновляет состояние игры"""
         if self.player:
             self.player.update()
 
@@ -120,28 +136,39 @@ class DevGame:
             for door in self.map.doors:
                 door.update()
 
+        # Частицы
         self.particles = [p for p in self.particles
                           if pygame.time.get_ticks() - p.start_time < p.life_time]
         for p in self.particles:
             p.update()
 
+        # NPC
         for npc in self.npcs:
             npc.update()
 
+        # Предметы
+        for item in self.items[:]:
+            item.update(self.player)
+        self.items = [item for item in self.items if item.alive]
+
+        # Оружие
         if self.weapon:
             self.weapon.update_animation()
 
+        # Стрельба
         mouse_buttons = pygame.mouse.get_pressed()
         if mouse_buttons[0] and self.weapon:
             if self.weapon.is_continuous and not self.weapon.reloading:
                 self.weapon.fire()
 
+        # Регенерация
         if self.player:
             self.player.update_regen()
 
         self.delta_time = self.clock.tick(FPS)
 
     def draw(self):
+        """Отрисовывает игру"""
         if self.renderer:
             self.renderer.draw_background()
 
@@ -151,71 +178,75 @@ class DevGame:
         if self.renderer:
             self.renderer.draw_fps()
 
-        if self.npcs:
-            self.npcs.sort(key=lambda npc: math.hypot(
-                npc.x - self.player.x, npc.y - self.player.y), reverse=True)
-            for npc in self.npcs:
-                npc.draw()
-                if npc.alive and self.renderer:
-                    if not getattr(npc, 'is_boss', False):
-                        self.renderer.draw_npc_health(npc)
-                    else:
-                        npc.draw_boss_hud()
+        # Сбор всех 3D объектов для сортировки
+        render_queue = []
+        render_queue.extend(self.npcs)
+        render_queue.extend(self.items)
+        render_queue.extend(self.particles)
 
-        for p in self.particles:
-            p.draw()
+        # Сортировка по дистанции
+        render_queue.sort(
+            key=lambda obj: math.hypot(obj.x - self.player.x, obj.y - self.player.y),
+            reverse=True
+        )
 
+        # Отрисовка объектов
+        for obj in render_queue:
+            obj.draw()
+
+        # Полоски HP над NPC
+        visible_npcs = [npc for npc in self.npcs if npc.alive]
+        visible_npcs.sort(key=lambda npc: math.hypot(npc.x - self.player.x, npc.y - self.player.y))
+        
+        for npc in visible_npcs:
+            if self.renderer:
+                if not getattr(npc, 'is_boss', False):
+                    self.renderer.draw_npc_health(npc)
+                else:
+                    npc.draw_boss_hud()
+
+        # Оружие
         if self.weapon:
             self.weapon.draw()
 
+        # Интерфейс
         if self.renderer:
             self.renderer.draw_interface()
             self.renderer.draw_crosshair()
 
-        # КОНСОЛЬ — ВСЕГДА ПОВЕРХ ВСЕГО
+        # Консоль
         if self.console:
             self.console.draw(self.screen)
 
         pygame.display.flip()
 
     def handle_events(self):
+        """Обрабатывает события"""
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 pygame.quit()
                 sys.exit()
 
-            # ============================================================
-            # КОНСОЛЬ — ПЕРВЫЙ ПРИОРИТЕТ
-            # ============================================================
+            # Консоль
             if self.console and self.console.active:
                 self.console.handle_event(event)
-                # Проверяем, не нажата ли тильда для закрытия консоли
                 if event.type == pygame.KEYDOWN and event.key == pygame.K_BACKQUOTE:
                     self.console.toggle()
                 continue
 
-            # ============================================================
-            # ОТКРЫТИЕ КОНСОЛИ (тильда)
-            # ============================================================
+            # Открытие консоли
             if event.type == pygame.KEYDOWN and event.key == pygame.K_BACKQUOTE:
                 if self.console:
                     self.console.toggle()
-                    # Если консоль открылась — пропускаем событие дальше
                     if self.console.active:
                         continue
 
-            # ============================================================
-            # ОБЫЧНЫЕ СОБЫТИЯ (только если консоль не активна)
-            # ============================================================
-
             # UI Manager (если включён)
             if self.ui_manager:
-                # Пропускаем события через UI Manager
                 handled = self.ui_manager.handle_event(event)
                 if handled:
                     continue
 
-                # Если UI не в PLAYING — рисуем UI и не обрабатываем игру
                 if self.ui_manager.current_state != self.ui_manager.states['PLAYING']:
                     continue
 
@@ -233,7 +264,7 @@ class DevGame:
                     self.ui_manager.current_state = self.ui_manager.states['PAUSE']
                     self.ui_manager.selected_option = 0
 
-                # Смена оружия
+                # Смена оружия (цифры)
                 if event.key == pygame.K_1:
                     self.level_manager.current_weapon_index = 0
                 if event.key == pygame.K_2 and len(self.inventory) > 1:
@@ -242,6 +273,8 @@ class DevGame:
                     self.level_manager.current_weapon_index = 2
                 if event.key == pygame.K_4 and len(self.inventory) > 3:
                     self.level_manager.current_weapon_index = 3
+                if event.key == pygame.K_5 and len(self.inventory) > 4:
+                    self.level_manager.current_weapon_index = 4
 
                 if self.level_manager.current_weapon_index < len(self.inventory):
                     self.weapon = self.inventory[self.level_manager.current_weapon_index]
@@ -251,30 +284,34 @@ class DevGame:
                     print("🔄 Перезагрузка уровня...")
                     self.load_level(self.current_level)
 
-            # Стрельба
+            # Стрельба и колесо мыши
             if event.type == pygame.MOUSEBUTTONDOWN:
                 if event.button == 1 and self.weapon:
                     if not self.weapon.reloading and not self.weapon.is_continuous:
                         self.weapon.fire()
 
-                # Колесо мыши
                 if event.button == 4:
                     self.level_manager.current_weapon_index = (
                         self.level_manager.current_weapon_index + 1
-                    ) % len(self.inventory)
+                    ) % max(1, len(self.inventory))
+                    self.weapon = self.inventory[self.level_manager.current_weapon_index]
+                    
                 if event.button == 5:
                     self.level_manager.current_weapon_index = (
                         self.level_manager.current_weapon_index - 1
-                    ) % len(self.inventory)
-                self.weapon = self.inventory[self.level_manager.current_weapon_index]
+                    ) % max(1, len(self.inventory))
+                    self.weapon = self.inventory[self.level_manager.current_weapon_index]
 
     def run(self):
+        """Главный цикл"""
         while True:
             self.handle_events()
 
+            # Музыка
             if self.music_manager and self.ui_manager:
                 self.music_manager.update(self.ui_manager.current_state, self.current_level)
 
+            # Игровой цикл
             if self.ui_manager:
                 if self.ui_manager.current_state == self.ui_manager.states['PLAYING']:
                     self.update()
@@ -283,7 +320,6 @@ class DevGame:
                     self.ui_manager.draw(self.screen)
                     pygame.display.flip()
             else:
-                # Без UI — всегда в игре
                 self.update()
                 self.draw()
 
@@ -340,6 +376,7 @@ def get_user_config():
 
 
 def main():
+    """Запуск dev_mode"""
     print("\n" + "=" * 60)
     print("  🛠️  РЕЖИМ РАЗРАБОТКИ")
     print("=" * 60)

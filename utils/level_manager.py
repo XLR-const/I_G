@@ -6,7 +6,7 @@ from setting import *
 from core.map import Map
 from core.player import Player
 from core.npc import Solder, Kamikaze, Jaggernaut, Lightning, Boss
-from core.weapon import Pistol, Shotgun, MachineGun, PlasmaGun
+from core.weapon import Pistol, Shotgun, MachineGun, PlasmaGun, NewWeapon
 from config.game_data import NPC_CONFIG, WEAPON_CONFIG, SYMBOLS_CONFIG
 from core.item import *
 import numpy as np
@@ -143,7 +143,14 @@ class LevelManager:
             if not weapon_class:
                 continue
 
-            weapon = weapon_class(self.game)
+            # ============================================================
+            # ЕСЛИ ЭТО NewWeapon — передаём weapon_name
+            # ============================================================
+            if class_name == 'NewWeapon':
+                weapon = weapon_class(self.game, weapon_name)
+            else:
+                weapon = weapon_class(self.game)
+            
             self.inventory.append(weapon)
 
         if not self.inventory:

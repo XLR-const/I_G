@@ -221,6 +221,8 @@ class Game:
                         self.level_manager.current_weapon_index = 2
                     if event.key == pygame.K_4 and len(self.inventory) > 3:
                         self.level_manager.current_weapon_index = 3
+                    if event.key == pygame.K_5 and len(self.inventory) > 4:
+                        self.level_manager.current_weapon_index = 4
 
                     if self.level_manager.current_weapon_index < len(self.inventory):
                         self.weapon = self.inventory[self.level_manager.current_weapon_index]

@@ -204,6 +204,19 @@ WEAPON_CONFIG = {
         'ammo_start': 8,
         'max_distance': 5,
     },
+        'AK-47': {
+        'name': 'AK-47',
+        'class_name': 'NewWeapon',       # Используем наш новый универсальный класс
+        'damage': 25,
+        'reload_time': 240,              # 4 кадра анимации * 60 мс скорость = 240 мс
+        'continuous': True,              # Автоматическая стрельба (зажим)
+        'ammo_start': 30,
+        'max_distance': 12,              # Автомат стреляет дальше пистолета и плазмы
+        'folder_name': 'AK47',           # Точное имя папки из resources/weapons/
+        'sprite_prefix': 'AK47',
+        'max_distance': 5
+    },
+
 }
 
 # ============================================================
