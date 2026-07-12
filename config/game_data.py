@@ -216,6 +216,19 @@ WEAPON_CONFIG = {
         'sprite_prefix': 'AK47',
         'max_distance': 5
     },
+        'COLT': {
+        'name': 'Colt 1911',
+        'class_name': 'NewWeapon',
+        'damage': 15,
+        'reload_time': 270,        # Время перезарядки строго под длину анимации!
+        'continuous': False,       # Одиночные выстрелы
+        'ammo_start': 7,
+        'max_distance': 8,
+        'folder_name': 'Colt',
+        'sprite_prefix': 'COLT',
+        'max_distance': 2
+    },
+
 
 }
 
