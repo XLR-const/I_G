@@ -62,14 +62,32 @@ SYMBOLS_CONFIG = {
         'sprite': 'resources/items/machine_gun.png',
         'description': 'Автомат (+150 патронов)'
     },
+        # Предметы: Новое оружие на полу
+    'k': {
+        'type': 'item',
+        'item_type': 'weapon',
+        'weapon_name': 'AK-47',
+        'ammo': 30,
+        'sprite': 'resources/weapons/AK47/icon.png',  # Используем готовую иконку из папки пушки!
+        'description': 'Автомат АК-47 (+30 патронов)'
+    },
+    'c': {
+        'type': 'item',
+        'item_type': 'weapon',
+        'weapon_name': 'COLT',
+        'ammo': 7,
+        'sprite': 'resources/weapons/Colt/icon.png',  # Иконка Кольта
+        'description': 'Пистолет Colt 1911 (+7 патронов)'
+    },
     'g': {
         'type': 'item',
         'item_type': 'weapon',
-        'weapon_name': 'Plasma Gun',
-        'ammo': 1,
-        'sprite': 'resources/items/plasma_gun.png',
-        'description': 'Плазмаган (+4 патрона)'
+        'weapon_name': 'COCH',
+        'ammo': 4,
+        'sprite': 'resources/weapons/COCH/icon.png',  # Иконка двустволки
+        'description': 'Двустволка Super Shotgun (+4 патрона)'
     },
+
     
     # Дверь
     'D': {'type': 'door', 'texture': 'resources/textures/D.png'},
@@ -223,7 +241,7 @@ WEAPON_CONFIG = {
         'reload_time': 270,        # Время перезарядки строго под длину анимации!
         'continuous': False,       # Одиночные выстрелы
         'max_distance': 8,
-        'folder_name': 'Colt',
+        'folder_name': 'COLT',
         'sprite_prefix': 'COLT',
         'max_distance': 2,
         'ammo_start': 30
