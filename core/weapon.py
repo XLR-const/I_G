@@ -105,7 +105,7 @@ class Weapon:
         if os.path.exists(config_file):
             self._parse_txt_config(config_file)
 
-        # 2. Сканируем папку и распределяем кадры (Doom-номенклатура)
+        # 2. Сканируем папку и распределяем кадры
         files = sorted(os.listdir(self.folder_path))
         for file in files:
             if file.startswith(self.sprite_prefix) and file.endswith('.png'):
@@ -116,21 +116,21 @@ class Weapon:
                 w, h = sprite.get_size()
                 sprite = pygame.transform.scale(sprite, (int(w * self.scale), int(h * self.scale)))
 
-                # Разбираем кадры по буквам после префикса (Например: AK47A0 -> буква A)
+                # Разбираем кадры по буквам после префикса
                 frame_letter = file[len(self.sprite_prefix)]
                 if frame_letter == 'A':
                     self.idle_frames.append((sprite, frame_letter))
-                elif frame_letter in ('B', 'C', 'D'):
-                    self.fire_frames.append((sprite, frame_letter))
                 else:
-                    self.reload_frames.append((sprite, frame_letter))
+                    # ИСПРАВЛЕНИЕ: Абсолютно ВСЕ остальные буквы (B, C, D, E, F... X) 
+                    # теперь складываются в один монолитный список анимации выстрела!
+                    self.fire_frames.append((sprite, frame_letter))
 
-        # Защита на случай неполных анимаций в скачанном паке
+        # Защита на случай неполных анимаций
         if not self.fire_frames:
             self.fire_frames = self.idle_frames
-        if not self.reload_frames:
-            self.reload_frames = self.idle_frames
             
+        # Список reload_frames нам больше не нужен, дублируем его для совместимости структуры
+        self.reload_frames = self.idle_frames
         self.current_frames = self.idle_frames
 
         # 3. Загружаем динамический звук выстрела из папки пушки
@@ -144,6 +144,7 @@ class Weapon:
                 self.sound = self.sound_empty_ammo
         else:
             self.sound = self.sound_empty_ammo
+
 
     def _parse_txt_config(self, filepath):
         """Парсер текстового конфига 'ключ = значение'"""

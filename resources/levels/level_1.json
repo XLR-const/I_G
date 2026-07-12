@@ -157,7 +157,8 @@
         "Machine Gun",
         "Plasma Gun",
         "AK-47",
-        "COLT"
+        "COLT",
+        "COCH"
     ],
     "starting_ammo": {
         "Pistol": 40,
@@ -165,7 +166,8 @@
         "Machine Gun": 400,
         "Plasma Gun": 15,
         "AK-47": 50,
-        "COLT": 30
+        "COLT": 30,
+        "COCH": 30
     },
     "background": {
         "ceiling_texture": "resources/textures/ceiling.png",

@@ -222,11 +222,22 @@ WEAPON_CONFIG = {
         'damage': 15,
         'reload_time': 270,        # Время перезарядки строго под длину анимации!
         'continuous': False,       # Одиночные выстрелы
-        'ammo_start': 7,
         'max_distance': 8,
         'folder_name': 'Colt',
         'sprite_prefix': 'COLT',
-        'max_distance': 2
+        'max_distance': 2,
+        'ammo_start': 30
+    },
+        'COCH': {
+        'name': 'Super Shotgun',
+        'class_name': 'NewWeapon',       # Используем наш универсальный класс
+        'damage': 80,                    # Огромный урон вблизи
+        'reload_time': 350,              # 5 кадров анимации * 70 мс скорость = 350 мс
+        'continuous': False,             # Одиночные выстрелы
+        'max_distance': 2,               # Эффективна только на ближней дистанции
+        'folder_name': 'COCH',           # Имя папки в resources/weapons/
+        'sprite_prefix': 'COCH',         # Префикс файлов картинок
+        'ammo_start': 30
     },
 
 
