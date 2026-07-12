@@ -169,6 +169,7 @@ WEAPON_CONFIG = {
         'sprite': 'resources/weapons/Pistol.png',
         'sound': 'resources/weapons/Pistol_shot.wav',
         'ammo_start': 40,
+        'max_distance': 4,
     },
     'Shotgun': {
         'name': 'Shotgun',
@@ -179,6 +180,7 @@ WEAPON_CONFIG = {
         'sprite': 'resources/weapons/Shotgun.png',
         'sound': 'resources/weapons/Shotgun_shot.wav',
         'ammo_start': 20,
+        'max_distance': 2,
     },
     'Machine Gun': {
         'name': 'Machine Gun',
@@ -189,6 +191,7 @@ WEAPON_CONFIG = {
         'sprite': 'resources/weapons/Machine Gun.png',
         'sound': 'resources/weapons/Machine Gun_shot.wav',
         'ammo_start': 300,
+        'max_distance': 5,
     },
     'Plasma Gun': {
         'name': 'Plasma Gun',
@@ -199,6 +202,7 @@ WEAPON_CONFIG = {
         'sprite': 'resources/weapons/Plasma Gun.png',
         'sound': 'resources/weapons/Plasma Gun_shot.wav',
         'ammo_start': 8,
+        'max_distance': 5,
     },
 }
 
