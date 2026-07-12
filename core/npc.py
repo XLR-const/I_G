@@ -75,13 +75,13 @@ class NPC:
         self.x, self.y = pos
         self.alive = True
         self.active = True
-        self.activation_distance = 15
+        self.activation_distance = 25
 
         self.state = "IDLE"
         self.state_timer = 0
 
         self.last_shot = 0
-        self.shoot_flash = 20
+        self.shoot_flash = 0
 
         sound_path = config.get('sound', 'resources/npc/npc_rifle.wav')
         sound_volume = config.get('sound_volume', 0.2)
@@ -190,6 +190,10 @@ class NPC:
 
         if dist > self.activation_distance:
             return
+        
+        if dist > self.activation_distance:
+            self.shoot_flash = 0
+            return
 
         dt = self.game.delta_time
         if dt > 0.033:
@@ -268,6 +272,12 @@ class NPC:
 
         x1, y1 = int(self.x), int(self.y)
         x2, y2 = int(self.game.player.x), int(self.game.player.y)
+
+        max_dist = self.activation_distance
+        dist = math.hypot(x2 - x1, y2 - y1)
+        if dist > max_dist:
+            self._cached_los = False
+            return False
 
         dx = abs(x2 - x1)
         dy = abs(y2 - y1)

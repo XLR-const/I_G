@@ -148,6 +148,8 @@ class Weapon:
         sin_a = math.sin(angle)
         cos_a = math.cos(angle)
 
+        MAX_SHOOT_DIST = 5
+        
         delta_dist_x = abs(1 / cos_a) if cos_a != 0 else 1e30
         delta_dist_y = abs(1 / sin_a) if sin_a != 0 else 1e30
 
@@ -166,7 +168,11 @@ class Weapon:
             side_dist_y = (y_map + 1.0 - oy) * delta_dist_y
 
         side = 0
-        while True:
+        dist = 0
+        steps = 0
+        max_steps = int(MAX_SHOOT_DIST * 10)
+        while steps < max_steps:
+            steps += 1
             if side_dist_x < side_dist_y:
                 side_dist_x += delta_dist_x
                 x_map += step_x

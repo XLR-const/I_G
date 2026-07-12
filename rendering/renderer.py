@@ -316,7 +316,7 @@ class Renderer:
         dy = npc.y - self.game.player.y
         dist = math.hypot(dx, dy)
         
-        if dist > 10:
+        if dist > 25:
             return
         
         theta = math.atan2(dy, dx)
