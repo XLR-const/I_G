@@ -69,25 +69,48 @@ class Weapon:
         if os.path.exists(config_file):
             self._parse_txt_config(config_file)
 
-        # 2. Строго перебираем алфавит от A до Z, чтобы гарантировать идеальный порядок кадров
+        # 2. Строго перебираем алфавит от A до Z
+        # Для буквы A мы проверим файлы от A1 до A9, чтобы собрать анимацию покоя
         for i in range(26):
             letter = chr(65 + i)  # 65 = 'A', 66 = 'B' и т.д.
-            filename = f"{self.sprite_prefix}{letter}0.png"
-            img_path = os.path.join(self.folder_path, filename)
             
-            if os.path.exists(img_path):
-                try:
-                    # Загружаем КАРТИНКУ в чистом виде, БЕЗ кортежей
-                    sprite = pygame.image.load(img_path).convert_alpha()
-                    w, h = sprite.get_size()
-                    sprite = pygame.transform.scale(sprite, (int(w * self.scale), int(h * self.scale)))
+            if letter == 'A':
+                # АНИМАЦИЯ ПОКОЯ: Ищем файлы вида PLASA1.png, PLASA2.png ... PLASA9.png
+                for num in range(1, 10):
+                    filename = f"{self.sprite_prefix}A{num}.png"
+                    img_path = os.path.join(self.folder_path, filename)
                     
-                    if letter == 'A':
+                    if os.path.exists(img_path):
+                        try:
+                            sprite = pygame.image.load(img_path).convert_alpha()
+                            w, h = sprite.get_size()
+                            sprite = pygame.transform.scale(sprite, (int(w * self.scale), int(h * self.scale)))
+                            self.idle_frames.append(sprite)
+                        except Exception as e:
+                            print(f"[Оружие] Ошибка чтения кадра покоя {filename}: {e}")
+                
+                # Если анимированных кадров нет, ищем старый добрый одиночный дефолт PLASA0.png
+                if not self.idle_frames:
+                    filename = f"{self.sprite_prefix}A0.png"
+                    img_path = os.path.join(self.folder_path, filename)
+                    if os.path.exists(img_path):
+                        sprite = pygame.image.load(img_path).convert_alpha()
+                        w, h = sprite.get_size()
+                        sprite = pygame.transform.scale(sprite, (int(w * self.scale), int(h * self.scale)))
                         self.idle_frames.append(sprite)
-                    else:
+            else:
+                # АНИМАЦИЯ ВЫСТРЕЛА: Оставляем старый стандарт (PLASB0.png, PLASC0.png)
+                filename = f"{self.sprite_prefix}{letter}0.png"
+                img_path = os.path.join(self.folder_path, filename)
+                
+                if os.path.exists(img_path):
+                    try:
+                        sprite = pygame.image.load(img_path).convert_alpha()
+                        w, h = sprite.get_size()
+                        sprite = pygame.transform.scale(sprite, (int(w * self.scale), int(h * self.scale)))
                         self.fire_frames.append(sprite)
-                except Exception as e:
-                    print(f"[Оружие] Ошибка чтения кадра {filename}: {e}")
+                    except Exception as e:
+                        print(f"[Оружие] Ошибка чтения кадра выстрела {filename}: {e}")
 
         # Защита от пустых анимаций
         if not self.fire_frames:
@@ -139,9 +162,11 @@ class Weapon:
                         self.frame_offsets[letter] = (x_shift, y_shift)
 
     def update_animation(self):
-        """Обновляет кадры анимации по таймеру"""
+        """Обновляет кадры анимации по таймеру (поддерживает циклическую анимацию покоя)"""
+        now = pygame.time.get_ticks()
+
         if self.reloading:
-            now = pygame.time.get_ticks()
+            # Анимация выстрела (останавливается, когда доходит до конца списка)
             if now - self.last_shot_time > self.animation_speed:
                 self.last_shot_time = now
                 self.frame_index += 1
@@ -151,9 +176,28 @@ class Weapon:
                     self.current_frames = self.idle_frames
                     self.frame_index = 0
                 
-                # Обновляем чистую картинку pygame.Surface для рендеринга и HUD
                 if self.current_frames and self.frame_index < len(self.current_frames):
                     self.sprite = self.current_frames[self.frame_index]
+        else:
+            # АНИМАЦИЯ ПОКОЯ (Мерцание колбы плазмагана)
+            # Если у оружия больше 1 кадра в стойке покое — крутим их по кругу бесконечно!
+            if len(self.idle_frames) > 1:
+                # Скорость мерцания молнии в колбе (60 мс — будет очень динамично)
+                idle_speed = 60 
+                
+                if now - self.last_shot_time > idle_speed:
+                    self.last_shot_time = now
+                    # Увеличиваем индекс кадра
+                    self.frame_index += 1
+                    # Зацикливаем индекс: если дошли до конца, сбрасываем в 0
+                    self.frame_index %= len(self.idle_frames)
+                    
+                    self.sprite = self.idle_frames[self.frame_index]
+            else:
+                # Если кадр всего один (как у автомата или кольта) — просто всегда держим его
+                self.frame_index = 0
+                self.sprite = self.idle_frames[0]
+
 
     def fire(self):
         """Выполняет выстрел с использованием честного луча DDA"""

@@ -63,6 +63,14 @@ SYMBOLS_CONFIG = {
         'sprite': 'resources/weapons/COCH/icon.png',  # Иконка двустволки
         'description': 'Двустволка Super Shotgun (+4 патрона)'
     },
+    'p': {
+        'type': 'item',
+        'item_type': 'weapon',
+        'weapon_name': 'PLASMA',
+        'ammo': 1,
+        'sprite': 'resources/weapons/PLASMA/icon.png',
+        'description': 'PLASMA'
+    },
 
     
     # Дверь
@@ -154,50 +162,6 @@ NPC_CONFIG = {
 # КОНФИГУРАЦИЯ ОРУЖИЯ
 # ============================================================
 WEAPON_CONFIG = {
-    'Pistol': {
-        'name': 'Pistol',
-        'class_name': 'Pistol',
-        'damage': 10,
-        'reload_time': 150,
-        'continuous': False,
-        'sprite': 'resources/weapons/Pistol.png',
-        'sound': 'resources/weapons/Pistol_shot.wav',
-        'ammo_start': 40,
-        'max_distance': 4,
-    },
-    'Shotgun': {
-        'name': 'Shotgun',
-        'class_name': 'Shotgun',
-        'damage': 50,
-        'reload_time': 800,
-        'continuous': False,
-        'sprite': 'resources/weapons/Shotgun.png',
-        'sound': 'resources/weapons/Shotgun_shot.wav',
-        'ammo_start': 20,
-        'max_distance': 2,
-    },
-    'Machine Gun': {
-        'name': 'Machine Gun',
-        'class_name': 'MachineGun',
-        'damage': 10,
-        'reload_time': 90,
-        'continuous': True,
-        'sprite': 'resources/weapons/Machine Gun.png',
-        'sound': 'resources/weapons/Machine Gun_shot.wav',
-        'ammo_start': 300,
-        'max_distance': 5,
-    },
-    'Plasma Gun': {
-        'name': 'Plasma Gun',
-        'class_name': 'PlasmaGun',
-        'damage': 100,
-        'reload_time': 400,
-        'continuous': False,
-        'sprite': 'resources/weapons/Plasma Gun.png',
-        'sound': 'resources/weapons/Plasma Gun_shot.wav',
-        'ammo_start': 8,
-        'max_distance': 5,
-    },
         'AK-47': {
         'name': 'AK-47',
         'class_name': 'NewWeapon',       # Используем наш новый универсальный класс
@@ -225,7 +189,7 @@ WEAPON_CONFIG = {
         'COCH': {
         'name': 'Super Shotgun',
         'class_name': 'NewWeapon',       # Используем наш универсальный класс
-        'damage': 80,                    # Огромный урон вблизи
+        'damage': 50,                    # Огромный урон вблизи
         'reload_time': 350,              # 5 кадров анимации * 70 мс скорость = 350 мс
         'continuous': False,             # Одиночные выстрелы
         'max_distance': 2,               # Эффективна только на ближней дистанции
@@ -233,6 +197,17 @@ WEAPON_CONFIG = {
         'sprite_prefix': 'COCH',         # Префикс файлов картинок
         'ammo_start': 30
     },
+        'PLASMA': {
+            'name': 'Plasma Gun',
+            'damage': 75,
+            'reload_time': 350,
+            'continuous': False,
+            'max_distance': 6,
+            'folder_name': 'PLASMA',
+            'sprite_prefix': 'PLASMA',
+            'ammo_start': 1
+            
+        }
 
 
 }
