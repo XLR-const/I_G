@@ -97,7 +97,7 @@ class GameStub:
 
 
 def create_npc(game, npc_type, x, y):
-    from core.npc import Solder, Kamikaze, Jaggernaut, Lightning, Boss
+    from core.npc_old import Solder, Kamikaze, Jaggernaut, Lightning, Boss
     npc_classes = {'2': Solder, '3': Kamikaze, '4': Jaggernaut, '5': Lightning, '6': Boss}
     if npc_type in npc_classes:
         npc = npc_classes[npc_type](game, pos=(x + 0.5, y + 0.5))
