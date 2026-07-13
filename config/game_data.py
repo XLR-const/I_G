@@ -38,38 +38,40 @@ SYMBOLS_CONFIG = {
         'sprite': 'resources/items/armor.png',
         'description': 'Броня (+25 Armor)'
     },
-        'p': {
+    
+    'k': {
         'type': 'item',
         'item_type': 'weapon',
-        'weapon_name': 'Pistol',
-        'ammo': 8,
-        'sprite': 'resources/items/pistol.png',
-        'description': 'Пистолет (+20 патронов)'
+        'weapon_name': 'AK-47',
+        'ammo': 30,
+        'sprite': 'resources/weapons/AK47/icon.png',  # Используем готовую иконку из папки пушки!
+        'description': 'Автомат АК-47 (+30 патронов)'
     },
-    's': {
+    'c': {
         'type': 'item',
         'item_type': 'weapon',
-        'weapon_name': 'Shotgun',
-        'ammo': 4,
-        'sprite': 'resources/items/shotgun.png',
-        'description': 'Дробовик (+10 патронов)'
-    },
-    'm': {
-        'type': 'item',
-        'item_type': 'weapon',
-        'weapon_name': 'Machine Gun',
-        'ammo': 50,
-        'sprite': 'resources/items/machine_gun.png',
-        'description': 'Автомат (+150 патронов)'
+        'weapon_name': 'COLT',
+        'ammo': 15,
+        'sprite': 'resources/weapons/Colt/icon.png',  # Иконка Кольта
+        'description': 'Пистолет Colt 1911 (+7 патронов)'
     },
     'g': {
         'type': 'item',
         'item_type': 'weapon',
-        'weapon_name': 'Plasma Gun',
-        'ammo': 1,
-        'sprite': 'resources/items/plasma_gun.png',
-        'description': 'Плазмаган (+4 патрона)'
+        'weapon_name': 'COCH',
+        'ammo': 4,
+        'sprite': 'resources/weapons/COCH/icon.png',  # Иконка двустволки
+        'description': 'Двустволка Super Shotgun (+4 патрона)'
     },
+    'p': {
+        'type': 'item',
+        'item_type': 'weapon',
+        'weapon_name': 'PLASMA',
+        'ammo': 1,
+        'sprite': 'resources/weapons/PLASMA/icon.png',
+        'description': 'PLASMA'
+    },
+
     
     # Дверь
     'D': {'type': 'door', 'texture': 'resources/textures/D.png'},
@@ -160,50 +162,54 @@ NPC_CONFIG = {
 # КОНФИГУРАЦИЯ ОРУЖИЯ
 # ============================================================
 WEAPON_CONFIG = {
-    'Pistol': {
-        'name': 'Pistol',
-        'class_name': 'Pistol',
-        'damage': 10,
-        'reload_time': 150,
-        'continuous': False,
-        'sprite': 'resources/weapons/Pistol.png',
-        'sound': 'resources/weapons/Pistol_shot.wav',
-        'ammo_start': 40,
-        'max_distance': 4,
+        'AK-47': {
+        'name': 'AK-47',
+        'class_name': 'NewWeapon',       # Используем наш новый универсальный класс
+        'damage': 25,
+        'reload_time': 240,              # 4 кадра анимации * 60 мс скорость = 240 мс
+        'continuous': True,              # Автоматическая стрельба (зажим)
+        'ammo_start': 30,
+        'max_distance': 12,              # Автомат стреляет дальше пистолета и плазмы
+        'folder_name': 'AK47',           # Точное имя папки из resources/weapons/
+        'sprite_prefix': 'AK47',
+        'max_distance': 5
     },
-    'Shotgun': {
-        'name': 'Shotgun',
-        'class_name': 'Shotgun',
-        'damage': 50,
-        'reload_time': 800,
-        'continuous': False,
-        'sprite': 'resources/weapons/Shotgun.png',
-        'sound': 'resources/weapons/Shotgun_shot.wav',
-        'ammo_start': 20,
+        'COLT': {
+        'name': 'Colt 1911',
+        'class_name': 'NewWeapon',
+        'damage': 15,
+        'reload_time': 270,        # Время перезарядки строго под длину анимации!
+        'continuous': False,       # Одиночные выстрелы
+        'max_distance': 8,
+        'folder_name': 'COLT',
+        'sprite_prefix': 'COLT',
         'max_distance': 2,
+        'ammo_start': 30
     },
-    'Machine Gun': {
-        'name': 'Machine Gun',
-        'class_name': 'MachineGun',
-        'damage': 10,
-        'reload_time': 90,
-        'continuous': True,
-        'sprite': 'resources/weapons/Machine Gun.png',
-        'sound': 'resources/weapons/Machine Gun_shot.wav',
-        'ammo_start': 300,
-        'max_distance': 5,
+        'COCH': {
+        'name': 'Super Shotgun',
+        'class_name': 'NewWeapon',       # Используем наш универсальный класс
+        'damage': 50,                    # Огромный урон вблизи
+        'reload_time': 350,              # 5 кадров анимации * 70 мс скорость = 350 мс
+        'continuous': False,             # Одиночные выстрелы
+        'max_distance': 2,               # Эффективна только на ближней дистанции
+        'folder_name': 'COCH',           # Имя папки в resources/weapons/
+        'sprite_prefix': 'COCH',         # Префикс файлов картинок
+        'ammo_start': 30
     },
-    'Plasma Gun': {
-        'name': 'Plasma Gun',
-        'class_name': 'PlasmaGun',
-        'damage': 100,
-        'reload_time': 400,
-        'continuous': False,
-        'sprite': 'resources/weapons/Plasma Gun.png',
-        'sound': 'resources/weapons/Plasma Gun_shot.wav',
-        'ammo_start': 8,
-        'max_distance': 5,
-    },
+        'PLASMA': {
+            'name': 'Plasma Gun',
+            'damage': 75,
+            'reload_time': 350,
+            'continuous': False,
+            'max_distance': 6,
+            'folder_name': 'PLASMA',
+            'sprite_prefix': 'PLASMA',
+            'ammo_start': 1
+            
+        }
+
+
 }
 
 # ============================================================

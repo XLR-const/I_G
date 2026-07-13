@@ -4,6 +4,7 @@ import pygame
 import math
 from setting import *
 from config.game_data import SYMBOLS_CONFIG
+from core.weapon import Weapon
 
 
 class Item:
@@ -226,44 +227,36 @@ class WeaponItem(Item):
         # Получаем инвентарь из level_manager
         inventory = self.game.level_manager.inventory
         if inventory is None:
-            #print("[Оружие] Ошибка: инвентарь не найден")
             return False
 
         # Проверяем, есть ли уже такое оружие в инвентаре
         weapon_found = None
         for weapon in inventory:
-            if weapon.name == self.weapon_name:
+            # ИСПРАВЛЕНИЕ: Сверяем системные weapon_name ('Colt' == 'Colt'), 
+            # чтобы избежать дублирования из-за разных красивых имен на экране
+            if weapon.weapon_name == self.weapon_name:
                 weapon_found = weapon
                 break
 
         if weapon_found:
-            # Оружие уже есть → добавляем патроны
+            # Оружие уже есть → просто добавляем патроны в существующий ствол
             weapon_found.ammo += self.ammo
             self.alive = False
-            #print(f"[Оружие] +{self.ammo} патронов для {self.weapon_name}")
             return True
         else:
-            # Оружия нет → добавляем в инвентарь
-            from core.weapon import Pistol, Shotgun, MachineGun, PlasmaGun
-            weapon_classes = {
-                'Pistol': Pistol,
-                'Shotgun': Shotgun,
-                'Machine Gun': MachineGun,
-                'Plasma Gun': PlasmaGun,
-            }
+            # Оружия нет → добавляем в инвентарь через универсальный класс Weapon
+            from core.weapon import Weapon
+            
+            new_weapon = Weapon(self.game, self.weapon_name)
+            new_weapon.ammo = self.ammo
+            inventory.append(new_weapon)
+            
+            # Если это первая пушка или в руках у игрока пусто — сразу даем ее в руки
+            if len(inventory) == 1 or self.game.weapon is None:
+                self.game.weapon = new_weapon
+                self.game.level_manager.current_weapon_index = len(inventory) - 1
 
-            if self.weapon_name in weapon_classes:
-                new_weapon = weapon_classes[self.weapon_name](self.game)
-                new_weapon.ammo = self.ammo
-                inventory.append(new_weapon)
-                
-                # Если это первое оружие в инвентаре — делаем его активным
-                if len(inventory) == 1:
-                    self.game.weapon = new_weapon
-                    self.game.level_manager.current_weapon_index = 0
+            self.alive = False
+            return True
 
-                self.alive = False
-                #print(f"[Оружие] Получено: {self.weapon_name} (+{self.ammo} патронов)")
-                return True
 
-        return False
