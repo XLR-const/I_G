@@ -8,7 +8,7 @@ from core.particle import Particle
 
 
 class Weapon:
-    """Класс оружия с автозагрузкой из папок"""
+    """Класс оружия с автозагрузкой из папок и монотонной покадровой анимацией"""
 
     def __init__(self, game, weapon_name):
         self.game = game
@@ -40,12 +40,12 @@ class Weapon:
         self.animation_speed = 60
         self.frame_offsets = {}
 
-        # Контейнеры для анимации
+        # Контейнеры для анимации (хранят ТОЛЬКО чистые pygame.Surface)
         self.idle_frames = []
         self.fire_frames = []
         self.current_frames = []
         
-        # Свойство self.sprite теперь хранит чистый pygame.Surface для HUD
+        # Текущий отображаемый спрайт для HUD интерфейса
         self.sprite = None
 
         # Звук
@@ -59,7 +59,7 @@ class Weapon:
             self._load_weapon_data()
 
     def _load_weapon_data(self):
-        """Загружает всё из папки оружия"""
+        """Загружает всё из папки оружия с гарантированным порядком кадров от A до Z"""
         if not os.path.exists(self.folder_path):
             print(f"[Оружие] Папка не найдена: {self.folder_path}")
             return
@@ -69,22 +69,25 @@ class Weapon:
         if os.path.exists(config_file):
             self._parse_txt_config(config_file)
 
-        # 2. Загружаем кадры
-        files = sorted(os.listdir(self.folder_path))
-        for file in files:
-            if file.startswith(self.sprite_prefix) and file.endswith('.png'):
-                img_path = os.path.join(self.folder_path, file)
-                sprite = pygame.image.load(img_path).convert_alpha()
-
-                w, h = sprite.get_size()
-                sprite = pygame.transform.scale(sprite, (int(w * self.scale), int(h * self.scale)))
-
-                frame_letter = file[len(self.sprite_prefix)]
-                # Сохраняем картинку вместе с её буквой в кортеж
-                if frame_letter == 'A':
-                    self.idle_frames.append((sprite, frame_letter))
-                else:
-                    self.fire_frames.append((sprite, frame_letter))
+        # 2. Строго перебираем алфавит от A до Z, чтобы гарантировать идеальный порядок кадров
+        for i in range(26):
+            letter = chr(65 + i)  # 65 = 'A', 66 = 'B' и т.д.
+            filename = f"{self.sprite_prefix}{letter}0.png"
+            img_path = os.path.join(self.folder_path, filename)
+            
+            if os.path.exists(img_path):
+                try:
+                    # Загружаем КАРТИНКУ в чистом виде, БЕЗ кортежей
+                    sprite = pygame.image.load(img_path).convert_alpha()
+                    w, h = sprite.get_size()
+                    sprite = pygame.transform.scale(sprite, (int(w * self.scale), int(h * self.scale)))
+                    
+                    if letter == 'A':
+                        self.idle_frames.append(sprite)
+                    else:
+                        self.fire_frames.append(sprite)
+                except Exception as e:
+                    print(f"[Оружие] Ошибка чтения кадра {filename}: {e}")
 
         # Защита от пустых анимаций
         if not self.fire_frames:
@@ -92,21 +95,20 @@ class Weapon:
         if not self.idle_frames:
             fallback = pygame.Surface((100, 100))
             fallback.fill((200, 0, 0))
-            self.idle_frames = [(fallback, 'A')]
-            self.fire_frames = [(fallback, 'A')]
+            self.idle_frames = [fallback]
+            self.fire_frames = [fallback]
 
         self.current_frames = self.idle_frames
-        # Записываем чистую картинку первого кадра для HUD интерфейса
-        self.sprite = self.idle_frames[0][0] if self.idle_frames else None
+        self.sprite = self.idle_frames[0] if self.idle_frames else None
 
-        # 3. Загружаем звук
+        # 3. Загружаем динамический звук выстрела из папки пушки
         sound_path = os.path.join(self.folder_path, 'shot.wav')
         if os.path.exists(sound_path):
             try:
                 self.sound = pygame.mixer.Sound(sound_path)
                 self.sound.set_volume(0.2)
             except Exception as e:
-                print(f"[Оружие] Ошибка загрузки звука: {e}")
+                print(f"[Оружие] Ошибка загрузки звука выстрела: {e}")
                 self.sound = self.sound_empty_ammo
         else:
             self.sound = self.sound_empty_ammo
@@ -137,7 +139,7 @@ class Weapon:
                         self.frame_offsets[letter] = (x_shift, y_shift)
 
     def update_animation(self):
-        """Обновляет анимацию"""
+        """Обновляет кадры анимации по таймеру"""
         if self.reloading:
             now = pygame.time.get_ticks()
             if now - self.last_shot_time > self.animation_speed:
@@ -148,13 +150,13 @@ class Weapon:
                     self.reloading = False
                     self.current_frames = self.idle_frames
                     self.frame_index = 0
-                    
-                # Обновляем текстуру для HUD (берем только картинку из кортежа)
+                
+                # Обновляем чистую картинку pygame.Surface для рендеринга и HUD
                 if self.current_frames and self.frame_index < len(self.current_frames):
-                    self.sprite = self.current_frames[self.frame_index][0]
+                    self.sprite = self.current_frames[self.frame_index]
 
     def fire(self):
-        """Выстрел"""
+        """Выполняет выстрел с использованием честного луча DDA"""
         if self.reloading or self.ammo <= 0:
             if self.ammo <= 0:
                 self.sound_empty_ammo.play()
@@ -162,48 +164,33 @@ class Weapon:
 
         self.reloading = True
         self.last_shot_time = pygame.time.get_ticks()
+        
+        # Переключаемся на непрерывную ленту выстрела
         self.current_frames = self.fire_frames
         self.frame_index = 0
-        
-        # Переключаем картинку HUD на первый кадр вспышки выстрела
         if self.fire_frames:
-            self.sprite = self.fire_frames[0][0]
+            self.sprite = self.fire_frames[0]  # Гарантированно берем ПЕРВЫЙ кадр выстрела (вспышку)
 
         self.sound.play()
         self.ammo -= 1
 
+        # Запускаем луч выстрела (DDA)
         hit_x, hit_y, dist, side = self._get_hit_pos()
 
-        # Попадания в NPC
-        for npc in self.game.npcs:
-            if not npc.alive:
-                continue
-
-            dx = npc.x - self.game.player.x
-            dy = npc.y - self.game.player.y
-            dist_npc = math.hypot(dx, dy)
-
-            theta = math.atan2(dy, dx)
-            delta = theta - self.game.player.angle
-            delta = (delta + math.pi) % math.tau - math.pi
-
-            view_width = 0.3 / dist_npc
-
-            if abs(delta) < view_width and dist_npc < dist and math.cos(delta) > 0:
-                npc.get_damage(self.damage)
-
-        # Частицы
+        # Спавним искры или кровь в точке попадания
+        particle_color = (200, 0, 0) if side == -1 else (255, 200, 50)
+        
         for _ in range(10):
             p_x = hit_x + uniform(-0.02, 0.02)
             p_y = hit_y + uniform(-0.02, 0.02)
             self.game.particles.append(
-                Particle(self.game, (p_x, p_y), (255, 200, 50), uniform(0.001, 0.005))
+                Particle(self.game, (p_x, p_y), particle_color, uniform(0.001, 0.005))
             )
 
         return hit_x, hit_y, dist, side
 
     def _get_hit_pos(self):
-        """DDA с ограничением по дистанции"""
+        """Улучшенный DDA алгоритм: считает точку попадания пули с учетом стен и врагов"""
         ox, oy = self.game.player.x, self.game.player.y
         x_map, y_map = int(ox), int(oy)
         angle = self.game.player.angle
@@ -211,7 +198,6 @@ class Weapon:
         cos_a = math.cos(angle)
 
         max_dist = self.max_distance
-
         delta_dist_x = abs(1 / cos_a) if cos_a != 0 else 1e30
         delta_dist_y = abs(1 / sin_a) if sin_a != 0 else 1e30
 
@@ -230,8 +216,10 @@ class Weapon:
             side_dist_y = (y_map + 1.0 - oy) * delta_dist_y
 
         side = 0
+        dist = 0
         steps = 0
         max_steps = int(max_dist * 10)
+        npc_hit = None
 
         while steps < max_steps:
             steps += 1
@@ -244,8 +232,26 @@ class Weapon:
                 y_map += step_y
                 side = 1
 
-            if (x_map, y_map) in self.game.map.world_map:
+            # Проверка на врага
+            for npc in self.game.npcs:
+                if npc.alive and int(npc.x) == x_map and int(npc.y) == y_map:
+                    npc_hit = npc
+                    break
+            
+            if npc_hit:
                 break
+
+            # Проверка на стену через числовую матрицу
+            if 0 <= x_map < self.game.map.numeric_grid.shape[1] and 0 <= y_map < self.game.map.numeric_grid.shape[0]:
+                cell_value = self.game.map.numeric_grid[y_map, x_map]
+                if cell_value > 0:
+                    door_id = getattr(self.game.raycasting, 'door_id', -1)
+                    if cell_value == door_id:
+                        door_offset = self.game.map.door_states[y_map, x_map]
+                        if door_offset < 0.8:
+                            break
+                    else:
+                        break
 
         if side == 0:
             dist = side_dist_x - delta_dist_x
@@ -255,26 +261,32 @@ class Weapon:
         hit_x = ox + dist * cos_a
         hit_y = oy + dist * sin_a
 
+        if npc_hit:
+            npc_hit.get_damage(self.damage)
+            return hit_x, hit_y, dist, -1
+
         return hit_x, hit_y, dist, side
 
     def draw(self):
-        """Рисует оружие на экране"""
+        """Рисует оружие на экране с точным вычислением букв отдачи"""
         self.update_animation()
 
         if self.sprite is None:
             return
 
-        # self.sprite теперь всегда хранит чистую картинку pygame.Surface
+        # self.sprite — это гарантированно чистый pygame.Surface,get_size() сработает идеально
         sw, sh = self.sprite.get_size()
 
-        # Базовая позиция по центру низа экрана
+        # Базовая позиция по центру низа экрана с учетом базовых сдвигов из config.txt
         x = WIDTH // 2 - sw // 2 + self.offset_x
         y = HEIGHT - sh + self.offset_y
 
         # Рассчитываем покадровое смещение отдачи
-        if self.current_frames and self.frame_index < len(self.current_frames):
-            # Извлекаем букву кадра напрямую из кортежа текущего кадра
-            letter = self.current_frames[self.frame_index][1]
+        # Отдача применяется только в тот момент, когда мы проигрываем анимацию выстрела
+        if self.current_frames == self.fire_frames and self.frame_index < len(self.current_frames):
+            # Переводим текущий индекс кадра обратно в Doom-букву кадра выстрела
+            # Индекс 0 превращается в 'B' (ASCII 66), индекс 1 в 'C' (ASCII 67) и так далее
+            letter = chr(66 + self.frame_index)
             
             if letter in self.frame_offsets:
                 fx, fy = self.frame_offsets[letter]
@@ -282,3 +294,4 @@ class Weapon:
                 y += fy
 
         self.game.screen.blit(self.sprite, (x, y))
+
