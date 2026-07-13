@@ -6,7 +6,7 @@ from setting import *
 from core.map import Map
 from core.player import Player
 from core.npc import Solder, Kamikaze, Jaggernaut, Lightning, Boss
-from core.weapon import Pistol, Shotgun, MachineGun, PlasmaGun, NewWeapon
+from core.weapon import Weapon
 from config.game_data import NPC_CONFIG, WEAPON_CONFIG, SYMBOLS_CONFIG
 from core.item import *
 import numpy as np
@@ -130,34 +130,53 @@ class LevelManager:
             return False
 
         self.inventory = []
-        for weapon_name in level_data.get('inventory', ['Pistol']):
-            config = WEAPON_CONFIG.get(weapon_name)
-            if not config:
-                continue
+        
+        # Читаем инвентарь из JSON. Если ключа нет — по умолчанию выдаем список с 'Colt'
+        start_weapons = level_data.get('inventory', ['Colt'])
+        
+        # Защита на случай, если в JSON ключ 'inventory' есть, но он записан как пустой массив []
+        if not start_weapons:
+            start_weapons = ['Colt']
+        
+        for weapon_name in start_weapons:
+            # Проверяем, существует ли вообще такая пушка в нашем WEAPON_CONFIG
+            if weapon_name in WEAPON_CONFIG:
+                # Создаем пушку через наш единый универсальный класс Weapon
+                weapon = Weapon(self.game, weapon_name)
+                self.inventory.append(weapon)
 
-            class_name = config.get('class_name')
-            if not class_name:
-                continue
-
-            weapon_class = globals().get(class_name)
-            if not weapon_class:
-                continue
-
-            # ============================================================
-            # ЕСЛИ ЭТО NewWeapon — передаём weapon_name
-            # ============================================================
-            if class_name == 'NewWeapon':
-                weapon = weapon_class(self.game, weapon_name)
-            else:
-                weapon = weapon_class(self.game)
-            
-            self.inventory.append(weapon)
-
+        # Финальная защита: если инвентарь все еще пуст (например, 'Colt' удален из WEAPON_CONFIG)
         if not self.inventory:
-            self.inventory = [Pistol(self.game)]
+            if 'Colt' in WEAPON_CONFIG:
+                self.inventory.append(Weapon(self.game, 'Colt'))
+            else:
+                # Берем первую попавшуюся пушку из конфига, чтобы игра никогда не падала
+                first_weapon_name = list(WEAPON_CONFIG.keys())[0]
+                self.inventory.append(Weapon(self.game, first_weapon_name))
 
+        # Делаем активным самое первое оружие из списка инвентаря
         self.current_weapon_index = 0
-        self.weapon = self.inventory[0]
+        
+        if len(self.inventory) > 0:
+            active_weapon = self.inventory[0]
+            
+            # Записываем оружие в менеджер уровней
+            self.weapon = active_weapon 
+            
+            # Записываем оружие в главный класс игры
+            self.game.weapon = active_weapon 
+            
+            # Записываем оружие напрямую в объект игрока
+            if hasattr(self.game, 'player') and self.game.player is not None:
+                self.game.player.weapon = active_weapon
+                
+                # Если у игрока есть свой массив инвентаря, синхронизируем и его
+                if hasattr(self.game.player, 'inventory'):
+                    self.game.player.inventory = self.inventory
+        else:
+            self.game.weapon = None
+            if hasattr(self.game, 'player') and self.game.player is not None:
+                self.game.player.weapon = None
 
         self.npcs = []
         for npc_x, npc_y, npc_type in self.map.npc_positions:

@@ -220,8 +220,12 @@ class Renderer:
     def draw_interface(self):
         """Рисует интерфейс: полоску здоровья, оружие, патроны"""
         hp = self.game.player.hp
-        current_weapon = self.game.weapon.name
-        ammo = self.game.weapon.ammo
+        if self.game.weapon:
+            current_weapon = self.game.weapon.name
+            ammo = self.game.weapon.ammo
+        else:
+            current_weapon = "Fists"
+            ammo = 0
         font_path = 'resources/fonts/Fy.ttf'
         
         health_bar_pos = grid_to_pixel(1, 16)

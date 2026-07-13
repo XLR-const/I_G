@@ -38,31 +38,7 @@ SYMBOLS_CONFIG = {
         'sprite': 'resources/items/armor.png',
         'description': 'Броня (+25 Armor)'
     },
-        'p': {
-        'type': 'item',
-        'item_type': 'weapon',
-        'weapon_name': 'Pistol',
-        'ammo': 8,
-        'sprite': 'resources/items/pistol.png',
-        'description': 'Пистолет (+20 патронов)'
-    },
-    's': {
-        'type': 'item',
-        'item_type': 'weapon',
-        'weapon_name': 'Shotgun',
-        'ammo': 4,
-        'sprite': 'resources/items/shotgun.png',
-        'description': 'Дробовик (+10 патронов)'
-    },
-    'm': {
-        'type': 'item',
-        'item_type': 'weapon',
-        'weapon_name': 'Machine Gun',
-        'ammo': 50,
-        'sprite': 'resources/items/machine_gun.png',
-        'description': 'Автомат (+150 патронов)'
-    },
-        # Предметы: Новое оружие на полу
+    
     'k': {
         'type': 'item',
         'item_type': 'weapon',
@@ -75,7 +51,7 @@ SYMBOLS_CONFIG = {
         'type': 'item',
         'item_type': 'weapon',
         'weapon_name': 'COLT',
-        'ammo': 7,
+        'ammo': 15,
         'sprite': 'resources/weapons/Colt/icon.png',  # Иконка Кольта
         'description': 'Пистолет Colt 1911 (+7 патронов)'
     },
