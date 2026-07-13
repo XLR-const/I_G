@@ -268,30 +268,60 @@ class Weapon:
         return hit_x, hit_y, dist, side
 
     def draw(self):
-        """Рисует оружие на экране с точным вычислением букв отдачи"""
+        """Рисует оружие на экране с точным вычислением букв отдачи и покачиванием на основе движения"""
         self.update_animation()
 
         if self.sprite is None:
             return
 
-        # self.sprite — это гарантированно чистый pygame.Surface,get_size() сработает идеально
+        # Получаем чистый размер картинки pygame.Surface
         sw, sh = self.sprite.get_size()
 
-        # Базовая позиция по центру низа экрана с учетом базовых сдвигов из config.txt
+        # 1. БАЗОВАЯ ПОЗИЦИЯ (Центр низа экрана с учетом сдвигов из config.txt)
         x = WIDTH // 2 - sw // 2 + self.offset_x
         y = HEIGHT - sh + self.offset_y
 
-        # Рассчитываем покадровое смещение отдачи
-        # Отдача применяется только в тот момент, когда мы проигрываем анимацию выстрела
+        # ============================================================
+        # МЕХАНИКА ПОКАЧИВАНИЯ ОРУЖИЯ (WEAPON BOBBING НА ОСНОВЕ СКОРОСТИ)
+        # ============================================================
+        # Заставляем пушку качаться, только если игрок НЕ стреляет
+        if not self.reloading:
+            # Получаем текущее время
+            time_ms = pygame.time.get_ticks()
+
+            # Проверяем, двигается ли игрок на самом деле.
+            # Если в вашем классе Player переменная скорости называется по-другому, 
+            # мы используем универсальную проверку: нажимаются ли клавиши ходьбы.
+            # Но чтобы это работало ВЕЗДЕ, мы вынесем опрос кнопок напрямую через pygame
+            keys = pygame.key.get_pressed()
+            is_moving = (keys[pygame.K_w] or keys[pygame.K_s] or keys[pygame.K_a] or keys[pygame.K_d] or
+                         keys[pygame.K_UP] or keys[pygame.K_DOWN] or keys[pygame.K_LEFT] or keys[pygame.K_RIGHT])
+
+            if is_moving:
+                # Скорость покачивания (частота синусоиды)
+                bob_speed = 0.001 
+                
+                # Амплитуда покачивания в пикселях (сделайте больше, если незаметно!)
+                bob_amplitude_x = 25  # Сдвиг влево-вправо
+                bob_amplitude_y = 15  # Сдвиг вверх-вниз
+
+                # Математика классического Doom (рисует "восьмерку")
+                bob_x = math.sin(time_ms * bob_speed) * bob_amplitude_x
+                bob_y = abs(math.cos(time_ms * bob_speed * 2)) * bob_amplitude_y
+
+                # Вносим коррективы в финальные координаты
+                x += int(bob_x)
+                y += int(bob_y)
+        # ============================================================
+
+        # 2. РАСЧЕТ ИНДИВИДУАЛЬНОЙ ОТДАЧИ КАДРОВ ПРИ ВЫСТРЕЛЕ
         if self.current_frames == self.fire_frames and self.frame_index < len(self.current_frames):
-            # Переводим текущий индекс кадра обратно в Doom-букву кадра выстрела
-            # Индекс 0 превращается в 'B' (ASCII 66), индекс 1 в 'C' (ASCII 67) и так далее
             letter = chr(66 + self.frame_index)
-            
             if letter in self.frame_offsets:
                 fx, fy = self.frame_offsets[letter]
                 x += fx
                 y += fy
 
+        # Финальный вывод пушки на экран
         self.game.screen.blit(self.sprite, (x, y))
 

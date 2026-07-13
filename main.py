@@ -138,7 +138,7 @@ class Game:
         self.player.update_regen()
         pygame.display.set_caption(f'FPS: {self.clock.get_fps():.1f}')
 
-    def draw(self):
+    def draw_classic(self):
         """Отрисовывает игру"""
         self.renderer.draw_background()
         self.raycasting.ray_cast()
@@ -178,6 +178,63 @@ class Game:
         self.console.draw(self.screen)
 
         pygame.display.flip()
+        
+    def draw(self):
+        """Рисует оружие на экране с точным вычислением букв отдачи и покачиванием при ходьбе (Bobbing)"""
+        self.update_animation()
+
+        if self.sprite is None:
+            return
+
+        # Получаем чистый размер картинки pygame.Surface
+        sw, sh = self.sprite.get_size()
+
+        # 1. БАЗОВАЯ ПОЗИЦИЯ (Центр низа экрана с учетом сдвигов из config.txt)
+        x = WIDTH // 2 - sw // 2 + self.offset_x
+        y = HEIGHT - sh + self.offset_y
+
+        # ============================================================
+        # МЕХАНИКА ПОКАЧИВАНИЯ ОРУЖИЯ (WEAPON BOBBING КАК В DOOM)
+        # ============================================================
+        # Проверяем, нажимает ли игрок клавиши ходьбы (WASD / стрелочки)
+        keys = pygame.key.get_pressed()
+        is_moving = keys[pygame.K_w] or keys[pygame.K_s] or keys[pygame.K_a] or keys[pygame.K_d] or \
+                    keys[pygame.K_UP] or keys[pygame.K_DOWN] or keys[pygame.K_LEFT] or keys[pygame.K_RIGHT]
+
+        # Покачивание работает только если игрок идет И пушка НЕ перезаряжается/не стреляет
+        if is_moving and not self.reloading:
+            time_ms = pygame.time.get_ticks()
+            
+            # Частота покачивания (скорость движения из стороны в сторону)
+            bob_speed = 0.008 
+            
+            # Амплитуда покачивания (на сколько пикселей пушка улетает вбок и вниз)
+            bob_amplitude_x = 18  # движение влево-вправо
+            bob_amplitude_y = 10  # движение вверх-вниз
+
+            # Математика Doom: по горизонтали пушка качается с обычной частотой,
+            # а по вертикали — с удвоенной (рисует плавную "восьмерку" или бесконечность)
+            bob_x = math.sin(time_ms * bob_speed) * bob_amplitude_x
+            bob_y = abs(math.cos(time_ms * bob_speed * 2)) * bob_amplitude_y
+
+            x += int(bob_x)
+            y += int(bob_y)
+        # ============================================================
+
+        # 2. РАСЧЕТ ИНДИВИДУАЛЬНОЙ ОТДАЧИ КАДРОВ ПРИ ВЫСТРЕЛЕ
+        # (Если идет стрельба, отдача перекрывает покачивание от ходьбы)
+        if self.current_frames == self.fire_frames and self.frame_index < len(self.current_frames):
+            # Индекс 0 = 'B', индекс 1 = 'C' и т.д.
+            letter = chr(66 + self.frame_index)
+            
+            if letter in self.frame_offsets:
+                fx, fy = self.frame_offsets[letter]
+                x += fx
+                y += fy
+
+        # Финальный вывод пушки на экран
+        self.game.screen.blit(self.sprite, (x, y))
+
 
 
     def handle_events(self):
