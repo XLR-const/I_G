@@ -171,13 +171,29 @@ class Toolbar:
         return self._create_surface(symbol, (60, 60, 70))
 
     def _load_npc_sprite(self, name):
+        """Загружает спрайт NPC по новой системе (NpcName_move_front_1.png)"""
         try:
-            path = os.path.join(NPC_DIR, name, f"{name}_idle_front.png")
+            # ============================================================
+            # НОВАЯ СИСТЕМА: ищем NpcName_move_front_1.png
+            # ============================================================
+            path = os.path.join(NPC_DIR, name, f"{name}_move_front_1.png")
             if os.path.exists(path):
                 surf = pygame.image.load(path).convert_alpha()
-                return pygame.transform.scale(surf, (32, 32))
-        except:
-            pass
+                size = 34
+                return pygame.transform.scale(surf, (size, size))
+            
+            # ============================================================
+            # Если не найдено, пробуем старую систему для совместимости
+            # ============================================================
+            path_old = os.path.join(NPC_DIR, name, f"{name}_idle_front.png")
+            if os.path.exists(path_old):
+                surf = pygame.image.load(path_old).convert_alpha()
+                size = 34
+                return pygame.transform.scale(surf, (size, size))
+                
+        except Exception as e:
+            print(f"[Toolbar] Ошибка загрузки NPC {name}: {e}")
+        
         return None
     
     def _load_item_texture(self, symbol):
