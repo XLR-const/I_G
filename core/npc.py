@@ -108,10 +108,16 @@ class NPCAnimator:
 
 
     def _update_sizes(self):
-        """Синхронизирует текущие размеры текстуры для корректного Z-буфера рендерера"""
+        """Синхронизирует только пропорции текстуры для корректного скейлинга"""
         if self.current_image:
-            self.sprite_width, self.sprite_height = self.current_image.get_size()
-            self.sprite_ratio = self.sprite_width / self.sprite_height
+            img_w, img_h = self.current_image.get_size()
+            self.sprite_ratio = img_w / img_h
+            
+            # Условные единицы для внутренней совместимости
+            self.sprite_height = self.npc.scale
+            self.sprite_width = self.npc.scale * self.sprite_ratio
+
+
 
     def _calculate_direction(self):
         """Определяет, каким из 8 ракурсов NPC повернут к камере игрока"""
@@ -176,6 +182,7 @@ class NPCAnimator:
             key = f"{d_type}_front_{self.death_frame}"
             self.current_image = self.sprites.get(key, self.current_image)
             self._update_sizes()
+            self.npc.hurt_flash = 0
             return
 
         # 2. РАСЧЕТ РАКУРСА ДЛЯ ЖИВЫХ СОСТОЯНИЙ
@@ -425,45 +432,42 @@ class NPC:
 
     def update(self):
         """Кадровое обновление NPC"""
-        # Если монстр умер, мы НЕ делаем return! Мы продолжаем обновлять 
-        # аниматор, чтобы труп линейно упал на пол и остался лежать вечно
-        if self.state == "DEAD":
-            self.animator.update()
-            self.image = self.animator.current_image
-            self.sprite_width = self.animator.sprite_width
-            self.sprite_height = self.animator.sprite_height
-            self.sprite_ratio = self.animator.sprite_ratio
-            return
-
-        # Отсечка по глобальной дистанции активации ИИ
-        dist = math.hypot(self.game.player.x - self.x, self.game.player.y - self.y)
-        if dist > self.activation_distance:
-            return
-
         dt = self.game.delta_time
         if dt > 0.033:
             dt = 0.033
 
-        # Уменьшаем таймеры эффектов
-        if self.hurt_flash > 0: self.hurt_flash -= 1
-        if self.shoot_flash > 0: self.shoot_flash -= 1
-
-        # ЕСЛИ ЕСТЬ КАСТОМНАЯ СУПЕР-ЛОГИКА ИИ ИЗ СКРИПТА logic.py — ВЫПОЛНЯЕМ ЕЁ
-        if hasattr(self, 'custom_update'):
-            self.custom_update(dt)
+        # 1. Уменьшаем таймеры эффектов
+        if self.state != "DEAD":
+            if self.hurt_flash > 0: self.hurt_flash -= 1
+            if self.shoot_flash > 0: self.shoot_flash -= 1
         else:
-            # Иначе крутим стандартный конечный автомат поведения
-            self.update_state(dt)
+            # Намертво выключаем эффекты боли и выстрелов для трупов
+            self.hurt_flash = 0
+            self.shoot_flash = 0
 
-        # Синхронизируем состояние с 8-ракурсным аниматором
+        # 2. Логика поведения ИИ (только для живых)
+        if self.state != "DEAD":
+            # Отсечка по глобальной дистанции активации ИИ
+            dist = math.hypot(self.game.player.x - self.x, self.game.player.y - self.y)
+            if dist > self.activation_distance:
+                return
+
+            if hasattr(self, 'custom_update'):
+                self.custom_update(dt)
+            else:
+                self.update_state(dt)
+
+        # 3. Синхронизируем состояние с 8-ракурсным аниматором (работает и для живых, и для мертвых)
         self.animator.update()
 
-        # Транслируем актуальные размеры и картинку наружу для рендерера игры
+        # 4. ДИНАМИЧЕСКИЙ МОСТИК ДЛЯ РЕНДЕРЕРА:
         self.image = self.animator.current_image
         self.sprite_width = self.animator.sprite_width
         self.sprite_height = self.animator.sprite_height
         self.sprite_ratio = self.animator.sprite_ratio
+
         self.move_direction = self.animator.move_direction
+
 
     def has_line_of_sight(self):
         """Проверяет, видит ли NPC игрока по прямой линии (с кэшированием)"""
@@ -650,63 +654,138 @@ class NPC:
                 self.state = "CHASE"
 
     def draw(self):
-        """Отрисовывает 8-ракурсный спрайт NPC в 3D мире с учетом Z-буфера стен"""
-        # Труп продолжает рисоваться на полу (метод не отсекается по alive)
+        """Математически точный рендеринг спрайтов в стиле DOOM с оффсетами и прижатием к полу"""
+        if not self.alive and self.state != "DEAD": 
+            return
+
         dx = self.x - self.game.player.x
         dy = self.y - self.game.player.y
         dist = math.hypot(dx, dy)
-        
-        # Защита от деления на ноль при подходе в упор
         if dist < 0.2: 
             return
 
-        # Находим угол между игроком и NPC
         theta = math.atan2(dy, dx)
         delta = theta - self.game.player.angle
         delta = (delta + math.pi) % math.tau - math.pi
-        
-        # Отсекаем объекты, которые физически находятся за пределами FOV камеры
         if abs(delta) > HALF_FOV: 
             return
 
-        # Плоская дистанция (защита от эффекта "рыбьего глаза")
         dist_flat = dist * math.cos(delta)
         if dist_flat < 0.2: 
             return
 
-        # Вычисляем высоту и ширину 3D проекции на основе размеров спрайта
-        proj_height = int(SCREEN_DIST / dist_flat)
-        proj_width = int(proj_height * self.sprite_ratio)
-
-        # Ограничиваем максимальный размер вблизи для оптимизации FPS
-        if proj_height > HEIGHT * 2:
-            proj_height = HEIGHT * 2
-            proj_width = int(proj_height * self.sprite_ratio)
-
-        # Запрашиваем у аниматора готовую, отмасштабированную картинку нужного ракурса и цвета
-        img = self.animator.get_processed_image(proj_width, proj_height)
+        # 1. Получаем оригинальные размеры текущего кадра
+        raw_w, raw_h = self.animator.current_image.get_size()
+        img = self.animator.get_processed_image(raw_w, raw_h)
         if img is None: 
             return
 
-        # Находим координаты центра и левой границы спрайта на экране
+        # 2. Получаем размеры базового (живого) кадра для контроля масштаба трупов
+        base_idle_image = self.animator.sprites.get("move_front_1")
+        if base_idle_image:
+            base_w, base_h = base_idle_image.get_size()
+        else:
+            base_w, base_h = raw_w, raw_h
+
+        # 3. ЧЕСТНЫЙ РАСЧЕТ ПРОЕКЦИИ НА ОСНОВЕ ОБНОВЛЕННОГО SCALE (0.75)
+        # Вычисляем высоту полноценного спрайта на этой дистанции
+        proj_height = int((SCREEN_DIST / dist_flat) * self.scale)
+        
+        # Для трупов уменьшаем высоту проекции пропорционально тому, насколько кадр смерти площе живого кадра
+                # 3. ЧЕСТНЫЙ РАСЧЕТ ПРОЕКЦИИ С УЧЕТОМ SCALE ИЗ КОНФИГА
+        proj_height = int((SCREEN_DIST / dist_flat) * self.scale)
+        
+        # Для трупов уменьшаем высоту проекции, но добавляем множитель увеличения
+                # Для трупов плавно увеличиваем масштаб только к концу анимации падения
+        if self.state == "DEAD":
+            # Выясняем общее количество кадров смерти для этого типа
+            d_type = getattr(self, 'death_type', 'die')
+            max_frames = self.animator.max_death_frames if d_type == 'die' else self.animator.sprites.get("max_x_death_frames", 0)
+            
+            # Рассчитываем динамический множитель:
+            # На первом кадре (death_frame = 1) он будет равен 1.0 (оригинальный размер падающего врага)
+            # К последнему кадру он плавно вырастет до 1.45 (или любого другого нужного вам значения)
+            if max_frames > 1:
+                progress = (self.animator.death_frame - 1) / (max_frames - 1)
+                # 1.0 на старте анимации, 1.45 в самом конце на полу
+                current_multiplier = 1.0 + (0.45 * progress) 
+            else:
+                current_multiplier = 1.45
+
+            proj_height = int(proj_height * (raw_h / base_h) * current_multiplier)
+
+
+
+        # Вычисляем ширину текущего кадра на основе его реальных пропорций с диска
+        current_ratio = raw_w / raw_h
+        proj_width = int(proj_height * current_ratio)
+
+        # Защита от падения FPS в упор
+        if proj_height > HEIGHT * 2:
+            proj_height = HEIGHT * 2
+            proj_width = int(proj_height * current_ratio)
+
+                # Вычисляем базовый центр объекта по горизонтали
         center_x = (HALF_NUM_RAYS + delta / DELTA_ANGLE) * SCALE
+
+        # КОРРЕКЦИЯ СДВИГА ПРИ СМЕРТИ (Убираем вылет на игрока)
+        if self.state == "DEAD":
+            # Находим, в какую сторону раздулся кадр смерти относительно живого
+            # Вычисляем разницу в ширине между широким трупом и узким живым врагом
+            width_diff = proj_width - int(proj_height * (base_w / base_h))
+            
+            # Если труп стал шире живого кадра, плавно сдвигаем центр отрисовки на экране вбок/назад.
+            # Чтобы он падал "от игрока", мы корректируем координату X на основе прогресса анимации.
+            # Множитель 0.25 можно слегка изменить (например, 0.2 или 0.3), чтобы настроить дальность падения.
+            d_type = getattr(self, 'death_type', 'die')
+            max_frames = self.animator.max_death_frames if d_type == 'die' else self.animator.sprites.get("max_x_death_frames", 0)
+            
+            if max_frames > 1:
+                progress = (self.animator.death_frame - 1) / (max_frames - 1)
+                # Сдвигаем экранный центр в зависимости от угла delta, чтобы тело визуально ложилось на землю на месте смерти
+                center_x -= int(width_diff * 0.25 * progress * math.sin(delta))
+
         start_x = int(center_x - proj_width // 2)
 
-        # Пополосный рендеринг спрайта с шагом SCALE пикселей
+        # Шаг сканирования текстуры
+        texture_step = raw_w / proj_width
+
+        # 4. ПОЗИЦИОНИРОВАНИЕ ПО ПОЛУ ЧЕРЕЗ КЛАССИЧЕСКИЙ ВЕРТИКАЛЬНЫЙ СДВИГ (V_OFFSET)
+        # Вместо floor_y мы используем смещение от линии горизонта. 
+        # Чтобы живой враг стоял на полу, его центр нужно сдвинуть вниз на половину высоты стандартной стены.
+        # Вычисляем высоту стандартной стены без параметров масштаба монстра:
+        wall_height = int(SCREEN_DIST / dist_flat)
+        
+        # Сдвиг для удержания ног на земле
+        v_offset = wall_height // 2
+        
+        # Финальная верхняя точка спрайта на экране:
+        if self.state == "DEAD":
+            # Для трупа мы сдвигаем его вниз к полу, компенсируя то, что его текстура стала плоской
+            # Благодаря этому он лежит строго на земле и не движется на игрока при ходьбе
+            dead_offset = int((SCREEN_DIST / dist_flat) * ((base_h - raw_h) / base_h))
+            screen_y = HALF_HEIGHT - proj_height // 2 + v_offset - proj_height // 2 + (dead_offset // 2)
+        else:
+            # Для живых врагов и предметов — чистая посадка на пол
+            screen_y = HALF_HEIGHT - proj_height // 2 + v_offset - proj_height // 2
+
+        # 5. ПОПОЛОСНЫЙ РЕНДЕР С ПРОВЕРКОЙ Z-БУФЕРА
         for x in range(start_x, start_x + proj_width, SCALE):
             ray_idx = int(x // SCALE)
             
-            # Проверяем, попадает ли вертикальная полоса в границы экрана
             if 0 <= ray_idx < NUM_RAYS:
-                # Сверяемся с Z-буфером: если монстр ближе, чем стена за ним — рисуем полосу
                 if dist_flat < self.game.raycasting.z_buffer[ray_idx]:
                     sub_x = int(x - start_x)
                     
                     if 0 <= sub_x < proj_width:
-                        # Блитим (рисуем) вырезанную полоску спрайта на экран
-                        self.game.screen.blit(
-                            img, 
-                            (x, HALF_HEIGHT - proj_height // 2), 
-                            (sub_x, 0, SCALE, proj_height)
-                        )
+                        tex_x = int(sub_x * texture_step)
+                        
+                        if 0 <= tex_x < raw_w:
+                            # Вырезаем вертикальную полоску
+                            slice_surf = img.subsurface(tex_x, 0, 1, raw_h)
+                            scaled_slice = pygame.transform.scale(slice_surf, (SCALE, proj_height))
+
+                            # Отрисовка полосы
+                            self.game.screen.blit(scaled_slice, (x, screen_y))
+
 
