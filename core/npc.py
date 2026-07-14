@@ -244,45 +244,45 @@ class NPC:
     def __init__(self, game, npc_type, pos=(8.5, 7.5)):
         self.game = game
         self.npc_type = npc_type
-
-        # 1. Читаем базовые числовые параметры из глобального config/game_data.py
+        # 1. Считываем ВСЕ геймплейные атрибуты строго из глобального game_data.py
         config = NPC_CONFIG.get(npc_type, {})
         self.name = config.get('name', 'unknown')
         self.speed = config.get('speed', 0.3)
         self.hp = config.get('hp', 100)
         self.max_hp = self.hp
         self.damage = config.get('damage', 10)
+        
+        # Загружаем нашу новую трехступенчатую систему дистанций
+        self.activation_distance = config.get('activation_distance', 25)
+        self.view_distance = config.get('view_distance', 12)  # Новая дистанция видимости гг
         self.shoot_range = config.get('shoot_range', 5.0)
         self.shoot_delay = config.get('shoot_delay', 800)
 
-        # Физические параметры хитбокса и активации
+        # Физические параметры
         self.radius = config.get('radius', 0.35)
         self.size = 0.3
         self.x, self.y = pos
         self.alive = True
         self.active = True
-        self.activation_distance = 25
 
-        # Локальные таймеры FSM-состояний
+        # Локальные таймеры FSM
         self.state = "IDLE"
         self.state_timer = 0
         self.last_shot = 0
         self.shoot_flash = 0
         self.hurt_flash = 0
 
-        # Вектор движения для 8-ракурсной математики
         self.last_x = self.x
         self.last_y = self.y
 
-        # Настройки по умолчанию для текстового конфига папки
+        # Настройки для аниматора (эти три штуки остаются в config.txt)
         self.scale = 0.1
         self.animation_speed = 150
         self.death_speed = 120
 
-        # Ссылка на локальную папку ресурсов монстра
         self.folder_path = os.path.join('resources', 'npc', self.name)
 
-        # Читаем локальный config.txt монстра, если он существует
+        # Читаем локальный config.txt монстра (теперь там ТОЛЬКО параметры графики!)
         config_file = os.path.join(self.folder_path, 'config.txt')
         if os.path.exists(config_file):
             self._parse_local_txt_config(config_file)
@@ -343,29 +343,22 @@ class NPC:
                 print(f"[NPC] Ошибка загрузки скрипта логики для {self.name}: {e}")
 
     def _parse_local_txt_config(self, filepath):
-        """Парсит локальный config.txt внутри папки NPC с железной защитой от комментариев"""
+        """Парсит локальный config.txt внутри папки NPC (Только графика)"""
         with open(filepath, 'r', encoding='utf-8') as f:
             for line in f:
                 line = line.strip()
-                if not line or line.startswith('#'): 
-                    continue
-                
+                if not line or line.startswith('#'): continue
                 if '=' in line:
                     key, val = line.split('=', 1)
-                    key = key.strip()
-                    val = val.strip()
-                    
-                    # ПРАВИЛЬНО: Отрезаем комментарий и берем первый элемент [0] строки
+                    key, val = key.strip(), val.strip()
                     if '#' in val:
                         val = val.split('#', 1)[0].strip()
 
-                    # Перевод в числа теперь отработает идеально
+                    # Оставляем только то, что нужно для спрайтов
                     if key == 'scale': self.scale = float(val)
                     elif key == 'animation_speed': self.animation_speed = int(val)
                     elif key == 'death_speed': self.death_speed = int(val)
-                    elif key == 'radius': self.radius = float(val)
-                    elif key == 'shoot_range': self.shoot_range = float(val)
-                    elif key == 'shoot_delay': self.shoot_delay = int(val)
+
 
 
 
@@ -574,14 +567,27 @@ class NPC:
             return
 
         # 3. АНАЛИЗ ВИДИМОСТИ ИГРОКА ДЛЯ ЖИВЫХ СОСТОЯНИЙ
+                # 3. АНАЛИЗ ВИДИМОСТИ ИГРОКА С УЧЕТОМ ДИСТАНЦИИ ВЗГЛЯДА (view_distance)
         if can_see:
             if dist_to_player <= self.shoot_range:
+                # Если в упор на расстоянии стрельбы — атакуем
                 self.state = "ATTACK"
-            else:
-                if self.state != "CHASE":
+            elif dist_to_player <= self.view_distance:
+                # Если игрок зашел внутрь дистанции видимости — начинаем погоню!
+                if self.state != "CHASE" and self.state != "ATTACK":
                     self.state = "CHASE"
+            else:
+                # Игрок виден через луч LOS, но он слишком далеко (дальше view_distance)
+                # Бот продолжает заниматься мирными делами
+                if self.state in ("ATTACK", "CHASE"):
+                    if self.waypoints:
+                        self.state = "PATROL"
+                        self.current_waypoint = 0
+                    else:
+                        self.state = "IDLE"
+                        self.state_timer = pygame.time.get_ticks() + self.idle_duration
         else:
-            # Если потеряли игрока из виду — возвращаемся к мирным делам
+            # Если потеряли игрока из виду
             if self.state in ("ATTACK", "CHASE"):
                 if self.waypoints:
                     self.state = "PATROL"
@@ -589,6 +595,7 @@ class NPC:
                 else:
                     self.state = "IDLE"
                     self.state_timer = pygame.time.get_ticks() + self.idle_duration
+
 
         # 4. ЛОГИКА СОСТОЯНИЯ ОЖИДАНИЯ (IDLE)
         if self.state == "IDLE":
@@ -680,12 +687,16 @@ class NPC:
         if img is None: 
             return
 
-        # 2. Получаем размеры базового (живого) кадра для контроля масштаба трупов
+        # 2. ИСПРАВЛЕНИЕ: Получаем базовый живой кадр СТРОГО для этого конкретного NPC
+        # Мы берем имя текущего монстра (self.name), чтобы не читать чужой кэш!
         base_idle_image = self.animator.sprites.get("move_front_1")
-        if base_idle_image:
-            base_w, base_h = base_idle_image.get_size()
-        else:
+        
+        # На всякий случай жесткая страховка: если по какой-то причине кадр не нашелся,
+        # берем размеры текущего кадра, чтобы коэффициент (raw_h / base_h) стал равен ровно 1.0
+        if not base_idle_image:
             base_w, base_h = raw_w, raw_h
+        else:
+            base_w, base_h = base_idle_image.get_size()
 
         # 3. ЧЕСТНЫЙ РАСЧЕТ ПРОЕКЦИИ НА ОСНОВЕ ОБНОВЛЕННОГО SCALE (0.75)
         # Вычисляем высоту полноценного спрайта на этой дистанции
