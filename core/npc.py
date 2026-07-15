@@ -56,8 +56,16 @@ class NPCAnimator:
 
     
     def _initialize_resources(self):
-        """Проверяет кэш и собирает полную 8-ракурсную колоду спрайтов NPC в исходном качестве"""
+        """Проверяет кэш и собирает колоду спрайтов в исходном качестве"""
         name = self.npc.name
+        
+        # ============================================================
+        # ПОЛНАЯ УНИВЕРСАЛЬНОСТЬ: ЧИТАЕМ МАСШТАБ СТРОГО ИЗ ДАННЫХ NPC
+        # ============================================================
+        # Больше никакого хардкода имен! Код берет self.npc.scale, 
+        # который уже прочитан из config.txt к этому моменту!
+        scale = self.npc.scale
+        # ============================================================
 
         if name not in NPCAnimator.SPRITE_CACHE:
             cached_sprites = {}
@@ -68,7 +76,8 @@ class NPCAnimator:
                 for frame in range(1, 5):
                     key = f"move_{direction}_{frame}"
                     filename = f"{name}_move_{direction}_{frame}.png"
-                    cached_sprites[key] = self._load_and_scale_file(filename, 1.0, (150, 150, 150))
+                    cached_sprites[key] = self._load_and_scale_file(filename, scale, (150, 150, 150))
+
 
             # 2. Боевая стойка и Выстрел (ATTACK и SHOOT)
             fallback_idle = cached_sprites.get("move_front_1")
