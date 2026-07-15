@@ -333,7 +333,7 @@ class NPC:
         self._cached_los = True
 
         # 4. МАГИЯ ДИНАМИЧЕСКИХ СКРИПТОВ ЛОГИКИ (logic.py)
-        # Если в папке монстра лежит logic.py — намертво привязываем его функции к методам self!
+        # Если в папке монстра лежит logic.py — отдаем ему полную власть над объектом NPC
         logic_file = os.path.join(self.folder_path, 'logic.py')
         if os.path.exists(logic_file):
             try:
@@ -341,15 +341,11 @@ class NPC:
                 custom_logic = importlib.util.module_from_spec(spec)
                 spec.loader.exec_module(custom_logic)
                 
-                # Подменяем стандартный метод атаки на кастомный из logic.py с сохранением self
-                if hasattr(custom_logic, 'perform_attack'):
-                    self.perform_attack = types.MethodType(custom_logic.perform_attack, self)
-                
-                # Подменяем стандартный метод логики обновлений (если нужен уникальный ИИ)
-                if hasattr(custom_logic, 'custom_update'):
-                    self.custom_update = types.MethodType(custom_logic.custom_update, self)
+                # Ищем универсальную точку входа для тотального перехвата методов
+                if hasattr(custom_logic, 'init_logic'):
+                    custom_logic.init_logic(self)
             except Exception as e:
-                print(f"[NPC] Ошибка загрузки скрипта логики для {self.name}: {e}")
+                print(f"[NPC] Ошибка инициализации скрипта логики для {self.name}: {e}")
 
     def _parse_local_txt_config(self, filepath):
         """Парсит локальный config.txt внутри папки NPC (Только графика)"""
