@@ -4,118 +4,114 @@ import pygame
 import types
 from random import uniform
 
+# Динамически извлекаем константы рейкастинга из игры
+try:
+    import setting
+    SCREEN_DIST = getattr(setting, 'SCREEN_DIST', 800)
+    HALF_HEIGHT = getattr(setting, 'HALF_HEIGHT', 384)
+    NUM_RAYS = getattr(setting, 'NUM_RAYS', 120)
+    SCALE = getattr(setting, 'SCALE', 8)
+    HALF_NUM_RAYS = getattr(setting, 'HALF_NUM_RAYS', 60)
+    DELTA_ANGLE = getattr(setting, 'DELTA_ANGLE', 0.008)
+    HALF_FOV = getattr(setting, 'HALF_FOV', 0.52)
+except:
+    SCREEN_DIST, HALF_HEIGHT, NUM_RAYS, SCALE = 800, 384, 120, 8
+    HALF_NUM_RAYS, DELTA_ANGLE, HALF_FOV = 60, 0.008, 0.52
+
+
 # ==============================================================================
-# 1. НЕЗАВИСИМЫЙ КЛАСС ЛЕТЯЩЕГО 3D-ФАЕРБОЛА БОССА
+# 1. ПОДСИСТЕМА АВТОНОМНЫХ 3D-СНАРЯДОВ БОССА
 # ==============================================================================
 
 class BossBallProjectile:
     """Огненный шар, который плавно летит, крутит анимацию и взрывается об стены"""
-    def __init__(self, game, boss, x, y, angle, speed, frames, explosion_frames, damage, explosion_sound=None):
+    def __init__(self, game, boss, x, y, angle, speed, frames, explosion_frames, damage, size_mult=0.4, anim_speed=60, explosion_sound=None):
         self.game = game
-        self.boss = boss  
+        self.boss = boss
         self.x = x
         self.y = y
         self.angle = angle
         self.speed = speed
-        self.frames = frames  
-        self.explosion_frames = explosion_frames  
-        self.explosion_sound = explosion_sound  # ЗАПОМИНАЕМ ЗВУК ВЗРЫВА
+        self.frames = frames
+        self.explosion_frames = explosion_frames
+        self.explosion_sound = explosion_sound
         self.damage = damage
-        
+        self.size_mult = size_mult
+        self.anim_speed = anim_speed
+
         self.current_frame = 0
         self.anim_timer = pygame.time.get_ticks()
         self.alive = True
-        self.is_exploding = False 
+        self.is_exploding = False
 
     def update(self):
-        if not self.alive: return
-        
+        if not self.alive:
+            return
         dt = self.game.delta_time
-        if dt > 0.033: dt = 0.033
+        if dt > 0.033:
+            dt = 0.033
 
-        # Если шар еще ЛЕТИТ (не взрывается)
         if not self.is_exploding:
             self.x += math.cos(self.angle) * self.speed * dt
             self.y += math.sin(self.angle) * self.speed * dt
-            
-            # Проверяем удар об стену
+
             if self.game.map.is_wall(int(self.x), int(self.y)):
                 self.trigger_explosion()
                 return
 
-            # Проверяем попадание в игрока
             if math.hypot(self.game.player.x - self.x, self.game.player.y - self.y) < 0.4:
                 self.game.player.take_damage(self.damage)
                 self.trigger_explosion()
                 return
 
-        # Кадровая анимация
         now = pygame.time.get_ticks()
-        if now - self.anim_timer > 60:
+        if now - self.anim_timer > self.anim_speed:
             self.anim_timer = now
             self.current_frame += 1
-            
-            # Если мы в режиме взрыва и дошли до конца анимации взрыва — полностью удаляем снаряд
             if self.is_exploding:
                 if self.current_frame >= len(self.explosion_frames):
                     self.alive = False
             else:
-                # Если просто летим — циклим кадры вихря по кругу
                 self.current_frame %= len(self.frames)
 
     def trigger_explosion(self):
-        """Включает режим покадрового взрыва об стену со звуком"""
         if self.explosion_frames:
             self.is_exploding = True
-            self.speed = 0  
-            self.current_frame = 0  
-            
-            # ИСПРАВЛЕНИЕ: Включаем кастомный звук детонации при ударе об стену!
+            self.speed = 0
+            self.current_frame = 0
             if self.explosion_sound:
                 self.explosion_sound.play()
         else:
-            self.alive = False  
-
+            self.alive = False
 
     def draw(self):
-        if not self.alive: return
-        
-        # Выбираем, какую колоду спрайтов рендерить прямо сейчас
+        if not self.alive or not self.frames:
+            return
         current_deck = self.explosion_frames if self.is_exploding else self.frames
-        if not current_deck or self.current_frame >= len(current_deck): return
-        
+        if not current_deck or self.current_frame >= len(current_deck):
+            return
+
         img = current_deck[self.current_frame]
         raw_w, raw_h = img.get_size()
-        
-        try:
-            import setting
-            SCREEN_DIST = getattr(setting, 'SCREEN_DIST', 800)
-            HALF_HEIGHT = getattr(setting, 'HALF_HEIGHT', 384)
-            NUM_RAYS = getattr(setting, 'NUM_RAYS', 120)
-            SCALE = getattr(setting, 'SCALE', 8)
-            HALF_NUM_RAYS = getattr(setting, 'HALF_NUM_RAYS', 60)
-            DELTA_ANGLE = getattr(setting, 'DELTA_ANGLE', 0.008)
-            HALF_FOV = getattr(setting, 'HALF_FOV', 0.52)
-        except:
-            SCREEN_DIST, HALF_HEIGHT, NUM_RAYS, SCALE = 800, 384, 120, 8
-            HALF_NUM_RAYS, DELTA_ANGLE, HALF_FOV = 60, 0.008, 0.52
 
         dx = self.x - self.game.player.x
         dy = self.y - self.game.player.y
         dist = math.hypot(dx, dy)
-        if dist < 0.2: return
+        if dist < 0.2:
+            return
 
         theta = math.atan2(dy, dx)
         delta = theta - self.game.player.angle
         delta = (delta + math.pi) % math.tau - math.pi
-        if abs(delta) > HALF_FOV: return
+        if abs(delta) > HALF_FOV:
+            return
 
         dist_flat = dist * math.cos(delta)
-        if dist_flat < 0.2: return
+        if dist_flat < 0.2:
+            return
 
-        # Если взрывается — делаем спрайт взрыва чуть побольше (0.6), летящий шар поменьше (0.4)
-        size_multiplier = 0.6 if self.is_exploding else 0.4
-        proj_height = int((SCREEN_DIST / dist_flat) * size_multiplier) 
+        current_size = 0.6 if self.is_exploding else self.size_mult
+        proj_height = int((SCREEN_DIST / dist_flat) * current_size)
         proj_width = int(proj_height * (raw_w / raw_h))
 
         center_x = (HALF_NUM_RAYS + delta / DELTA_ANGLE) * SCALE
@@ -136,113 +132,285 @@ class BossBallProjectile:
                             self.game.screen.blit(scaled_slice, (x, screen_y))
 
 
-
 # ==============================================================================
-# 2. МЕТОДЫ ОБНОВЛЕНИЯ, ОТРИСОВКИ И ВЫСТРЕЛA БОССA
+# 2. ЛИЧНЫЙ, НЕЗАВИСИМЫЙ МЕТОД ОБНОВЛЕНИЯ АНИМАЦИЙ ДЛЯ АНИМАТОРA БОССА
 # ==============================================================================
 
-def my_standard_boss_attack(self):
-    now = pygame.time.get_ticks()
-    if now - self.last_shot < self.shoot_delay:
+def boss_personal_animator_update(self_animator):
+    """ПОЛНАЯ ЗАМЕНА МЕТОДА update() У ОБЪЕКТА NPCAnimator БОССА.
+    Базовый код аниматора ядра отключен на 100%. Мы сами полностью управляем графикой!"""
+    npc = self_animator.npc
+
+    # Если Босс мертв — запускаем оригинальный цикл падения трупа
+    if npc.state == "DEAD":
+        self_animator.base_animator_update_func()
         return
 
-    self.last_shot = now
-    self.state = "SHOOT"
-    self.shoot_flash = 3  
-    
-    # ИСПРАВЛЕНИЕ: Глушим базовую заглушку и включаем ЧЕСТНЫЙ мощный звук залпа Босса!
-    if hasattr(self, 'sound_shoulder') and self.sound_shoulder:
-        self.sound_shoulder.play()
+    # В режиме атак — аниматор Босса забирает текстуру замаха
+    if npc.boss_internal_state in ("MELEE_ATTACK", "HAND_ATTACK", "SHOULDER_ATTACK"):
+        prefix = "shoulder" if npc.boss_internal_state == "SHOULDER_ATTACK" else "hand"
+        key = f"attack_{prefix}_front_{npc.boss_attack_frame}"
 
-    angle_to_player = math.atan2(self.game.player.y - self.y, self.game.player.x - self.x)
-    fireball_frames = getattr(self, 'boss_fireball_frames', [])
-    explosion_frames = getattr(self, 'boss_explosion_frames', []) 
-    
-    if fireball_frames:
-        # Прокидываем ссылку на звук взрыва внутрь самого фаербола
-        expl_sound = getattr(self, 'sound_explosion', None)
-        ball = BossBallProjectile(
-            self.game, self, self.x, self.y, angle_to_player, 
-            speed=4.5, frames=fireball_frames, explosion_frames=explosion_frames, 
-            damage=25, explosion_sound=expl_sound  # ПЕРЕДАЕМ ЗВУК
-        )
-        self.boss_projectiles.append(ball)
+        self_animator.current_image = self_animator.sprites.get(key, npc.image)
+        return
+
+    # Если Босс просто идет — возвращаем стандартный 8-ракурсный перебор ног
+    self_animator.base_animator_update_func()
 
 
+# ==============================================================================
+# 3. ПОЛНОСТЬЮ ЧИСТЫЙ И ИЗОЛИРОВАННЫЙ UPDATE ДЛЯ СУЩНОСТИ БОССА
+# ==============================================================================
 
+def boss_total_isolated_update(self):
+    """Независимый апдейт Кузнеца. Управляет снарядами, звуками и внутренним FSM"""
+    dt = self.game.delta_time
+    if dt > 0.033:
+        dt = 0.033
+    now = pygame.time.get_ticks()
 
-def my_boss_custom_update(self, dt):
-    """Кастомный ИИ-мостик: обновляет летящие снаряды, а затем выполняет стандартный ИИ ядра"""
-    # Каждую итерацию чистим мертвые и обновляем живые фаерболы
+    # 1. Обновляем летящие ракеты и взрывы
     self.boss_projectiles = [p for p in self.boss_projectiles if p.alive]
     for proj in self.boss_projectiles:
         proj.update()
 
-    # Сразу после этого вызываем стандартный метод перемещения и логики из ядра npc.py!
-    self.update_state(dt)
+    # 2. Обработка смерти Босса
+    if not self.alive or self.hp <= 0:
+        self.state = "DEAD"
+        if hasattr(self, 'sound_fire_loop') and self.sound_fire_loop:
+            self.sound_fire_loop.stop()
+
+        self.animator.update()
+        self.image = self.animator.current_image
+
+        if self.image:
+            self.sprite_width, self.sprite_height = self.image.get_size()
+            self.sprite_ratio = self.sprite_width / self.sprite_height
+        return
+
+    # Оптимизация дистанции ИИ
+    dist_to_player = math.hypot(self.game.player.x - self.x, self.game.player.y - self.y)
+    if dist_to_player > self.activation_distance:
+        return
+
+    if self.hurt_flash > 0:
+        self.hurt_flash -= 1
+    if self.shoot_flash > 0:
+        self.shoot_flash -= 1
+
+    # 3. Аудио-эмбиент рычания
+    if self.boss_internal_state == "CHASE" and hasattr(self, 'sound_idle_growl') and self.sound_idle_growl:
+        if now > self.boss_growl_timer:
+            self.boss_growl_timer = now + uniform(5000, 9000)
+            self.sound_idle_growl.play()
+
+    can_see = self.has_line_of_sight()
+    if can_see and dist_to_player <= self.view_distance:
+        if hasattr(self, 'sound_sight_phrase') and self.sound_sight_phrase and not self.boss_said_sight_phrase:
+            self.boss_said_sight_phrase = True
+            self.sound_sight_phrase.play()
+
+    # ==========================================================================
+    # СТРУКТУРА ЛОКАЛЬНОГО КОНЕЧНОГО АВТОМАТА БОССА
+    # ==========================================================================
+
+    # СИТУАЦИЯ А: ФАЗА ВЕДЕНИЯ КАСТОМНОГО ОГНЯ
+    if self.boss_internal_state in ("MELEE_ATTACK", "HAND_ATTACK", "SHOULDER_ATTACK"):
+        self.animator._calculate_direction()
+        self.move_direction = self.animator.move_direction
+
+        if now - self.boss_attack_timer > 150:
+            self.boss_attack_timer = now
+            self.boss_attack_frame += 1
+
+            # Атака: Дальний бой (SHOULDER, вылет на 3-м кадре)
+            if self.boss_internal_state == "SHOULDER_ATTACK" and self.boss_attack_frame == 3:
+                vortex_frames = getattr(self, 'boss_fireball_frames', [])
+                if vortex_frames:
+                    ball = BossBallProjectile(
+                        self.game, self,
+                        self.x, self.y,
+                        math.atan2(self.game.player.y - self.y, self.game.player.x - self.x),
+                        speed=4.5,
+                        frames=vortex_frames,
+                        explosion_frames=getattr(self, 'boss_explosion_frames', []),
+                        damage=25,
+                        size_mult=0.4,
+                        anim_speed=60,
+                        explosion_sound=getattr(self, 'sound_explosion', None)
+                    )
+                    self.boss_projectiles.append(ball)
+
+            # Атака: Средний бой (HAND, вылет на 2-м кадре)
+            elif self.boss_internal_state == "HAND_ATTACK" and self.boss_attack_frame == 2:
+                rocket_frames = getattr(self, 'boss_rocket_frames', [])
+                if rocket_frames:
+                    ball = BossBallProjectile(
+                        self.game, self,
+                        self.x, self.y,
+                        math.atan2(self.game.player.y - self.y, self.game.player.x - self.x),
+                        speed=5.5,
+                        frames=rocket_frames,
+                        explosion_frames=getattr(self, 'boss_explosion_frames', []),
+                        damage=18,
+                        size_mult=0.45,
+                        anim_speed=35,
+                        explosion_sound=getattr(self, 'sound_explosion', None)
+                    )
+                    self.boss_projectiles.append(ball)
+
+            max_f = 4 if self.boss_internal_state == "SHOULDER_ATTACK" else 3
+            if self.boss_attack_frame > max_f:
+                self.last_shot = now
+                self.boss_internal_state = "CHASE"
+                self.state = "CHASE"
+
+        # Запускаем наш личный аниматор для фиксации текстуры атаки
+        self.animator.update()
+        self.image = self.animator.current_image
+
+    # СИТУАЦИЯ Б: ФАЗА ОБЫЧНОГО ПРЕСЛЕДОВАНИЯ
+    else:
+        if can_see and dist_to_player <= self.shoot_range and (now - self.last_shot >= self.shoot_delay):
+            self.boss_attack_timer = now
+            self.boss_attack_frame = 1
+
+            if dist_to_player <= 5.5:
+                self.boss_internal_state = "HAND_ATTACK"
+                self.state = "ATTACK"
+                if hasattr(self, 'sound_hand') and self.sound_hand:
+                    self.sound_hand.play()
+            else:
+                self.boss_internal_state = "SHOULDER_ATTACK"
+                self.state = "ATTACK"
+                if hasattr(self, 'sound_shoulder') and self.sound_shoulder:
+                    self.sound_shoulder.play()
+        else:
+            self.update_state(dt)
+            self.animator.update()
+            self.image = self.animator.current_image
+            self.move_direction = self.animator.move_direction
+
+    # Передаем обновленные физические размеры в 3D-движок игры
+    if self.image:
+        self.sprite_width, self.sprite_height = self.image.get_size()
+        self.sprite_ratio = self.sprite_width / self.sprite_height
 
 
-def my_boss_custom_draw(self):
-    """Кастомный метод отрисовки: сначала рисует самого Босса через ядро, затем поверх — его снаряды"""
-    # 1. Вызываем оригинальный метод draw() из ядра, который отлично работает
+def boss_custom_draw(self):
     self.base_draw_method()
-    
-    # 2. Поверх тела Босса прорисовываем все летящие огненные шары со сверкой Z-буфера
     for proj in self.boss_projectiles:
         proj.draw()
 
 
 # ==============================================================================
-# 3. ТОЧКА ВХОДА ИНИЦИАЛИЗАЦИИ БОССА
+# 4. ТОЧКА ВХОДА ИНИЦИАЛИЗАЦИИ БОССА
 # ==============================================================================
 
 def init_logic(npc):
-    """Точка входа Этапа 2.1. Инициализирует контейнеры и перехватывает draw/update/attack"""
-    # Создаем локальный изолированный список для фаерболов прямо внутри Босса
+    """Главная точка входа. Намертво изолирует ИИ и Аниматор Босса от базового ядра"""
     npc.boss_projectiles = []
     npc.boss_fireball_frames = []
+    npc.boss_rocket_frames = []
+    npc.boss_explosion_frames = []
+
+    npc.boss_internal_state = "CHASE"
+    npc.boss_attack_frame = 1
+    npc.boss_attack_timer = 0
+
     scale = npc.scale
+
+    def load_local_frames(prefix, count):
+        frames = []
+        for idx in range(1, count + 1):
+            filename = f"{prefix}_{idx}.png"
+            path = os.path.join(npc.folder_path, filename)
+            if os.path.exists(path):
+                original = pygame.image.load(path)
+                new_w = int(original.get_width() * scale)
+                new_h = int(original.get_height() * scale)
+                frames.append(pygame.transform.scale(original, (new_w, new_h)))
+        return frames
+
+    npc.boss_fireball_frames = load_local_frames("proj_vortex", 9)
+    npc.boss_rocket_frames = load_local_frames("proj_rocket", 16)
+    npc.boss_explosion_frames = load_local_frames("fx_big_explosion", 5)
+
+    print(f"\n[УСПЕХ] Начинаем тотальную изолированную загрузку спрайтов атак Босса...")
+    
+    # 1. Загружаем 3 кадра атаки пушкой с руки (HAND)
+    for f in range(1, 4):
+        key = f"attack_hand_front_{f}"
+        filename = f"{npc.name}_attack_hand_front_{f}.png"
+        path = os.path.join(npc.folder_path, filename)
+
+        if os.path.exists(path):
+            # Загружаем НАПРЯМУЮ с диска по полному пути, минуя базовый аниматор ядра!
+            original = pygame.image.load(path)
+            new_w = int(original.get_width() * scale)
+            new_h = int(original.get_height() * scale)
+            
+            # Сохраняем честный отмасштабированный HD-кадр в колоду спрайтов Босса
+            npc.animator.sprites[key] = pygame.transform.scale(original, (new_w, new_h))
+            print(f"  ✅ Загружен боевой кадр рук: {key}")
+        else:
+            print(f"  ❌ КРИТИЧЕСКАЯ ОШИБКА: Файл потерялся: {path}")
+            npc.animator.sprites[key] = npc.animator.sprites.get("move_front_1")
+
+    # 2. Загружаем 4 кадра атаки пушками из-за плеч (SHOULDER)
+    for f in range(1, 5):
+        key = f"attack_shoulder_front_{f}"
+        filename = f"{npc.name}_attack_shoulder_front_{f}.png"
+        path = os.path.join(npc.folder_path, filename)
+
+        if os.path.exists(path):
+            original = pygame.image.load(path)
+            new_w = int(original.get_width() * scale)
+            new_h = int(original.get_height() * scale)
+            
+            npc.animator.sprites[key] = pygame.transform.scale(original, (new_w, new_h))
+            print(f"  ✅ Загружен боевой кадр плеч: {key}")
+        else:
+            print(f"  ❌ КРИТИЧЕСКАЯ ОШИБКА: Файл потерялся: {path}")
+            npc.animator.sprites[key] = npc.animator.sprites.get("move_front_1")
+            
+    print("-" * 60)
+
     try:
         npc.sound_shoulder = pygame.mixer.Sound(os.path.join(npc.folder_path, 'sound_shoulder.wav'))
+        npc.sound_hand = pygame.mixer.Sound(os.path.join(npc.folder_path, 'sound_hand.wav'))
         npc.sound_explosion = pygame.mixer.Sound(os.path.join(npc.folder_path, 'sound_explosion.wav'))
-        
-        # Выставляем громкость босса
-        npc.sound_shoulder.set_volume(0.15)
-        npc.sound_explosion.set_volume(0.15)
+        npc.sound_idle_growl = pygame.mixer.Sound(os.path.join(npc.folder_path, 'sound_idle_growl.wav'))
+        npc.sound_sight_phrase = pygame.mixer.Sound(os.path.join(npc.folder_path, 'sound_sight_phrase.wav'))
+
+        vol = 0.45
+        for s in [npc.sound_shoulder, npc.sound_hand, npc.sound_explosion, npc.sound_idle_growl]:
+            if s:
+                s.set_volume(vol)
+        if npc.sound_sight_phrase:
+            npc.sound_sight_phrase.set_volume(vol * 1.3)
+
     except Exception as e:
-        print(f"[БОСС] Кастомное аудио не найдено, используем дефолт: {e}")
+        print(f"[БОСС] Аудио не найдено, фолбек: {e}")
         npc.sound_shoulder = npc.shoot_sound
+        npc.sound_hand = npc.shoot_sound
         npc.sound_explosion = npc.shoot_sound
+        npc.sound_idle_growl = None
+        npc.sound_sight_phrase = None
 
-    
-    # Загружаем кадры вихря
-    for idx in range(1, 10):
-        filename = f"proj_vortex_{idx}.png"
-        path = os.path.join(npc.folder_path, filename)
-        if os.path.exists(path):
-            original = pygame.image.load(path)
-            new_w = int(original.get_width() * scale)
-            new_h = int(original.get_height() * scale)
-            npc.boss_fireball_frames.append(pygame.transform.scale(original, (new_w, new_h)))
+    npc.boss_growl_timer = pygame.time.get_ticks() + uniform(2000, 6000)
+    npc.boss_said_sight_phrase = False
 
-    # Привязываем метод выстрела
-    npc.perform_attack = types.MethodType(my_standard_boss_attack, npc)
-    
-    # Подключаем кастомное обновление и отрисовку через официальные мостики движка
-    npc.custom_update = types.MethodType(my_boss_custom_update, npc)
-    
-    # Перехватываем метод draw()
+    # ПОЛНЫЙ ДВУХСТОРОННИЙ ПЕРЕХВАТ СУЩНОСТИ И ЕЕ ГРАФИКИ
     npc.base_draw_method = types.MethodType(npc.draw.__func__, npc)
-    npc.draw = types.MethodType(my_boss_custom_draw, npc)
-        # Прописываем в самый низ функции init_logic загрузку fx_big_explosion (5 кадров)
-    npc.boss_explosion_frames = []
-    for idx in range(1, 6):
-        filename = f"fx_big_explosion_{idx}.png"
-        path = os.path.join(npc.folder_path, filename)
-        if os.path.exists(path):
-            original = pygame.image.load(path)
-            new_w = int(original.get_width() * scale)
-            new_h = int(original.get_height() * scale)
-            npc.boss_explosion_frames.append(pygame.transform.scale(original, (new_w, new_h)))
+    npc.draw = types.MethodType(boss_custom_draw, npc)
 
-    print(f"[БОСС Этап 2.1] Изолированный вывод снарядов успешно подключен.")
+    # 1. Заменяем метод update самого Босса (ИИ изолирован)
+    npc.update = types.MethodType(boss_total_isolated_update, npc)
+
+    # 2. Заменяем метод update лично у АНИМАТОРA Босса (Графика изолирована!)
+    npc.animator.base_animator_update_func = types.MethodType(npc.animator.update.__func__, npc.animator)
+    npc.animator.update = types.MethodType(boss_personal_animator_update, npc.animator)
+
+    print(f"[УСПЕХ БОССА] Личный независимый Аниматор и ИИ HellSmith полностью запущены.")
+    
