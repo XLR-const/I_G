@@ -326,12 +326,20 @@ def boss_personal_animator_update(self_animator):
         return
 
     if npc.boss_internal_state in ("MELEE_ATTACK", "HAND_ATTACK", "SHOULDER_ATTACK"):
-        prefix = "shoulder" if npc.boss_internal_state == "SHOULDER_ATTACK" else "hand"
+        # 🔥 ТОЧЕЧНОЕ ИСПРАВЛЕНИЕ: Честно распределяем префиксы под все три типа оружия!
+        if npc.boss_internal_state == "SHOULDER_ATTACK":
+            prefix = "shoulder"
+        elif npc.boss_internal_state == "MELEE_ATTACK":
+            prefix = "melee"
+        else:
+            prefix = "hand"
+            
         key = f"attack_{prefix}_front_{npc.boss_attack_frame}"
         self_animator.current_image = self_animator.sprites.get(key, npc.image)
         return
 
     self_animator.base_animator_update_func()
+
 
 
 def boss_total_isolated_update(self):
@@ -369,13 +377,32 @@ def boss_total_isolated_update(self):
             self.boss_said_sight_phrase = True
             self.sound_sight_phrase.play()
 
-    if self.boss_internal_state in ("HAND_ATTACK", "SHOULDER_ATTACK"):
+    if self.boss_internal_state in ("MELEE_ATTACK", "HAND_ATTACK", "SHOULDER_ATTACK"):
         self.animator._calculate_direction()
         self.move_direction = self.animator.move_direction
 
         if now - self.boss_attack_timer > 150:
             self.boss_attack_timer = now
             self.boss_attack_frame += 1
+
+            # --- ТРИГГЕР БЛИЖНЕГО БОЯ: УДАР МОЛОТОМ (ВСПЫШКА НА 2 КАДРЕ) ---
+            # --- УДЛИНЕННАЯ ОГНЕННАЯ ДОРОЖКА МОЛОТА НА 2 КАДРЕ ---
+            if self.boss_internal_state == "MELEE_ATTACK" and self.boss_attack_frame == 2:
+                if hasattr(self, 'sound_melee') and self.sound_melee: 
+                    self.sound_melee.play()
+                
+                fire_frames = getattr(self, 'boss_ground_fire_frames', [])
+                if fire_frames:
+                    strike_angle = math.atan2(self.game.player.y - self.y, self.game.player.x - self.x)
+                    
+                    # 🔥 ТОЧЕЧНЫЙ АПГРЕЙД: теперь спавним 5 луж пламени в ряд до 5 клеток вперед!
+                    for step in (1.0, 2.0, 3.0, 4.0, 5.0):
+                        fx = self.x + math.cos(strike_angle) * step
+                        fy = self.y + math.sin(strike_angle) * step
+                        
+                        wave = GroundFireWave(self.game, self, fx, fy, fire_frames, damage=6)
+                        self.boss_projectiles.append(wave)
+
 
             if self.boss_internal_state == "SHOULDER_ATTACK" and self.boss_attack_frame == 3:
                 vortex_frames = getattr(self, 'boss_fireball_frames', [])
@@ -388,7 +415,7 @@ def boss_total_isolated_update(self):
                     )
                     self.boss_projectiles.append(ball)
 
-                        # Атака: Средний бой (HAND, вылет ПЯТИ параболических ракет веером на 2-м кадре)
+            # Атака: Средний бой (HAND, вылет ПЯТИ параболических ракет веером на 2-м кадре)
             elif self.boss_internal_state == "HAND_ATTACK" and self.boss_attack_frame == 2:
                 rocket_frames = getattr(self, 'boss_rocket_frames', [])
                 if rocket_frames:
@@ -430,15 +457,29 @@ def boss_total_isolated_update(self):
         self.animator.update()
         self.image = self.animator.current_image
 
+        # ФАЗА ВЫБОРА АТАК И НАВИГАЦИИ ПО КАРТЕ
     else:
         if can_see and dist_to_player <= self.shoot_range and (now - self.last_shot >= self.shoot_delay):
             self.boss_attack_timer = now
             self.boss_attack_frame = 1
-            if dist_to_player <= 3.0:
+            
+            # --- УЛЬТИМАТИВНЫЙ ОГРАНИЧИТЕЛЬ БЛИЖНЕГО БОЯ ---
+            if dist_to_player <= 5.0:
+                # Если игрок подошел в упор — Босс Бескомпромиссно бьет молотом в пол!
+                self.boss_internal_state = "MELEE_ATTACK"
+                self.state = "ATTACK"
+                # Запускаем звук взмаха/речи Босса (если sound_melee загружен)
+                if hasattr(self, 'sound_melee') and self.sound_melee: 
+                    self.sound_melee.play()
+            
+            elif dist_to_player <= 4.5:
+                # Если на средней дистанции — закидывает ковровыми ракетами руки
                 self.boss_internal_state = "HAND_ATTACK"
                 self.state = "ATTACK"
                 if hasattr(self, 'sound_hand') and self.sound_hand: self.sound_hand.play()
+            
             else:
+                # На дальней дистанции — бросаем кубик 50/50% между веерными ракетами и вихрем! [Example 5]
                 if random() < 0.5:
                     self.boss_internal_state = "HAND_ATTACK"
                     self.state = "ATTACK"
@@ -452,6 +493,7 @@ def boss_total_isolated_update(self):
             self.animator.update()
             self.image = self.animator.current_image
             self.move_direction = self.animator.move_direction
+
 
     if self.image:
         self.sprite_width, self.sprite_height = self.image.get_size()
@@ -516,6 +558,15 @@ def init_logic(npc):
             npc.animator.sprites[key] = pygame.transform.scale(original, (new_w, new_h))
         else:
             npc.animator.sprites[key] = npc.animator.sprites.get("move_front_1")
+            
+        # Допиши в init_logic, если их там нет:
+    for f in range(1, 4):
+        key = f"attack_melee_front_{f}"
+        path = os.path.join(npc.folder_path, f"{npc.name}_attack_melee_front_{f}.png")
+        if os.path.exists(path):
+            original = pygame.image.load(path)
+            npc.animator.sprites[key] = pygame.transform.scale(original, (int(original.get_width() * scale), int(original.get_height() * scale)))
+
 
     try:
         npc.sound_shoulder = pygame.mixer.Sound(os.path.join(npc.folder_path, 'sound_shoulder.wav'))
