@@ -176,35 +176,39 @@ class HighMortarRocket:
         if dt > 0.033: dt = 0.033
         now = pygame.time.get_ticks()
 
-        # ФАЗА 1: РАКЕТА ЛЕТИТ В ВОЗДУХЕ (КОНТРОЛЬ ПО ТАЙМЕРУ ВРЕМЕНИ)
-        if self.in_air:
-            # Двигаем ракету вперед по вектору угла
+        # ФАЗА 1: РАКЕТА ЛЕТИТ В ВОЗДУХЕ ПО ДУГЕ СИНУСОИДЫ
+        if getattr(self, 'in_air', True):
+            # Двигаем ракету вперед по горизонтали
             self.x += math.cos(self.angle) * self.speed * dt
             self.y += math.sin(self.angle) * self.speed * dt
 
-            # Считаем пройденный временной прогресс полета (от 0.0 до 1.0)
-            time_passed = now - self.flight_start_time
-            progress = time_passed / self.total_flight_duration
+            # ИСПРАВЛЕНИЕ: Считаем РЕАЛЬНОЕ пройденное расстояние от точки запуска!
+            current_dist_travelled = math.hypot(self.x - self.start_x, self.y - self.start_y)
+            
+            # Считаем процент прогресса пути (от 0.0 до 1.0)
+            progress = current_dist_travelled / self.target_dist if self.target_dist > 0 else 1.0
 
-            # Ракета приземляется ТОЛЬКО когда вышло время полета ИЛИ она врезалась в стену глубоко
-            if progress >= 1.0 or (progress > 0.2 and self.game.map.is_wall(int(self.x), int(self.y))):
+            # 🔥 УЛЬТИМАТИВНЫЙ ТРИГГЕР ПОСАДКИ: ракета падает на пол, если долетела до точки ГГ
+            # ИЛИ если по пути наткнулась на физическую стену лабиринта!
+            if progress >= 1.0 or self.game.map.is_wall(int(self.x), int(self.y)):
                 self.in_air = False
-                self.speed = 0  # Полностью останавливаем её на полу
+                self.speed = 0  # Намертво застывает на полу в точке назначения!
                 self.z = 0.0
                 self.current_frame = 0
                 self.anim_timer = pygame.time.get_ticks()
             else:
-                # Парабола синусоиды: плавно поднимает биллборд на пике до 1.8 клеток вверх
-                self.z = math.sin(progress * math.pi) * 1.8  
-                self.current_frame = 0  # Замораживаем на первом кадре (proj_rocket_1)
+                # Парабола синусоиды поднимает биллборд вверх
+                self.z = math.sin(progress * math.pi) * 1.5  
+                self.current_frame = 0  # Заморозили кадр кручения в воздухе
             return
 
-        # ФАЗА 2: РАКЕТА УПАЛА НА ЗЕМЛЮ И ЧЕСТНО КРУТИТСЯ (ЗАДЕРЖКА ВЗРЫВА)
+        # ФАЗА 2: РАКЕТА УПАЛА И ЧЕСТНО КРУТИТСЯ НА ЗЕМЛЕ (ЗАДЕРЖКА ВЗРЫВА)
         if now - self.anim_timer > 45: 
             self.anim_timer = now
             self.current_frame += 1
             if self.current_frame >= len(self.frames):
                 self.trigger_detonation()
+
 
     def trigger_detonation(self):
         """Активирует взрыв по окружности поражения и поджигает пол"""
