@@ -132,6 +132,158 @@ class BossBallProjectile:
                             self.game.screen.blit(scaled_slice, (x, screen_y))
 
 
+class HighMortarRocket:
+    """Новый изолированный класс для навесной ракеты из пушки руки (HAND)"""
+    def __init__(self, game, boss, start_x, start_y, target_dist, angle, frames, explosion_frames, fire_frames, damage, explosion_sound=None):
+            # ИСПРАВЛЕНИЕ: Добавили explosion_sound=None в самый конец списка аргументов!
+            self.game = game
+            self.boss = boss
+            self.x = start_x
+            self.y = start_y
+            self.start_x = start_x
+            self.start_y = start_y
+            self.angle = angle
+            self.speed = 7.0           
+            self.frames = frames       
+            self.explosion_frames = explosion_frames
+            self.fire_frames = fire_frames
+            self.damage = damage
+            self.explosion_sound = explosion_sound  # Запоминаем кастомный звук взрыва ракеты
+            
+            self.target_dist = target_dist
+            self.z = 0.0               
+            self.current_frame = 0
+            self.anim_timer = pygame.time.get_ticks()
+            self.alive = True
+            self.in_air = True        # Флаг: пока летит по воздуху — анимация заморожена
+
+    def update(self):
+        if not self.alive: return
+        dt = self.game.delta_time
+        if dt > 0.033: dt = 0.033
+
+        # ФАЗА 1: ЛЕТИТ В ВОЗДУХЕ ПО ДУГЕ
+        if self.in_air:
+            self.x += math.cos(self.angle) * self.speed * dt
+            self.y += math.sin(self.angle) * self.speed * dt
+
+            # Считаем пройденный процент пути до точки назначения
+            dist_travelled = math.hypot(self.x - self.start_x, self.y - self.start_y)
+            progress = dist_travelled / self.target_dist if self.target_dist > 0 else 1.0
+
+            if progress >= 1.0 or self.game.map.is_wall(int(self.x), int(self.y)):
+                # Ракетка упала на пол! Останавливаем полет и включаем кручение
+                self.in_air = False
+                self.speed = 0
+                self.z = 0.0
+                self.current_frame = 0
+                self.anim_timer = pygame.time.get_ticks()
+            else:
+                # Синусоида параболы поднимает биллборд ракеты вверх
+                self.z = math.sin(progress * math.pi) * 1.5
+                self.current_frame = 0 # Замораживаем на 1-м кадре в воздухе
+            return
+
+        # ФАЗА 2: УПАЛА И БЕШЕНО КРУТИТСЯ НА ЗЕМЛЕ (ЗАДЕРЖКА ВЗРЫВА)
+        now = pygame.time.get_ticks()
+        if now - self.anim_timer > 35:
+            self.anim_timer = now
+            self.current_frame += 1
+            # Прокрутила все 16 кадров на полу — взрывается!
+            if self.current_frame >= len(self.frames):
+                self.trigger_detonation()
+
+    def trigger_detonation(self):
+        self.alive = False
+        
+        # Включаем кастомный звук бабаха
+        if hasattr(self.boss, 'sound_explosion') and self.boss.sound_explosion:
+            self.boss.sound_explosion.play()
+
+        # 1. РАЗОВЫЙ ПЛОТНЫЙ УРОН ВЗРЫВА (Радиус окружности — 1.2 клетки)
+        dist_to_player = math.hypot(self.game.player.x - self.x, self.game.player.y - self.y)
+        if dist_to_player <= 1.2:
+            self.game.player.take_damage(self.damage)
+
+        # 2. Спавним визуальный мини-взрыв на 7 кадров через твой список снарядов Босса
+        if self.explosion_frames:
+            # Создаем фейковый BossBallProjectile с нулевой скоростью для анимации взрыва
+            expl = BossBallProjectile(self.game, self.boss, self.x, self.y, 0, speed=0, frames=self.explosion_frames, damage=0)
+            expl.on_animation_end = lambda: setattr(expl, 'alive', False)
+            self.boss.boss_projectiles.append(expl)
+
+        # 3. ПОДЖОГ ЗЕМЛИ: Спавним лужу высокопериодичного огня (23 кадра fx_ground_fire)
+        if self.fire_frames:
+            fire_wave = GroundFireWave(self.game, self.boss, self.x, self.y, self.fire_frames, damage=4)
+            self.boss.boss_projectiles.append(fire_wave)
+
+    def draw(self):
+        """Рендеринг биллборда ракеты с учетом высоты параболы self.z"""
+        if not self.alive or not self.frames or self.current_frame >= len(self.frames): return
+        
+        img = self.frames[self.current_frame]
+        raw_w, raw_h = img.get_size()
+        dx, dy = self.x - self.game.player.x, self.y - self.game.player.y
+        dist = math.hypot(dx, dy)
+        if dist < 0.2: return
+
+        theta = math.atan2(dy, dx)
+        delta = theta - self.game.player.angle
+        delta = (delta + math.pi) % math.tau - math.pi
+        if abs(delta) > HALF_FOV: return
+        dist_flat = dist * math.cos(delta)
+        if dist_flat < 0.2: return
+
+        proj_height = int((SCREEN_DIST / dist_flat) * 0.4) 
+        proj_width = int(proj_height * (raw_w / raw_h))
+        center_x = (HALF_NUM_RAYS + delta / DELTA_ANGLE) * SCALE
+        start_x = int(center_x - proj_width // 2)
+        texture_step = raw_w / proj_width if proj_width > 0 else 1.0
+
+        # Смещаем вертикальные полосы вверх, пока ракета летит по дуге в воздухе
+        z_offset = int((self.z * SCREEN_DIST) / dist_flat) if dist_flat > 0 else 0
+
+        for x in range(start_x, start_x + proj_width, SCALE):
+            ray_idx = int(x // SCALE)
+            if 0 <= ray_idx < NUM_RAYS and dist_flat < self.game.raycasting.z_buffer[ray_idx]:
+                sub_x = int(x - start_x)
+                if 0 <= sub_x < proj_width:
+                    tex_x = int(sub_x * texture_step)
+                    if 0 <= tex_x < raw_w:
+                        screen_y = HALF_HEIGHT + proj_height // 2 - proj_height - z_offset
+                        slice_surf = img.subsurface(tex_x, 0, 1, raw_h)
+                        scaled_slice = pygame.transform.scale(slice_surf, (SCALE, proj_height))
+                        self.game.screen.blit(scaled_slice, (x, screen_y))
+
+
+class GroundFireWave(BossBallProjectile):
+    """Огненная лужа: высокопериодичный тикающий урон по окружности радиусом 2.0 клетки"""
+    def __init__(self, game, boss, x, y, frames, damage):
+        # Передаем параметры в твой базовый класс, выставляя размер лужи побольше (0.8)
+        super().__init__(game, boss, x, y, angle=0, speed=0, frames=frames, damage=damage)
+        self.size_mult = 0.8
+        self.anim_speed = 80
+
+    def update(self):
+        if not self.alive: return
+        
+        # Окружность поражения радиусом 2.0 клетки
+        dist_to_player = math.hypot(self.game.player.x - self.x, self.game.player.y - self.y)
+        if dist_to_player <= 2.0:
+            # Наносим тикающий урон очень часто — каждый 3-й кадр горения
+            if self.current_frame % 3 == 0:
+                self.game.player.take_damage(self.damage)
+
+        # Смена кадров горения до 23 кадра
+        now = pygame.time.get_ticks()
+        if now - self.anim_timer > self.anim_speed:
+            self.anim_timer = now
+            self.current_frame += 1
+            if self.current_frame >= len(self.frames):
+                self.alive = False  # Пламя полностью потухло
+
+
+
 # ==============================================================================
 # 2. ЛИЧНЫЙ, НЕЗАВИСИМЫЙ МЕТОД ОБНОВЛЕНИЯ АНИМАЦИЙ ДЛЯ АНИМАТОРA БОССА
 # ==============================================================================
@@ -163,10 +315,9 @@ def boss_personal_animator_update(self_animator):
 # ==============================================================================
 
 def boss_total_isolated_update(self):
-    """Независимый апдейт Кузнеца. Управляет снарядами, звуками и внутренним FSM"""
+    """Независимый ИИ Босса с хитрым чередованием атак и защитой от затирания"""
     dt = self.game.delta_time
-    if dt > 0.033:
-        dt = 0.033
+    if dt > 0.033: dt = 0.033
     now = pygame.time.get_ticks()
 
     # 1. Обновляем летящие ракеты и взрывы
@@ -177,12 +328,8 @@ def boss_total_isolated_update(self):
     # 2. Обработка смерти Босса
     if not self.alive or self.hp <= 0:
         self.state = "DEAD"
-        if hasattr(self, 'sound_fire_loop') and self.sound_fire_loop:
-            self.sound_fire_loop.stop()
-
         self.animator.update()
         self.image = self.animator.current_image
-
         if self.image:
             self.sprite_width, self.sprite_height = self.image.get_size()
             self.sprite_ratio = self.sprite_width / self.sprite_height
@@ -190,15 +337,11 @@ def boss_total_isolated_update(self):
 
     # Оптимизация дистанции ИИ
     dist_to_player = math.hypot(self.game.player.x - self.x, self.game.player.y - self.y)
-    if dist_to_player > self.activation_distance:
-        return
+    if dist_to_player > self.activation_distance: return
 
-    if self.hurt_flash > 0:
-        self.hurt_flash -= 1
-    if self.shoot_flash > 0:
-        self.shoot_flash -= 1
+    if self.hurt_flash > 0: self.hurt_flash -= 1
+    if self.shoot_flash > 0: self.shoot_flash -= 1
 
-    # 3. Аудио-эмбиент рычания
     if self.boss_internal_state == "CHASE" and hasattr(self, 'sound_idle_growl') and self.sound_idle_growl:
         if now > self.boss_growl_timer:
             self.boss_growl_timer = now + uniform(5000, 9000)
@@ -213,9 +356,9 @@ def boss_total_isolated_update(self):
     # ==========================================================================
     # СТРУКТУРА ЛОКАЛЬНОГО КОНЕЧНОГО АВТОМАТА БОССА
     # ==========================================================================
-
-    # СИТУАЦИЯ А: ФАЗА ВЕДЕНИЯ КАСТОМНОГО ОГНЯ
-    if self.boss_internal_state in ("MELEE_ATTACK", "HAND_ATTACK", "SHOULDER_ATTACK"):
+    
+    # СИТУАЦИЯ А: ФАЗА ВЕДЕНИЯ КАСТОМНОГО ОГНЯ (Когда босс застывает и машет пушками)
+    if self.boss_internal_state in ("HAND_ATTACK", "SHOULDER_ATTACK"):
         self.animator._calculate_direction()
         self.move_direction = self.animator.move_direction
 
@@ -223,78 +366,78 @@ def boss_total_isolated_update(self):
             self.boss_attack_timer = now
             self.boss_attack_frame += 1
 
-            # Атака: Дальний бой (SHOULDER, вылет на 3-м кадре)
+            # Залп наплечных пушек (Дальний бой, вылет прямого вихря на 3-м кадре)
             if self.boss_internal_state == "SHOULDER_ATTACK" and self.boss_attack_frame == 3:
                 vortex_frames = getattr(self, 'boss_fireball_frames', [])
                 if vortex_frames:
+                    # ИСПРАВЛЕНИЕ: Передали обязательный аргумент boss_explosion_frames на его законное место!
                     ball = BossBallProjectile(
-                        self.game, self,
-                        self.x, self.y,
-                        math.atan2(self.game.player.y - self.y, self.game.player.x - self.x),
-                        speed=4.5,
-                        frames=vortex_frames,
-                        explosion_frames=getattr(self, 'boss_explosion_frames', []),
-                        damage=25,
-                        size_mult=0.4,
-                        anim_speed=60,
-                        explosion_sound=getattr(self, 'sound_explosion', None)
+                        self.game, self, self.x, self.y, 
+                        math.atan2(self.game.player.y - self.y, self.game.player.x - self.x), 
+                        speed=4.5, 
+                        frames=vortex_frames, 
+                        explosion_frames=getattr(self, 'boss_explosion_frames', []), # Добавили
+                        damage=25
                     )
                     self.boss_projectiles.append(ball)
 
-            # Атака: Средний бой (HAND, вылет на 2-м кадре)
+            # Выстрел из руки (Средний бой, вылет параболической ракеты на 2-м кадре)
             elif self.boss_internal_state == "HAND_ATTACK" and self.boss_attack_frame == 2:
                 rocket_frames = getattr(self, 'boss_rocket_frames', [])
                 if rocket_frames:
-                    ball = BossBallProjectile(
-                        self.game, self,
-                        self.x, self.y,
-                        math.atan2(self.game.player.y - self.y, self.game.player.x - self.x),
-                        speed=5.5,
-                        frames=rocket_frames,
-                        explosion_frames=getattr(self, 'boss_explosion_frames', []),
-                        damage=18,
-                        size_mult=0.45,
-                        anim_speed=35,
-                        explosion_sound=getattr(self, 'sound_explosion', None)
+                    angle = math.atan2(self.game.player.y - self.y, self.game.player.x - self.x)
+                    ball = HighMortarRocket(
+                        self.game, self, self.x, self.y, target_dist=dist_to_player, angle=angle, 
+                        frames=rocket_frames, 
+                        explosion_frames=getattr(self, 'boss_mini_explosion_frames', []), 
+                        fire_frames=getattr(self, 'boss_ground_fire_frames', []), 
+                        damage=20, explosion_sound=getattr(self, 'sound_explosion', None)
                     )
                     self.boss_projectiles.append(ball)
 
             max_f = 4 if self.boss_internal_state == "SHOULDER_ATTACK" else 3
             if self.boss_attack_frame > max_f:
-                self.last_shot = now
+                self.last_shot = now  
                 self.boss_internal_state = "CHASE"
                 self.state = "CHASE"
 
-        # Запускаем наш личный аниматор для фиксации текстуры атаки
+        # Принудительно заставляем наш изолированный аниматор удерживать картинку замаха
         self.animator.update()
         self.image = self.animator.current_image
 
-    # СИТУАЦИЯ Б: ФАЗА ОБЫЧНОГО ПРЕСЛЕДОВАНИЯ
+    # ФАЗА ВЫБОРА АТАК И НАВИГАЦИИ ПО КАРТЕ ЧЕРЕЗ БРОСОК КУБИКА 50/50%
     else:
         if can_see and dist_to_player <= self.shoot_range and (now - self.last_shot >= self.shoot_delay):
             self.boss_attack_timer = now
             self.boss_attack_frame = 1
-
-            if dist_to_player <= 5.5:
+            
+            # В упор (< 3.0 клеток) — гарантированно выжигает пол ракетой под ногами ГГ!
+            if dist_to_player <= 3.0:
                 self.boss_internal_state = "HAND_ATTACK"
                 self.state = "ATTACK"
-                if hasattr(self, 'sound_hand') and self.sound_hand:
-                    self.sound_hand.play()
+                if hasattr(self, 'sound_hand') and self.sound_hand: self.sound_hand.play()
             else:
-                self.boss_internal_state = "SHOULDER_ATTACK"
-                self.state = "ATTACK"
-                if hasattr(self, 'sound_shoulder') and self.sound_shoulder:
-                    self.sound_shoulder.play()
+                # На дистанции — честный бросок кубика вероятности 50 на 50%! [Example 5]
+                from random import random
+                if random() < 0.5:
+                    self.boss_internal_state = "HAND_ATTACK"
+                    self.state = "ATTACK"
+                    if hasattr(self, 'sound_hand') and self.sound_hand: self.sound_hand.play()
+                else:
+                    self.boss_internal_state = "SHOULDER_ATTACK"
+                    self.state = "ATTACK"
+                    if hasattr(self, 'sound_shoulder') and self.sound_shoulder: self.sound_shoulder.play()
         else:
+            # Если Босс не готов стрелять — он просто мирно преследует игрока по A*
             self.update_state(dt)
             self.animator.update()
             self.image = self.animator.current_image
             self.move_direction = self.animator.move_direction
 
-    # Передаем обновленные физические размеры в 3D-движок игры
     if self.image:
         self.sprite_width, self.sprite_height = self.image.get_size()
         self.sprite_ratio = self.sprite_width / self.sprite_height
+
 
 
 def boss_custom_draw(self):
@@ -413,4 +556,18 @@ def init_logic(npc):
     npc.animator.update = types.MethodType(boss_personal_animator_update, npc.animator)
 
     print(f"[УСПЕХ БОССА] Личный независимый Аниматор и ИИ HellSmith полностью запущены.")
+    
+    # Скопируй эти строчки в самый низ своего init_logic:
+    def load_local_fx(prefix, count):
+        frames = []
+        for idx in range(1, count + 1):
+            path = os.path.join(self.folder_path, f"{prefix}_{idx}.png")
+            if os.path.exists(path):
+                original = pygame.image.load(path)
+                frames.append(pygame.transform.scale(original, (int(original.get_width() * self.scale), int(original.get_height() * self.scale))))
+        return frames
+
+    self.boss_mini_explosion_frames = load_local_fx("fx_mini_explosion", 7)
+    self.boss_ground_fire_frames = load_local_fx("fx_ground_fire", 23)
+
     
