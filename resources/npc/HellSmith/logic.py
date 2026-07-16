@@ -270,8 +270,8 @@ class GroundFireWave:
         if not self.alive: return
         
         dist_to_player = math.hypot(self.game.player.x - self.fixed_x, self.game.player.y - self.fixed_y)
-        if dist_to_player <= 2.0:
-            if self.current_frame % 3 == 0:
+        if dist_to_player <= 5.0:
+            if self.current_frame % 8 == 0:
                 self.game.player.take_damage(self.damage)
 
         now = pygame.time.get_ticks()
@@ -400,7 +400,7 @@ def boss_total_isolated_update(self):
                         fx = self.x + math.cos(strike_angle) * step
                         fy = self.y + math.sin(strike_angle) * step
                         
-                        wave = GroundFireWave(self.game, self, fx, fy, fire_frames, damage=6)
+                        wave = GroundFireWave(self.game, self, fx, fy, fire_frames, damage=1)
                         self.boss_projectiles.append(wave)
 
 
@@ -574,9 +574,10 @@ def init_logic(npc):
         npc.sound_explosion = pygame.mixer.Sound(os.path.join(npc.folder_path, 'sound_explosion.wav'))
         npc.sound_idle_growl = pygame.mixer.Sound(os.path.join(npc.folder_path, 'sound_idle_growl.wav'))
         npc.sound_sight_phrase = pygame.mixer.Sound(os.path.join(npc.folder_path, 'sound_sight_phrase.wav'))
+        npc.sound_melee = pygame.mixer.Sound(os.path.join(npc.folder_path, 'sound_melee.wav'))
 
-        vol = 0.45
-        for s in [npc.sound_shoulder, npc.sound_hand, npc.sound_explosion, npc.sound_idle_growl]:
+        vol = 0.05
+        for s in [npc.sound_shoulder, npc.sound_hand, npc.sound_explosion, npc.sound_idle_growl, npc.sound_melee]:
             if s: s.set_volume(vol)
         if npc.sound_sight_phrase: npc.sound_sight_phrase.set_volume(vol * 1.3)
     except Exception as e:
