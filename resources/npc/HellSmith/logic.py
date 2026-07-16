@@ -75,14 +75,20 @@ class BossBallProjectile:
                 self.current_frame %= len(self.frames)
 
     def trigger_explosion(self):
+        # ИСПРАВЛЕНИЕ: Если у шара нет своего звука, берем глобальный со склада Босса
+        sound_to_play = self.explosion_sound if self.explosion_sound else getattr(self.boss, 'sound_explosion', None)
+
         if self.explosion_frames:
             self.is_exploding = True
             self.speed = 0
             self.current_frame = 0
-            if self.explosion_sound:
-                self.explosion_sound.play()
+            if sound_to_play:
+                sound_to_play.play()
         else:
             self.alive = False
+            if sound_to_play:
+                sound_to_play.play()
+
 
     def draw(self):
         if not self.alive or not self.frames:
