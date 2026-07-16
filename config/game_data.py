@@ -17,7 +17,6 @@ SYMBOLS_CONFIG = {
     'C': {'type': 'wall', 'texture': 'resources/textures/C.png'},
     'L': {'type': 'wall', 'texture': 'resources/textures/L.png'},
     'R': {'type': 'wall', 'texture': 'resources/textures/R.png'},
-    'B': {'type': 'wall', 'texture': 'resources/textures/B.png'},
     'G': {'type': 'wall', 'texture': 'resources/textures/G.png'},
     'W': {'type': 'wall', 'texture': 'resources/textures/W.png'},
     'I': {'type': 'wall', 'texture': 'resources/textures/I.png'},
@@ -123,6 +122,19 @@ NPC_CONFIG = {
         'shoot_delay': 2200,           # Задержка МЕЖДУ длинными очередями
         'sound_volume': 0.3,
     },
+    'B': {
+        'name': 'HellSmith',            # Имя папки со спрайтами и logic.py
+        'speed': 0.15,                  # Идет медленно, но неумолимо, сотрясая пол
+        'hp': 2000,                     # Огромный запас здоровья для долгого боя
+        'damage': 20,                   # Базовый урон (кастомные атаки в logic.py пересчитают его)
+        # --- ТРЕХСТУПЕНЧАТАЯ СИСТЕМА ДИСТАНЦИЙ ---
+        'activation_distance': 35,      # Оптимизация (ИИ просыпается за 35 клеток)
+        'view_distance': 25,            # Зоркость (Заметит игрока и включит боевой клич с 25 клеток)
+        'shoot_range': 12.0,            # Дальний бой (Начнет спавнить вихри с 12 клеток)
+        'shoot_delay': 1800,            # Кулдаун в миллисекундах МЕЖДУ его супер-атаками
+        'sound_volume': 0.45,           # Слышно на весь уровень!
+    },
+
 
 
 
