@@ -148,52 +148,61 @@ class HighMortarRocket:
         self.start_x = start_x
         self.start_y = start_y
         self.angle = angle
-        self.speed = 7.0           
+        
+        # Регулируем скорость: делаем полёт плавным
+        self.speed = 6.0           
         self.frames = frames       
         self.explosion_frames = explosion_frames
         self.fire_frames = fire_frames
         self.damage = damage
         self.explosion_sound = explosion_sound  
         
-        self.target_dist = target_dist
+        # ЗАЩИТА НА СТАРТЕ: Если дистанция нулевая, насильно ставим 3 клетки, чтобы не было мгновенного взрыва!
+        self.target_dist = target_dist if target_dist > 0.5 else 3.0
         self.z = 0.0               
         self.current_frame = 0
-        self.anim_timer = pygame.time.get_ticks()
         self.alive = True
-        self.in_air = True        # Флаг: пока летит по воздуху — анимация заморожена
+        self.in_air = True        
+        
+        # ТАЙМЕР ЧЕСТНОГО ВРЕМЕНИ ПОЛЁТА: считаем время жизни ракеты в воздухе
+        self.flight_start_time = pygame.time.get_ticks()
+        # Ракета гарантированно летит время, пропорциональное расстоянию (например, 150 мс на клетку)
+        self.total_flight_duration = max(300, min(1500, int(self.target_dist * 150))) 
+        self.anim_timer = pygame.time.get_ticks()
 
     def update(self):
         if not self.alive: return
         dt = self.game.delta_time
         if dt > 0.033: dt = 0.033
+        now = pygame.time.get_ticks()
 
-        # ФАЗА 1: РАКЕТА ЛЕТИТ В ВОЗДУХЕ ПО ДУГЕ СИНУСОИДЫ
-        if getattr(self, 'in_air', True):
+        # ФАЗА 1: РАКЕТА ЛЕТИТ В ВОЗДУХЕ (КОНТРОЛЬ ПО ТАЙМЕРУ ВРЕМЕНИ)
+        if self.in_air:
+            # Двигаем ракету вперед по вектору угла
             self.x += math.cos(self.angle) * self.speed * dt
             self.y += math.sin(self.angle) * self.speed * dt
 
-            dist_travelled = math.hypot(self.x - self.start_x, self.y - self.start_y)
-            progress = dist_travelled / self.target_dist if self.target_dist > 0 else 1.0
+            # Считаем пройденный временной прогресс полета (от 0.0 до 1.0)
+            time_passed = now - self.flight_start_time
+            progress = time_passed / self.total_flight_duration
 
-            if progress >= 1.0 or self.game.map.is_wall(int(self.x), int(self.y)):
-                # Ракета шлёпнулась на землю! Включаем кручение задержки
+            # Ракета приземляется ТОЛЬКО когда вышло время полета ИЛИ она врезалась в стену глубоко
+            if progress >= 1.0 or (progress > 0.2 and self.game.map.is_wall(int(self.x), int(self.y))):
                 self.in_air = False
-                self.speed = 0  # Намертво застывает на полу
+                self.speed = 0  # Полностью останавливаем её на полу
                 self.z = 0.0
                 self.current_frame = 0
                 self.anim_timer = pygame.time.get_ticks()
             else:
-                # Парабола синусоиды поднимает биллборд
-                self.z = math.sin(progress * math.pi) * 1.5  
-                self.current_frame = 0  # Заморозили кадр кручения в воздухе (proj_rocket_1)
+                # Парабола синусоиды: плавно поднимает биллборд на пике до 1.8 клеток вверх
+                self.z = math.sin(progress * math.pi) * 1.8  
+                self.current_frame = 0  # Замораживаем на первом кадре (proj_rocket_1)
             return
 
-        # ФАЗА 2: РАКЕТА УПАЛА И ЧЕСТНО КРУТИТСЯ НА ЗЕМЛЕ (ЗАДЕРЖКА ВЗРЫВА)
-        now = pygame.time.get_ticks()
-        if now - self.anim_timer > 45: # Оптимальная скорость задержки кручения (45 мс на кадр)
+        # ФАЗА 2: РАКЕТА УПАЛА НА ЗЕМЛЮ И ЧЕСТНО КРУТИТСЯ (ЗАДЕРЖКА ВЗРЫВА)
+        if now - self.anim_timer > 45: 
             self.anim_timer = now
             self.current_frame += 1
-            # Прокрутила все 16 кадров на полу — взрывается!
             if self.current_frame >= len(self.frames):
                 self.trigger_detonation()
 
@@ -205,21 +214,13 @@ class HighMortarRocket:
         if sound_to_play:
             sound_to_play.play()
 
-        # Разовый урон взрыва в радиусе 1.2 клетки
         dist_to_player = math.hypot(self.game.player.x - self.x, self.game.player.y - self.y)
         if dist_to_player <= 1.2:
             self.game.player.take_damage(self.damage)
 
-        # Спавним визуальный мини-взрыв на 7 кадров (fx_mini_explosion)
+        # Спавним мини-взрыв, который гарантированно удалится через 7 кадров
         if self.explosion_frames:
-            # ИСПРАВЛЕНИЕ ЗАЦИКЛИВАНИЯ: Передаем кадры взрыва в ОСНОВНОЙ контейнер frames класса BossBallProjectile,
-            # но выставляем speed=0 и пишем кастомный on_animation_end, чтобы взрыв гарантированно УДАЛЯЛСЯ из игры!
-            expl = BossBallProjectile(
-                self.game, self.boss, self.x, self.y, 
-                angle=0, speed=0, frames=self.explosion_frames, 
-                explosion_frames=[], damage=0, size_mult=0.6, anim_speed=60
-            )
-            # Переопределяем метод update у этой конкретной вспышки, чтобы она исчезла после 7 кадров
+            expl = BossBallProjectile(self.game, self.boss, self.x, self.y, angle=0, speed=0, frames=self.explosion_frames, explosion_frames=[], damage=0, size_mult=0.5, anim_speed=60)
             def custom_expl_update(self_expl):
                 now_ex = pygame.time.get_ticks()
                 if now_ex - self_expl.anim_timer > self_expl.anim_speed:
@@ -230,7 +231,6 @@ class HighMortarRocket:
             expl.update = types.MethodType(custom_expl_update, expl)
             self.boss.boss_projectiles.append(expl)
 
-        # ПОДЖОГ ЗЕМЛИ: Спавним окружность яростного пламени (fx_ground_fire)
         if self.fire_frames:
             fire_wave = GroundFireWave(self.game, self.boss, self.x, self.y, self.fire_frames, damage=4)
             self.boss.boss_projectiles.append(fire_wave)
@@ -251,7 +251,8 @@ class HighMortarRocket:
         dist_flat = dist * math.cos(delta)
         if dist_flat < 0.2: return
 
-        # СДУВАЕМ РАКЕТУ ИЗЯЩНО: Фиксированный масштаб 0.35, чтобы она выглядела аккуратно
+        # ЖЕСТКИЙ ПРЕДЕЛ МАСШТАБА: выставляем фиксированный аккуратный размер 0.35 клеток,
+        # чтобы её физически не могло раздуть, даже если она взрывается близко!
         proj_height = int((SCREEN_DIST / dist_flat) * 0.35) 
         proj_width = int(proj_height * (raw_w / raw_h))
         center_x = (HALF_NUM_RAYS + delta / DELTA_ANGLE) * SCALE
@@ -267,34 +268,87 @@ class HighMortarRocket:
                 if 0 <= sub_x < proj_width:
                     tex_x = int(sub_x * texture_step)
                     if 0 <= tex_x < raw_w:
-                        screen_y = HALF_HEIGHT + proj_height // 2 - proj_height - z_offset
+                        # ИСПРАВЛЕНИЕ: Изменили формулу! Намертво сажаем ракету основанием на пол лабиринта
+                        screen_y = HALF_HEIGHT + (proj_height // 2) - z_offset
+                        
                         slice_surf = img.subsurface(tex_x, 0, 1, raw_h)
                         scaled_slice = pygame.transform.scale(slice_surf, (SCALE, proj_height))
                         self.game.screen.blit(scaled_slice, (x, screen_y))
 
 
-class GroundFireWave(BossBallProjectile):
-    """Огненная лужа: высокопериодичный тикающий урон по окружности радиусом 2.0 клетки"""
+
+class GroundFireWave:
+    """Полностью независимый класс огненной лужи: лежит строго на полу и наносит тикающий урон"""
     def __init__(self, game, boss, x, y, frames, damage):
-        # ИСПРАВЛЕНИЕ: Выравниваем цепочку аргументов конструктора, ставим пустой список на 8-е место!
-        super().__init__(game, boss, x, y, angle=0, speed=0, frames=frames, explosion_frames=[], damage=damage)
-        self.size_mult = 0.8
-        self.anim_speed = 80
+        self.game = game
+        self.boss = boss
+        self.x = x
+        self.y = y
+        self.frames = frames       # 23 кадра fx_ground_fire
+        self.damage = damage
+        self.size_mult = 0.8       # Большой размер костра на полу
+        self.anim_speed = 80       
+        
+        self.current_frame = 0
+        self.anim_timer = pygame.time.get_ticks()
+        self.alive = True
+        self.z = 0.0               # Лежит прямо на земле
 
     def update(self):
         if not self.alive: return
         
+        # Высокопериодичный урон по окружности радиусом 2.0 клетки
         dist_to_player = math.hypot(self.game.player.x - self.x, self.game.player.y - self.y)
         if dist_to_player <= 2.0:
+            # Наносим урон быстро: каждый 3-й кадр горения анимации лужи
             if self.current_frame % 3 == 0:
                 self.game.player.take_damage(self.damage)
 
+        # Перебор кадров горения
         now = pygame.time.get_ticks()
         if now - self.anim_timer > self.anim_speed:
             self.anim_timer = now
             self.current_frame += 1
             if self.current_frame >= len(self.frames):
-                self.alive = False  # Пламя полностью потухло
+                self.alive = False  # Лужа полностью прогорела и потухла
+
+    def draw(self):
+        """Собственный метод отрисовки, который намертво сажает лужу на плоскость пола"""
+        if not self.alive or not self.frames or self.current_frame >= len(self.frames): return
+        
+        img = self.frames[self.current_frame]
+        raw_w, raw_h = img.get_size()
+        dx, dy = self.x - self.game.player.x, self.y - self.game.player.y
+        dist = math.hypot(dx, dy)
+        if dist < 0.2: return
+
+        theta = math.atan2(dy, dx)
+        delta = theta - self.game.player.angle
+        delta = (delta + math.pi) % math.tau - math.pi
+        if abs(delta) > HALF_FOV: return
+        dist_flat = dist * math.cos(delta)
+        if dist_flat < 0.2: return
+
+        proj_height = int((SCREEN_DIST / dist_flat) * self.size_mult) 
+        proj_width = int(proj_height * (raw_w / raw_h))
+        center_x = (HALF_NUM_RAYS + delta / DELTA_ANGLE) * SCALE
+        start_x = int(center_x - proj_width // 2)
+        texture_step = raw_w / proj_width if proj_width > 0 else 1.0
+
+        for x in range(start_x, start_x + proj_width, SCALE):
+            ray_idx = int(x // SCALE)
+            if 0 <= ray_idx < NUM_RAYS and dist_flat < self.game.raycasting.z_buffer[ray_idx]:
+                sub_x = int(x - start_x)
+                if 0 <= sub_x < proj_width:
+                    tex_x = int(sub_x * texture_step)
+                    if 0 <= tex_x < raw_w:
+                        # ЧЕСТНАЯ ПОСАДКА НА ПОЛ: Спрайт крепится своим нижним краем к полу лабиринта!
+                        screen_y = HALF_HEIGHT + (proj_height // 2)
+                        
+                        slice_surf = img.subsurface(tex_x, 0, 1, raw_h)
+                        scaled_slice = pygame.transform.scale(slice_surf, (SCALE, proj_height))
+                        self.game.screen.blit(scaled_slice, (x, screen_y))
+
 
 
 
@@ -398,20 +452,29 @@ def boss_total_isolated_update(self):
                     self.boss_projectiles.append(ball)
 
             # Атака: Средний бой (HAND, вылет параболической ракеты на 2-м кадре)
+            # Атака: Средний бой (HAND, вылет параболической ракеты на 2-м кадре)
             elif self.boss_internal_state == "HAND_ATTACK" and self.boss_attack_frame == 2:
                 rocket_frames = getattr(self, 'boss_rocket_frames', [])
                 if rocket_frames:
                     angle = math.atan2(self.game.player.y - self.y, self.game.player.x - self.x)
                     
-                    # СИНХРОНИЗАЦИЯ: Передаем строго по цепочке, чтобы убрать дикий раздутый масштаб ракеты!
+                    # 🔥 ЖЕСТКАЯ СИНХРОНИЗАЦИЯ: Явно именуем каждый аргумент!
+                    # Это на 100% сдует масштаб ракеты до 0.4 и вернет честную задержку кручения на полу!
                     ball = HighMortarRocket(
-                        self.game, self, self.x, self.y, 
-                        dist_to_player, angle, rocket_frames, 
-                        getattr(self, 'boss_mini_explosion_frames', []), 
-                        getattr(self, 'boss_ground_fire_frames', []), 
-                        20, getattr(self, 'sound_explosion', None)
+                        game=self.game,
+                        boss=self,
+                        start_x=self.x,
+                        start_y=self.y,
+                        target_dist=dist_to_player,
+                        angle=angle,
+                        frames=rocket_frames,
+                        explosion_frames=getattr(self, 'boss_mini_explosion_frames', []),
+                        fire_frames=getattr(self, 'boss_ground_fire_frames', []),
+                        damage=20,
+                        explosion_sound=getattr(self, 'sound_explosion', None)
                     )
                     self.boss_projectiles.append(ball)
+
 
 
 
