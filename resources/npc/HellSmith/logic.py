@@ -388,18 +388,38 @@ def boss_total_isolated_update(self):
                     )
                     self.boss_projectiles.append(ball)
 
+                        # Атака: Средний бой (HAND, вылет ПЯТИ параболических ракет веером на 2-м кадре)
             elif self.boss_internal_state == "HAND_ATTACK" and self.boss_attack_frame == 2:
                 rocket_frames = getattr(self, 'boss_rocket_frames', [])
                 if rocket_frames:
-                    angle = math.atan2(self.game.player.y - self.y, self.game.player.x - self.x)
-                    ball = HighMortarRocket(
-                        game=self.game, boss=self, start_x=self.x, start_y=self.y,
-                        target_dist=dist_to_player, angle=angle, frames=rocket_frames,
-                        explosion_frames=getattr(self, 'boss_mini_explosion_frames', []),
-                        fire_frames=getattr(self, 'boss_ground_fire_frames', []), damage=20,
-                        explosion_sound=getattr(self, 'sound_explosion', None)
-                    )
-                    self.boss_projectiles.append(ball)
+                    base_angle = math.atan2(self.game.player.y - self.y, self.game.player.x - self.x)
+                    
+                    # 🔥 ЗАПУСКАЕМ ВЕЕРНЫЙ ЗАЛП ИЗ 5 РАКЕТ ПО ОБЛАСТИ
+                    for _ in range(5):
+                        # Добавляем случайный разброс угла вылета (примерно +-15 градусов в радианах)
+                        random_angle_offset = uniform(-0.25, 0.22)
+                        final_angle = base_angle + random_angle_offset
+                        
+                        # Добавляем случайный разброс дистанции приземления (в радиусе +-1.5 клеток от ГГ)
+                        # max(1.0, ...) защищает от падения ракеты прямо внутрь хитбокса самого Босса
+                        random_dist_offset = uniform(-1.5, 1.5)
+                        final_target_dist = max(1.0, dist_to_player + random_dist_offset)
+                        
+                        ball = HighMortarRocket(
+                            game=self.game, 
+                            boss=self, 
+                            start_x=self.x, 
+                            start_y=self.y,
+                            target_dist=final_target_dist, 
+                            angle=final_angle, 
+                            frames=rocket_frames,
+                            explosion_frames=getattr(self, 'boss_mini_explosion_frames', []),
+                            fire_frames=getattr(self, 'boss_ground_fire_frames', []), 
+                            damage=15, # Снизили разовый урон до 15, так как ракет летит много
+                            explosion_sound=getattr(self, 'sound_explosion', None)
+                        )
+                        self.boss_projectiles.append(ball)
+
 
             max_f = 4 if self.boss_internal_state == "SHOULDER_ATTACK" else 3
             if self.boss_attack_frame > max_f:
