@@ -203,7 +203,7 @@ class HighMortarRocket:
             return
 
         # ФАЗА 2: РАКЕТА УПАЛА И ЧЕСТНО КРУТИТСЯ НА ЗЕМЛЕ (ЗАДЕРЖКА ВЗРЫВА)
-        if now - self.anim_timer > 45: 
+        if now - self.anim_timer > 120: 
             self.anim_timer = now
             self.current_frame += 1
             if self.current_frame >= len(self.frames):
