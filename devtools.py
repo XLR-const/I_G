@@ -4,11 +4,14 @@
 import os
 import sys
 import subprocess
+import glob
 
 # Пути к скриптам
 GENERATOR_PATH = os.path.join("utils", "generate_levels.py")
 EDITOR_PATH = os.path.join("map_editor", "main.py")
+DEV_MODE_PATH = os.path.join("dev_mode.py")
 LEVELS_DIR = os.path.join("resources", "levels")
+TESTS_DIR = os.path.join("tests")
 
 
 def clear_screen():
@@ -31,6 +34,17 @@ def get_levels():
     return sorted(levels)
 
 
+def get_tests():
+    """Возвращает список тестов из папки tests"""
+    if not os.path.exists(TESTS_DIR):
+        return []
+    tests = []
+    for f in os.listdir(TESTS_DIR):
+        if f.endswith('.py') and f != '__init__.py':
+            tests.append(f)
+    return sorted(tests)
+
+
 def print_header():
     """Печатает заголовок"""
     print("\n" + "=" * 60)
@@ -44,6 +58,7 @@ def print_menu():
     print("  [2] Редактор уровней")
     print("  [3] Список уровней")
     print("  [4] Запустить игру (DEV MODE)")
+    print("  [5] Запустить тесты")
     print("  [0] Выход")
     print("-" * 60)
 
@@ -58,7 +73,6 @@ def run_generator():
     
     input("Нажмите Enter для запуска генератора...")
     
-    # Запускаем генератор в том же терминале
     subprocess.run([sys.executable, GENERATOR_PATH])
     
     input("\nНажмите Enter для возврата в меню...")
@@ -80,7 +94,6 @@ def run_editor():
     print("\n  📂 ДОСТУПНЫЕ УРОВНИ:")
     print("-" * 60)
     
-    # Показываем уровни в колонках
     for i, num in enumerate(levels):
         print(f"    {i+1:2d}. Уровень {num}")
     
@@ -101,7 +114,6 @@ def run_editor():
                 
                 print(f"\n  🚀 Открываю уровень {level_num} в редакторе...")
                 
-                # Запускаем редактор
                 subprocess.run([sys.executable, EDITOR_PATH, file_path])
                 
                 input("\nНажмите Enter для возврата в меню...")
@@ -162,9 +174,59 @@ def run_dev_mode():
 
     input("\nНажмите Enter для запуска...")
 
-    subprocess.run([sys.executable, "dev_mode.py"])
+    subprocess.run([sys.executable, DEV_MODE_PATH])
 
     input("\nНажмите Enter для возврата в меню...")
+
+
+def run_tests():
+    """Запускает тесты из папки tests"""
+    clear_screen()
+    print_header()
+    
+    tests = get_tests()
+    
+    if not tests:
+        print("\n⚠️  Нет доступных тестов в папке tests/")
+        print("  Добавьте тесты в папку tests/")
+        input("\nНажмите Enter для возврата...")
+        return
+    
+    print("\n  🧪 ДОСТУПНЫЕ ТЕСТЫ:")
+    print("-" * 60)
+    
+    for i, test_name in enumerate(tests):
+        print(f"    {i+1:2d}. {test_name}")
+    
+    print("-" * 60)
+    
+    while True:
+        try:
+            choice = input("\n  Выберите номер теста (или 0 для отмены): ").strip()
+            
+            if choice == '0':
+                return
+            
+            idx = int(choice) - 1
+            
+            if 0 <= idx < len(tests):
+                test_name = tests[idx]
+                test_path = os.path.join(TESTS_DIR, test_name)
+                
+                print(f"\n  🚀 Запускаю тест: {test_name}")
+                print("  " + "-" * 40)
+                
+                subprocess.run([sys.executable, test_path])
+                
+                print("\n  " + "-" * 40)
+                print(f"  ✅ Тест {test_name} завершён.")
+                
+                input("\nНажмите Enter для возврата в меню...")
+                return
+            else:
+                print(f"  ❌ Неверный номер. Выберите от 1 до {len(tests)}")
+        except ValueError:
+            print("  ❌ Введите число!")
 
 
 def main():
@@ -184,11 +246,13 @@ def main():
             list_levels()
         elif choice == '4':
             run_dev_mode()
+        elif choice == '5':
+            run_tests()
         elif choice == '0':
             print("\n  👋 До свидания!")
             sys.exit(0)
         else:
-            print("\n  ❌ Неверный ввод. Выберите 0-4.")
+            print("\n  ❌ Неверный ввод. Выберите 0-5.")
             input("\nНажмите Enter для продолжения...")
 
 

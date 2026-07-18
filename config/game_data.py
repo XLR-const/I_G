@@ -17,7 +17,6 @@ SYMBOLS_CONFIG = {
     'C': {'type': 'wall', 'texture': 'resources/textures/C.png'},
     'L': {'type': 'wall', 'texture': 'resources/textures/L.png'},
     'R': {'type': 'wall', 'texture': 'resources/textures/R.png'},
-    'B': {'type': 'wall', 'texture': 'resources/textures/B.png'},
     'G': {'type': 'wall', 'texture': 'resources/textures/G.png'},
     'W': {'type': 'wall', 'texture': 'resources/textures/W.png'},
     'I': {'type': 'wall', 'texture': 'resources/textures/I.png'},
@@ -87,75 +86,70 @@ SYMBOLS_CONFIG = {
 # КОНФИГУРАЦИЯ NPC
 # ============================================================
 NPC_CONFIG = {
-    '2': {
-        'name': 'solder',
-        'class_name': 'Solder',
+        '2': {
+        'name': 'AutoGunGuy',
+        'speed': 0.28,
         'hp': 100,
-        'speed': 0.6,
-        'damage': 15,
-        'shoot_range': 8.0,
-        'shoot_delay': 600,
-        'radius': 0.35,
-        'sprite_base': 'resources/npc/solder/solder',
-        'sound': 'resources/npc/npc_rifle.wav',
-        'sound_volume': 0.2,
+        'damage': 6,
+        # --- ТРИ СТУПЕНИ ДИСТАНЦИЙ ---
+        'activation_distance': 35,     # Оптимизация (ИИ спит, если игрок дальше 25 клеток)
+        'view_distance': 12,           # Зоркость (Бот заметит игрока и побежит, только если тот ближе 12 клеток)
+        'shoot_range': 7.0,            # Стрельба (Остановится и откроет огонь на расстоянии 7 клеток)
+        'shoot_delay': 1400,
+        'sound_volume': 0.25,
     },
-    '3': {
-        'name': 'kamikaze',
-        'class_name': 'Kamikaze',
-        'hp': 40,
-        'speed': 1.8,
-        'damage': 40,
-        'shoot_range': 1.2,
+        '3': {
+        'name': 'BeamSolder',
+        'speed': 0.28,
+        'hp': 100,
+        'damage': 20,
+        # --- ТРИ СТУПЕНИ ДИСТАНЦИЙ ---
+        'activation_distance': 35,     # Оптимизация (ИИ спит, если игрок дальше 25 клеток)
+        'view_distance': 12,           # Зоркость (Бот заметит игрока и побежит, только если тот ближе 12 клеток)
+        'shoot_range': 7.0,            # Стрельба (Остановится и откроет огонь на расстоянии 7 клеток)
+        'shoot_delay': 2000,
+        'sound_volume': 0.25,
+    },
+        '4': {
+        'name': 'ChaingunMajor',        # Должно строго совпадать с именем папки!
+        'speed': 0.18,                 # Медлительный из-за тяжелого пулемета
+        'hp': 150,                     # Живучий мини-босс
+        'damage': 4,                   # Урон за одну пулю (небольшой, но их летит очень много!)
+        # --- Дистанции ---
+        'activation_distance': 30,     # Активируется издалека
+        'view_distance': 15,           # Замечает игрока с 15 клеток
+        'shoot_range': 9.0,            # Лупит через длинные коридоры
+        'shoot_delay': 2200,           # Задержка МЕЖДУ длинными очередями
+        'sound_volume': 0.3,
+    },
+    'B': {
+        'name': 'HellSmith',            # Имя папки со спрайтами и logic.py
+        'speed': 0.15,                  # Идет медленно, но неумолимо, сотрясая пол
+        'hp': 2000,                     # Огромный запас здоровья для долгого боя
+        'damage': 20,                   # Базовый урон (кастомные атаки в logic.py пересчитают его)
+        # --- ТРЕХСТУПЕНЧАТАЯ СИСТЕМА ДИСТАНЦИЙ ---
+        'activation_distance': 35,      # Оптимизация (ИИ просыпается за 35 клеток)
+        'view_distance': 25,            # Зоркость (Заметит игрока и включит боевой клич с 25 клеток)
+        'shoot_range': 15.0,            # Дальний бой (Начнет спавнить вихри с 12 клеток)
+        'shoot_delay': 1800,            # Кулдаун в миллисекундах МЕЖДУ его супер-атаками
+        'sound_volume': 0.45,           # Слышно на весь уровень!
+    },
+        '5': {
+        'name': 'SuicideBomber',
+        'speed': 0.48,        # Быстрый как пуля!
+        'hp': 80,             # Мало здоровья, чтобы игрок успевал сбрить его на подлете
+        'damage': 60,         # Больно взрывается
+        'activation_distance': 30,
+        'view_distance': 20,
+        'shoot_range': 0.6,   # Дистанция взрыва в упор
         'shoot_delay': 0,
-        'radius': 0.4,
-        'sprite_base': 'resources/npc/kamikaze/kamikaze',
-        'sound': 'resources/npc/npc_explosive.wav',
-        'sound_volume': 0.2,
+        'sound_volume': 0.5,
     },
-    '4': {
-        'name': 'jaggernaut',
-        'class_name': 'Jaggernaut',
-        'hp': 300,
-        'speed': 0.3,
-        'damage': 8,
-        'shoot_range': 10.0,
-        'shoot_delay': 150,
-        'radius': 0.5,
-        'sprite_base': 'resources/npc/jaggernaut/jaggernaut',
-        'sound': 'resources/npc/npc_machine_gun.wav',
-        'sound_volume': 0.2,
-    },
-    '5': {
-        'name': 'lightning',
-        'class_name': 'Lightning',
-        'hp': 30,
-        'speed': 1.1,
-        'damage': 10,
-        'shoot_range': 5.0,
-        'shoot_delay': 600,
-        'radius': 0.35,
-        'sprite_base': 'resources/npc/lightning/lightning',
-        'sound': 'resources/npc/npc_pistol.wav',
-        'sound_volume': 0.2,
-    },
-    '6': {
-        'class_name': 'Boss',
-        'name': 'boss',
-        'hp': 2000,
-        'speed': 0.3,
-        'damage': 25,
-        'shoot_range': 8.0,
-        'shoot_delay': 600,
-        'radius': 0.9,
-        'sprite_base': 'resources/npc/boss/boss',
-        'sound': 'resources/npc/npc_rifle.wav',
-        'sound_volume': 0.2,
-        'ball_speed': 2.5,
-        'ball_damage': 20,
-        'ball_count': 12,
-        'ball_cooldown': 2000,
-    },
+
+
+
+
+
 }
 
 # ============================================================

@@ -103,7 +103,7 @@ def test_astar_distance_limit():
 # ---------------------------------------
 def test_line_of_sight():
     """Тест: Проверка видимости через стены"""
-    from core.npc import NPC
+    from core.npc_old import NPC
     
     game = MockGame()
     npc = NPC(game, '2', pos=(2.0, 2.0))

@@ -5,7 +5,7 @@ import math
 from setting import *
 from core.map import Map
 from core.player import Player
-from core.npc import Solder, Kamikaze, Jaggernaut, Lightning, Boss
+from core.npc import NPC
 from core.weapon import Weapon
 from config.game_data import NPC_CONFIG, WEAPON_CONFIG, SYMBOLS_CONFIG
 from core.item import *
@@ -100,6 +100,7 @@ class LevelManager:
         self.particles = []
         self.total_kills = 0
         self.npcs = []
+        self.items = []
 
         self.map = Map(self.game, level_data['map'])
 
@@ -123,6 +124,7 @@ class LevelManager:
                 self.player = Player(self.game)
             self.player.x, self.player.y = self.map.player_spawn_pos
             self.player.hp = 100
+            self.player.armor = 0
             self.player.angle = 0
             self.exit_pos = self.map.exit_pos
         else:
@@ -180,26 +182,27 @@ class LevelManager:
 
         self.npcs = []
         for npc_x, npc_y, npc_type in self.map.npc_positions:
-            config = NPC_CONFIG.get(npc_type)
-            if not config:
-                continue
+            # Проверяем, существует ли вообще такой тип врага в нашем NPC_CONFIG
+            if npc_type in NPC_CONFIG:
+                # Центрируем врага на клетке (npc_x + 0.5, npc_y + 0.5)
+                x, y = npc_x + 0.5, npc_y + 0.5
+                
+                # Создаем пушку... то есть врага через наш единый универсальный класс NPC!
+                # Передаем ему объект игры, символ типа ('2', '7' и т.д.) и позицию
+                npc = NPC(self.game, npc_type, pos=(x, y))
+                self.npcs.append(npc)
 
-            class_name = config.get('class_name')
-            if not class_name:
-                continue
-
-            npc_class = globals().get(class_name)
-            if not npc_class:
-                continue
-
-            x, y = npc_x + 0.5, npc_y + 0.5
-            npc = npc_class(self.game, pos=(x, y))
-            self.npcs.append(npc)
-
+        # Автоматическая генерация путей патрулирования для всех заспавненных NPC
         for npc in self.npcs:
             try:
+                # Бот сам ищет свободные клетки вокруг себя
                 npc.generate_waypoints_auto(4)
-                npc.state = "PATROL"
+                
+                # Если точки нашлись, переводим его в мирный стейт ходьбы по комнатам
+                if npc.waypoints:
+                    npc.state = "PATROL"
+                else:
+                    npc.state = "IDLE"
             except Exception as e:
                 print(f"Ошибка waypoints для {npc.name}: {e}")
                 npc.waypoints = []
@@ -277,7 +280,33 @@ class LevelManager:
         self.total_kills = 0
         self.level_time = 0
         self.current_level = 1
+        
+        # ============================================================
+        # 🔥 УЛЬТИМАТИВНЫЙ ФИКС: ЖЁСТКАЯ ОЧИСТКА ОЗУ ЧЕРЕЗ .CLEAR()
+        # ============================================================
+        # Очищаем списки через .clear(), чтобы уничтожить двойников во всех модулях игры!
+        if hasattr(self.game, 'items') and self.game.items: self.game.items.clear()
+        if hasattr(self, 'items') and self.items: self.items.clear()
+        if hasattr(self.game, 'npcs') and self.game.npcs: self.game.npcs.clear()
+        if hasattr(self.game, 'particles') and self.game.particles: self.game.particles.clear()
+        
+        # Очищаем инвентарь левел-менеджера, чтобы пушки не накладывались друг на друга
+        if hasattr(self, 'inventory') and self.inventory: self.inventory.clear()
+        if hasattr(self.game, 'inventory') and self.game.inventory: self.game.inventory.clear()
+        
+        # Если у тебя есть object_handler (отрисовщик), принудительно вычищаем спрайты и оттуда:
+        if hasattr(self.game, 'object_handler') and hasattr(self.game.object_handler, 'sprite_list'):
+            self.game.object_handler.sprite_list.clear()
+            
+        self.game.items = []
+        self.game.npcs = []
+        self.game.particles = []
+        self.game.inventory = []
+        self.game.player = None
+        # ============================================================
+        
         self.load_level(self.current_level)
+
 
     def game_over(self):
         """Завершение игры"""
