@@ -100,6 +100,7 @@ class LevelManager:
         self.particles = []
         self.total_kills = 0
         self.npcs = []
+        self.items = []
 
         self.map = Map(self.game, level_data['map'])
 
@@ -123,6 +124,7 @@ class LevelManager:
                 self.player = Player(self.game)
             self.player.x, self.player.y = self.map.player_spawn_pos
             self.player.hp = 100
+            self.player.armor = 0
             self.player.angle = 0
             self.exit_pos = self.map.exit_pos
         else:
@@ -278,7 +280,33 @@ class LevelManager:
         self.total_kills = 0
         self.level_time = 0
         self.current_level = 1
+        
+        # ============================================================
+        # 🔥 УЛЬТИМАТИВНЫЙ ФИКС: ЖЁСТКАЯ ОЧИСТКА ОЗУ ЧЕРЕЗ .CLEAR()
+        # ============================================================
+        # Очищаем списки через .clear(), чтобы уничтожить двойников во всех модулях игры!
+        if hasattr(self.game, 'items') and self.game.items: self.game.items.clear()
+        if hasattr(self, 'items') and self.items: self.items.clear()
+        if hasattr(self.game, 'npcs') and self.game.npcs: self.game.npcs.clear()
+        if hasattr(self.game, 'particles') and self.game.particles: self.game.particles.clear()
+        
+        # Очищаем инвентарь левел-менеджера, чтобы пушки не накладывались друг на друга
+        if hasattr(self, 'inventory') and self.inventory: self.inventory.clear()
+        if hasattr(self.game, 'inventory') and self.game.inventory: self.game.inventory.clear()
+        
+        # Если у тебя есть object_handler (отрисовщик), принудительно вычищаем спрайты и оттуда:
+        if hasattr(self.game, 'object_handler') and hasattr(self.game.object_handler, 'sprite_list'):
+            self.game.object_handler.sprite_list.clear()
+            
+        self.game.items = []
+        self.game.npcs = []
+        self.game.particles = []
+        self.game.inventory = []
+        self.game.player = None
+        # ============================================================
+        
         self.load_level(self.current_level)
+
 
     def game_over(self):
         """Завершение игры"""

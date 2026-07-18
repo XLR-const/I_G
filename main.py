@@ -73,6 +73,7 @@ class Game:
         self.map = None
         self.npcs = []
         self.inventory = []
+        self.items = []
         self.weapon = None
         self.particles = []
         self.exit_pos = None
