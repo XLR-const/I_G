@@ -141,7 +141,7 @@ def run_dda_numba(ox, oy, player_angle, numeric_grid, door_states, num_rays,
 
         render_data[i, 0] = wall_char_id
         render_data[i, 1] = side
-        render_data[i, 2] = 0 
+        render_data[i, 2] = x_map * 1000 + y_map 
         render_data[i, 3] = int(proj_height)
         render_data[i, 4] = tex_x_pixel
 
@@ -279,19 +279,39 @@ class RayCasting:
         original_clip = self.game.screen.get_clip()
         self.game.screen.set_clip(pygame.Rect(0, 0, WIDTH, HEIGHT))
 
+        player_angle = self.game.player.angle
         # 3. ЦИКЛ ОТРИСОВКИ СТЕН И ДВЕРЕЙ НА ЭКРАНЕ
         for i in range(NUM_RAYS):
-            wall_char_id, side, _, proj_height, tex_x = render_data[i]
+            # 🔥 Изменили '_' на 'map_pos_id'
+            wall_char_id, side, map_pos_id, proj_height, tex_x = render_data[i]
             
             # Если луч улетел в пустоту — просто ничего не рисуем (убирает баг с небом)
             if wall_char_id == 0 or proj_height <= 0:
                 continue
 
             x = int(i * SCALE)
+            
+            # Дефолтное имя из конфига Numba
             wall_char = id_to_char.get(wall_char_id, '1')
+
+            # ==================================================================
+            # 🔥 ИДЕАЛЬНЫЙ ФИКС БЕЛЫХ ПОЛОС: Прямая распаковка координат из Numba
+            # ==================================================================
+            if wall_char_id == door_id and map_pos_id > 0:
+                # Распаковываем точные целочисленные индексы клетки без погрешностей округления!
+                tile_x = map_pos_id // 1000
+                tile_y = map_pos_id % 1000
+                
+                # Читаем реальное строковое имя прохода из матрицы карты
+                if 0 <= tile_y < len(self.game.map.text_map) and 0 <= tile_x < len(self.game.map.text_map[tile_y]):
+                    wall_char = str(self.game.map.text_map[tile_y][tile_x]).strip()
+            # ==================================================================
+
+            # Вытаскиваем готовую Pygame-текстуру по её честному имени
             texture = self.textures.get(wall_char)
 
             h = int(proj_height)
+
             
             # --- ПИКСЕЛИЗАЦИЯ СТЕН И ДВЕРЕЙ ВБЛИЗИ БЕЗ «ВОЛН» ---
             if h > HEIGHT:

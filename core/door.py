@@ -1,55 +1,82 @@
 import pygame
 import math
 from setting import *
+from config.game_data import *
 
 
 class Door:
-    """Класс двери с анимацией открытия и закрытия
+    """Класс двери с анимацией открытия, запертыми замками и секретными стенами-мимикриками"""
 
-    Attributes:
-        game: Объект игры
-        x: Координата X
-        y: Координата Y
-        state: Состояние двери (CLOSED, OPENING, OPENED, CLOSING)
-        open_progress: Прогресс открытия (0.0 - 1.0)
-        speed: Скорость открытия/закрытия
-        trigger_distance: Дистанция срабатывания
-        close_delay: Задержка перед закрытием в мс
-        close_timer: Таймер закрытия
-        color: Цвет двери (fallback)
-        frame: Кадр анимации
-    """
-
-    def __init__(self, game, x, y):
-        """Инициализирует дверь
-
-        Args:
-            game: Объект игры
-            x: Координата X
-            y: Координата Y
-        """
+    def __init__(self, game, x, y, door_type="normal", required_key=None, texture=None):
+        """Инициализирует дверь с текстурой из конфига"""
         self.game = game
-        self.x = x
-        self.y = y
+        self.x = float(x)
+        self.y = float(y)
+        
+        self.door_type = str(door_type).strip().lower()
+        self.required_key = str(required_key).strip().lower() if required_key else None
+        
+        # 🔥 СОХРАНЯЕМ ТЕКСТУРУ ИЗ КОНФИГА: Рэйкастинг прочитает этот путь
+        self.texture_id = texture 
+        
         self.state = "CLOSED"
         self.open_progress = 0.0
         self.speed = 0.05
         self.trigger_distance = 1.5
         self.close_delay = 1000
         self.close_timer = 0
-
-        self.color = WALL_COLORS['W']
+        self.color = (100, 100, 100)
         self.frame = 0
 
+        # === АВТОПОДБОР ТЕКСТУРЫ ДЛЯ СЕКРЕТНЫХ СТЕН ===
+        if self.door_type == "secret":
+            self.trigger_distance = 1.1
+            self.speed = 0.03
+            
+            try:
+                nx = int(self.x) - 1
+                ny = int(self.y)
+                
+                if 0 <= ny < len(self.game.map.text_map) and 0 <= nx < len(self.game.map.text_map[ny]):
+                    neighbor_char = str(self.game.map.text_map[ny][nx]).strip()
+                    
+                    # 🔥 КРАДЕМ ТЕКСТУРУ ИЗ КОНФИГА СОСЕДА:
+                    # Ищем соседа в SYMBOLS_CONFIG и забираем у него параметр 'texture'!
+                    if neighbor_char in SYMBOLS_CONFIG:
+                        neighbor_texture = SYMBOLS_CONFIG[neighbor_char].get('texture', None)
+                        if neighbor_texture:
+                            self.texture_id = neighbor_texture # Полная визуальная маскировка!
+                            print(f"[СЕКРЕТ] Скопирована текстура соседа из конфига: '{neighbor_texture}'")
+            except Exception as e:
+                print(f"[ДВЕРЬ] Ошибка мимикрии: {e}")
+
+
     def update(self):
-        """Обновляет состояние двери"""
+        """Обновляет состояние двери с учетом ключей и типов проходов"""
         dx = self.game.player.x - self.x
         dy = self.game.player.y - self.y
         dist = math.hypot(dx, dy)
 
         if self.state == "CLOSED":
             if dist < self.trigger_distance:
-                self.state = "OPENING"
+                
+                # 1. ПРОВЕРКА ДЛЯ ЗАПЕРТЫХ ЦВЕТНЫХ ДВЕРЕЙ
+                if self.door_type == "locked" and self.required_key:
+                    player_keys = getattr(self.game.player, 'keys_inventory', [])
+                    
+                    if self.required_key in player_keys:
+                        print(f"[ДВЕРЬ] Замок открыт {self.required_key.upper()} ключом!")
+                        self.state = "OPENING"
+                    else:
+                        if pygame.time.get_ticks() % 2000 < 20:
+                            print(f"[ЗАПЕРТО] Нужен {self.required_key.upper()} ключ!")
+                        return
+                
+                # 2. ДЛЯ ОБЫЧНЫХ И СЕКРЕТНЫХ ДВЕРЕЙ
+                else:
+                    if self.door_type == "secret":
+                        print("🎉 [СЕКРЕТ] Вы нашли потайной проход!")
+                    self.state = "OPENING"
 
         elif self.state == "OPENING":
             self.open_progress += self.speed
@@ -59,6 +86,10 @@ class Door:
                 self.close_timer = pygame.time.get_ticks() + self.close_delay
 
         elif self.state == "OPEN":
+            # 🔥 ФИКС: Секретная стена никогда не закрывается сама!
+            if self.door_type == "secret":
+                return
+                
             if dist > self.trigger_distance * 1.5:
                 if pygame.time.get_ticks() > self.close_timer:
                     self.state = "CLOSING"
@@ -70,22 +101,10 @@ class Door:
                 self.state = "CLOSED"
 
     def is_wall(self):
-        """Проверяет, является ли дверь стеной
-
-        Returns:
-            bool: True если дверь закрыта или закрывается
-        """
         return self.state == "CLOSED" or self.state == "CLOSING"
 
     def get_texture_offset(self):
-        """Возвращает смещение текстуры для анимации
-
-        Returns:
-            float: Прогресс открытия (0.0 - 1.0)
-        """
-        if self.state == "OPENING":
-            return self.open_progress
-        elif self.state == "CLOSING":
+        if self.state == "OPENING" or self.state == "CLOSING":
             return self.open_progress
         elif self.state == "OPEN":
             return 1.0

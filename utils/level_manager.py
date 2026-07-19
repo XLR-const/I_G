@@ -112,9 +112,21 @@ class LevelManager:
                 item = ArmorItem(self.game, x, y, amount)
             elif item_type == 'weapon':
                 item = WeaponItem(self.game, x, y, weapon_name, ammo)
+                
+            # 🔥 ЧИСТОЕ ДОБАВЛЕНИЕ КЛЮЧА ПО ТВОЕМУ ШАБЛОНУ:
+            elif item_type == 'key':
+                from core.item import KeyItem
+                # Берем цвет ключа ('red', 'blue' или 'yellow') напрямую из переменной amount
+                key_color = str(amount).strip().lower()
+                # Создаем объект ключа точно так же, как аптечку или броню
+                item = KeyItem(self.game, x, y, key_color=key_color)
+                
             else:
                 continue
+                
+            # Складываем в твой родной список предметов уровня
             self.items.append(item)
+
 
         background = level_data.get('background', {})
         self.game.renderer.set_background(background)

@@ -26,6 +26,7 @@ class Player:
         self.armor = 0
         self.max_hp = 100
         self.max_armor = 100
+        self.keys_inventory = []
         self.last_damage_time = 0
         self.regen_delay = 10000
         self.regen_speed = 10

@@ -72,9 +72,53 @@ SYMBOLS_CONFIG = {
     },
 
     
-    # Дверь
-    'Door': {'type': 'door', 'texture': 'resources/textures/D.png'},
-    
+ # --- СИСТЕМА ДВЕРЕЙ И СЕКРЕТОК С ТЕКСТУРАМИ ---
+    'door_normal': {
+        'type': 'door', 
+        'door_type': 'normal', 
+        'required_key': None,
+        'texture': 'resources/textures/door.png'       # Путь к текстуре обычной двери!
+    },
+    'door_red_key': {
+        'type': 'door', 
+        'door_type': 'locked', 
+        'required_key': 'red',
+        'texture': 'resources/textures/door_red.png'   # Путь к красной двери!
+    },
+    'door_blue_key': {
+        'type': 'door', 
+        'door_type': 'locked', 
+        'required_key': 'blue',
+        'texture': 'resources/textures/door_blue.png'
+    },
+    'door_yellow_key': {
+        'type': 'door', 
+        'door_type': 'locked', 
+        'required_key': 'yellow',
+        'texture': 'resources/textures/door_yellow.png'
+    },
+    'secret_wall': {
+        'type': 'door', 
+        'door_type': 'secret', 
+        'required_key': None,
+        'texture': 'resources/textures/brick.png'      # Дефолтная текстура секретки (на всякий случай)
+    },
+
+    # --- КЛЮЧИ ---
+    'key_red': {
+        'type': 'item', 'item_type': 'key', 'key_color': 'red',
+        'sprite': 'resources/items/red_key.png'
+    },
+    'key_blue': {
+        'type': 'item', 'item_type': 'key', 'key_color': 'blue',
+        'sprite': 'resources/items/blue_key.png'
+    },
+    'key_yellow': {
+        'type': 'item', 'item_type': 'key', 'key_color': 'yellow',
+        'sprite': 'resources/items/yellow_key.png'
+    },
+
+
     # Выход
     'Exit': {'type': 'exit'},
     

@@ -64,8 +64,19 @@ class Map:
                     if symbol_type == 'wall':
                         self.world_map[(i, j)] = char
                     elif symbol_type == 'door':
-                        door = Door(self.game, i + 0.5, j + 0.5)
+                        door_type = str(SYMBOLS_CONFIG[char].get('door_type', 'NORMAL')).lower()
+                        required_key = SYMBOLS_CONFIG[char].get('required_key', None)
+                        
+                        # 🔥 ДОБАВИЛИ: Вытаскиваем путь к текстуре прямо из конфига!
+                        door_texture = SYMBOLS_CONFIG[char].get('texture', None)
+                        
+                        # Передаем текстуру в класс двери пятым аргументом
+                        door = Door(self.game, i + 0.5, j + 0.5, door_type=door_type, required_key=required_key, texture=door_texture)
                         self.doors.append(door)
+                        
+                        if door_type == "secret":
+                            self.world_map[(i, j)] = char
+
                     elif symbol_type == 'exit':
                         self.exit_pos = (i + 0.5, j + 0.5)
                     elif symbol_type == 'player_spawn':
@@ -73,9 +84,17 @@ class Map:
                     elif symbol_type == 'item':
                         item_type = SYMBOLS_CONFIG[char].get('item_type')
                         amount = SYMBOLS_CONFIG[char].get('amount', 0)
+                        
+                        # 🔥 ХИРУРГИЧЕСКИЙ АПГРЕЙД ДЛЯ КЛЮЧЕЙ:
+                        # Если это ключ, мы записываем его цвет ('red', 'blue', 'yellow') в amount,
+                        # чтобы левел-менеджер прочитал его напрямую, без обращений к карте!
+                        if item_type == 'key':
+                            amount = SYMBOLS_CONFIG[char].get('key_color', 'red')
+                            
                         weapon_name = SYMBOLS_CONFIG[char].get('weapon_name', '')
                         ammo = SYMBOLS_CONFIG[char].get('ammo', 0)
                         self.item_positions.append((i, j, item_type, amount, weapon_name, ammo))
+
 
                 elif char in NPC_CONFIG:
                     self.npc_positions.append((i, j, char))
