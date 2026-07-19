@@ -269,30 +269,21 @@ class KeyItem(Item):
 
     def _load_sprite(self):
         """Загружает спрайт для конкретного цвета ключа"""
-        # Ищем в SYMBOLS_CONFIG по ключу key_red, key_blue, key_yellow
         target_symbol = f"key_{self.key_color}"
         
-        for symbol, config in SYMBOLS_CONFIG.items():
-            if symbol == target_symbol:
-                texture_path = config.get('texture') or config.get('sprite')
-                if texture_path:
-                    try:
-                        full_path = texture_path
-                        # Если путь относительный — добавляем корень проекта
-                        if not os.path.isabs(full_path):
-                            from setting import ROOT_DIR
-                            full_path = os.path.join(ROOT_DIR, full_path)
-                        
-                        self.sprite = pygame.image.load(full_path).convert_alpha()
-                        self.sprite = pygame.transform.scale(self.sprite, (32, 32))
-                        self.sprite_width, self.sprite_height = self.sprite.get_size()
-                        self.sprite_ratio = self.sprite_width / self.sprite_height
-                        return
-                    except Exception as e:
-                        print(f"[KeyItem] Ошибка загрузки {texture_path}: {e}")
-                break
+        config = SYMBOLS_CONFIG.get(target_symbol)
+        if config:
+            sprite_path = config.get('sprite')
+            if sprite_path:
+                try:
+                    self.sprite = pygame.image.load(sprite_path).convert_alpha()
+                    self.sprite = pygame.transform.scale(self.sprite, (32, 32))
+                    self.sprite_width, self.sprite_height = self.sprite.get_size()
+                    self.sprite_ratio = self.sprite_width / self.sprite_height
+                    return
+                except Exception as e:
+                    print(f"[KeyItem] Ошибка загрузки {sprite_path}: {e}")
 
-        # Если не загрузилось — создаём заглушку с цветом
         self._create_fallback_sprite()
 
     def _create_fallback_sprite(self):

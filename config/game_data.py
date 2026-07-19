@@ -107,15 +107,15 @@ SYMBOLS_CONFIG = {
     # --- КЛЮЧИ ---
     'key_red': {
         'type': 'item', 'item_type': 'key', 'key_color': 'red',
-        'sprite': 'resources/items/red_key.png'
+        'sprite': 'resources/items/key_red.png'
     },
     'key_blue': {
         'type': 'item', 'item_type': 'key', 'key_color': 'blue',
-        'sprite': 'resources/items/blue_key.png'
+        'sprite': 'resources/items/key_blue.png'
     },
     'key_yellow': {
         'type': 'item', 'item_type': 'key', 'key_color': 'yellow',
-        'sprite': 'resources/items/yellow_key.png'
+        'sprite': 'resources/items/key_yellow.png'
     },
 
 
