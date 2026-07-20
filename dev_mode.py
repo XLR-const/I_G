@@ -278,6 +278,16 @@ class DevGame:
 
                 if self.level_manager.current_weapon_index < len(self.inventory):
                     self.weapon = self.inventory[self.level_manager.current_weapon_index]
+                # Интерактивное нажатие на секретку
+                if event.key == pygame.K_e:
+                    # Проверяем секретные двери
+                    for door in self.map.doors:
+                        if door.door_type == "secret":
+                            dx = self.player.x - door.x
+                            dy = self.player.y - door.y
+                            if math.hypot(dx, dy) < 1.3:
+                                door.try_open()
+                                break
 
                 # F5 — перезагрузить уровень
                 if event.key == pygame.K_F5:

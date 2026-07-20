@@ -295,17 +295,28 @@ class RayCasting:
             wall_char = id_to_char.get(wall_char_id, '1')
 
             # ==================================================================
-            # 🔥 ИДЕАЛЬНЫЙ ФИКС БЕЛЫХ ПОЛОС: Прямая распаковка координат из Numba
+            # 🔥 ИДЕАЛЬНЫЙ ПЕРЕХВАТ ТЕКСТУРЫ ДЛЯ СЕКРЕТКИ ПО БУКВЕ СИМВОЛА
             # ==================================================================
             if wall_char_id == door_id and map_pos_id > 0:
-                # Распаковываем точные целочисленные индексы клетки без погрешностей округления!
                 tile_x = map_pos_id // 1000
                 tile_y = map_pos_id % 1000
                 
-                # Читаем реальное строковое имя прохода из матрицы карты
                 if 0 <= tile_y < len(self.game.map.text_map) and 0 <= tile_x < len(self.game.map.text_map[tile_y]):
                     wall_char = str(self.game.map.text_map[tile_y][tile_x]).strip()
+                    
+                    for door in self.game.map.doors:
+                        if int(door.x) == tile_x and int(door.y) == tile_y:
+                            if getattr(door, 'door_type', '') == 'secret':
+                                stolen_char = getattr(door, 'texture_id', None)
+                                # Если секретка успешно украла букву соседа (например, 'M' или 'C')
+                                if stolen_char:
+                                    wall_char = stolen_char # Подменяем 'secret_wall' на букву стены!
+                            break
             # ==================================================================
+
+
+
+
 
             # Вытаскиваем готовую Pygame-текстуру по её честному имени
             texture = self.textures.get(wall_char)
@@ -368,26 +379,30 @@ class RayCasting:
                     texture_slice = None
 
             # Финальный вывод вертикальной полосы на экран
+            # --- ФИНАЛЬНЫЙ ВЫВОД ВЕРТИКАЛЬНОЙ ПОЛОСЫ НА ЭКРАН ---
             if texture_slice is not None:
                 self.game.screen.blit(texture_slice, (x, y))
-                
-                # Теневой эффект (затенение Y-стен и дверей для 3D-объема)
                 if side == 1:
                     dark_surface = pygame.Surface((SCALE, texture_slice.get_height()))
                     dark_surface.set_alpha(80)
                     dark_surface.fill((0, 0, 0))
                     self.game.screen.blit(dark_surface, (x, y))
             else:
-                # Запасной вариант: цветной прямоугольник, если текстура повреждена или её нет
+                # 🔥 ИСПРАВЛЕНИЕ ЗАПАСНОЙ ЗАЛИВКИ:
+                # Если текстурный срез упал в ошибку из-за кэша subsurface,
+                # мы принудительно заставляем этот прямоугольник краситься в цвет соседа wall_char,
+                # а не в дефолтный серый цвет (200, 200, 200)!
                 rect_y = max(0, y)
                 rect_h = min(HEIGHT, h)
-                color = WALL_COLORS.get(wall_char, (200, 200, 200))
                 
-                # ИСПРАВЛЕНИЕ: Перемножаем каждый компонент цвета (R, G, B) отдельно
+                # Ищем цвет кирпича соседа в WALL_COLORS по букве ('M', 'C', '1'...), которую мы успешно украли!
+                color = WALL_COLORS.get(wall_char, (100, 100, 100))
+                
                 if side == 1:
                     color = (int(color[0] * 0.7), int(color[1] * 0.7), int(color[2] * 0.7))
                     
                 pygame.draw.rect(self.game.screen, color, (x, rect_y, SCALE, rect_h))
+
 
 
         # Восстанавливаем оригинальную область обрезки экрана для отрисовки пушки и HUD
