@@ -1,40 +1,25 @@
-"""Панель объектов (легенда) — упрощённая версия"""
+"""Панель объектов — полностью автоматическая из конфигов"""
 
 import os
 import sys
 import pygame
+from ..config import COLORS, SYMBOL_COLORS, TEXTURES_DIR, NPC_DIR
+from config.game_data import SYMBOLS_CONFIG, NPC_CONFIG
 
-# СНАЧАЛА добавляем путь к корню
 ROOT_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-if ROOT_DIR not in sys.path:
-    sys.path.insert(0, ROOT_DIR)
-
-# ПОТОМ импортируем всё остальное
-from ..config_loader import SYMBOLS_CONFIG, NPC_CONFIG
-from ..config import COLORS, TEXTURES_DIR, NPC_DIR
-
-
 class Toolbar:
-    """Панель с объектами"""
-
     def __init__(self, rect):
         self.rect = rect
-        
-        # Все объекты в плоском списке
         self.items = []
         self.selected_index = 0
         self.scroll_offset = 0
         self.item_height = 48
-        self.visible_items = 0
-        
-        # Отступ сверху для заголовка
         self.top_padding = 30
-        
+
         self._build_items()
-        self._update_visible_count()
 
     def _build_items(self):
-        """Собирает все объекты в плоский список"""
+        """Автоматически собирает все объекты из конфигов"""
         self.items = []
 
         # ============================================================
@@ -48,7 +33,7 @@ class Toolbar:
 
         self.items.append({'type': 'separator', 'label': 'СТЕНЫ'})
         for symbol in wall_symbols:
-            surf = self._load_texture(symbol)
+            surf = self._load_texture_or_color(symbol)
             self.items.append({
                 'type': 'item',
                 'symbol': symbol,
@@ -58,31 +43,30 @@ class Toolbar:
             })
 
         # ============================================================
-        # 2. ОБЪЕКТЫ
+        # 2. ДВЕРИ
         # ============================================================
-        self.items.append({'type': 'separator', 'label': 'ОБЪЕКТЫ'})
-
+        door_symbols = []
         for symbol, config in SYMBOLS_CONFIG.items():
             if config.get('type') == 'door':
-                surf = self._load_texture(symbol)
+                door_symbols.append(symbol)
+
+        if door_symbols:
+            self.items.append({'type': 'separator', 'label': 'ДВЕРИ'})
+            for symbol in door_symbols:
+                surf = self._load_texture_or_color(symbol)
+                door_type = SYMBOLS_CONFIG[symbol].get('door_type', 'normal')
                 self.items.append({
                     'type': 'item',
                     'symbol': symbol,
                     'surface': surf,
                     'label': symbol,
-                    'sub': 'дверь'
+                    'sub': f'дверь {door_type}'
                 })
 
-        for symbol, config in SYMBOLS_CONFIG.items():
-            if config.get('type') == 'exit':
-                surf = self._create_surface(symbol, (0, 100, 0))
-                self.items.append({
-                    'type': 'item',
-                    'symbol': symbol,
-                    'surface': surf,
-                    'label': symbol,
-                    'sub': 'выход'
-                })
+        # ============================================================
+        # 3. ОБЪЕКТЫ (спавн, выход, пол)
+        # ============================================================
+        self.items.append({'type': 'separator', 'label': 'ОБЪЕКТЫ'})
 
         for symbol, config in SYMBOLS_CONFIG.items():
             if config.get('type') == 'player_spawn':
@@ -94,8 +78,17 @@ class Toolbar:
                     'label': symbol,
                     'sub': 'спавн'
                 })
+            elif config.get('type') == 'exit':
+                surf = self._create_surface(symbol, (0, 100, 0))
+                self.items.append({
+                    'type': 'item',
+                    'symbol': symbol,
+                    'surface': surf,
+                    'label': symbol,
+                    'sub': 'выход'
+                })
 
-        surf = self._create_surface('_', (30, 30, 35))
+        surf = self._create_surface('_', (20, 20, 25))
         self.items.append({
             'type': 'item',
             'symbol': '_',
@@ -105,43 +98,39 @@ class Toolbar:
         })
 
         # ============================================================
-        # 3. ПРЕДМЕТЫ (с загрузкой текстур из конфига)
+        # 4. ПРЕДМЕТЫ
         # ============================================================
-        self.items.append({'type': 'separator', 'label': 'ПРЕДМЕТЫ'})
-
+        item_symbols = []
         for symbol, config in SYMBOLS_CONFIG.items():
             if config.get('type') == 'item':
+                item_symbols.append(symbol)
+
+        if item_symbols:
+            self.items.append({'type': 'separator', 'label': 'ПРЕДМЕТЫ'})
+            for symbol in item_symbols:
+                surf = self._load_texture_or_color(symbol)
+                config = SYMBOLS_CONFIG[symbol]
                 item_type = config.get('item_type', '')
                 
-                # Загружаем текстуру предмета
-                surf = self._load_item_texture(symbol)
-                
-                # Название для подписи
                 if item_type == 'health':
-                    label = 'h'
                     sub = 'аптечка +25 HP'
                 elif item_type == 'armor':
-                    label = 'a'
                     sub = 'броня +25 Armor'
-                elif item_type == 'weapon':
-                    weapon_name = config.get('weapon_name', '')
-                    ammo = config.get('ammo', 0)
-                    label = symbol
-                    sub = f'{weapon_name} (+{ammo} патр.)'
+                elif config.get('weapon_name'):
+                    sub = f'{config.get("weapon_name")} (+{config.get("ammo", 0)})'
                 else:
-                    label = symbol
                     sub = 'предмет'
                 
                 self.items.append({
                     'type': 'item',
                     'symbol': symbol,
                     'surface': surf,
-                    'label': label,
+                    'label': symbol,
                     'sub': sub
                 })
 
         # ============================================================
-        # 4. NPC
+        # 5. NPC
         # ============================================================
         self.items.append({'type': 'separator', 'label': 'NPC'})
 
@@ -160,70 +149,47 @@ class Toolbar:
                 'sub': f'{name} {"(босс)" if is_boss else ""}'
             })
 
-    def _load_texture(self, symbol):
-        try:
-            path = os.path.join(TEXTURES_DIR, f"{symbol}.png")
-            if os.path.exists(path):
-                surf = pygame.image.load(path).convert_alpha()
-                return pygame.transform.scale(surf, (32, 32))
-        except:
-            pass
-        return self._create_surface(symbol, (60, 60, 70))
+    def _load_texture_or_color(self, symbol):
+        """Загружает текстуру или создаёт цветной квадрат"""
+        config = SYMBOLS_CONFIG.get(symbol, {})
+        texture_path = config.get('texture') or config.get('sprite')
+        
+        if texture_path:
+            full_path = os.path.join(ROOT_DIR, texture_path)
+            if os.path.exists(full_path):
+                try:
+                    surf = pygame.image.load(full_path).convert_alpha()
+                    size = 34
+                    return pygame.transform.scale(surf, (size, size))
+                except:
+                    pass
+        
+        # Fallback: цвет
+        color = SYMBOL_COLORS.get(symbol, (60, 60, 70))
+        return self._create_surface(symbol, color)
 
     def _load_npc_sprite(self, name):
-        """Загружает спрайт NPC по новой системе (NpcName_move_front_1.png)"""
+        """Загружает спрайт NPC"""
         try:
-            # ============================================================
-            # НОВАЯ СИСТЕМА: ищем NpcName_move_front_1.png
-            # ============================================================
+            # Новая система: name_move_front_1.png
             path = os.path.join(NPC_DIR, name, f"{name}_move_front_1.png")
             if os.path.exists(path):
                 surf = pygame.image.load(path).convert_alpha()
                 size = 34
                 return pygame.transform.scale(surf, (size, size))
             
-            # ============================================================
-            # Если не найдено, пробуем старую систему для совместимости
-            # ============================================================
+            # Старая система: name_idle_front.png
             path_old = os.path.join(NPC_DIR, name, f"{name}_idle_front.png")
             if os.path.exists(path_old):
                 surf = pygame.image.load(path_old).convert_alpha()
                 size = 34
                 return pygame.transform.scale(surf, (size, size))
-                
-        except Exception as e:
-            print(f"[Toolbar] Ошибка загрузки NPC {name}: {e}")
-        
+        except:
+            pass
         return None
-    
-    def _load_item_texture(self, symbol):
-        """Загружает текстуру предмета из SYMBOLS_CONFIG"""
-        config = SYMBOLS_CONFIG.get(symbol, {})
-        sprite_path = config.get('sprite')
-        
-        if sprite_path:
-            try:
-                # Путь относительно корня проекта
-                full_path = os.path.join(ROOT_DIR, sprite_path)
-                if os.path.exists(full_path):
-                    surf = pygame.image.load(full_path).convert_alpha()
-                    size = 34
-                    return pygame.transform.scale(surf, (size, size))
-            except Exception as e:
-                print(f"[Toolbar] Ошибка загрузки {sprite_path}: {e}")
-        
-        # Если не загрузилось — цветной квадрат
-        if config.get('item_type') == 'health':
-            return self._create_surface(symbol, (200, 0, 0))
-        elif config.get('item_type') == 'armor':
-            return self._create_surface(symbol, (0, 100, 200))
-        elif config.get('item_type') == 'weapon':
-            return self._create_surface(symbol, (200, 200, 0))
-        else:
-            return self._create_surface(symbol, (150, 150, 150))
 
     def _create_surface(self, symbol, color):
-        size = 32
+        size = 34
         surf = pygame.Surface((size, size))
         surf.fill(color)
         pygame.draw.rect(surf, (80, 80, 90), surf.get_rect(), 1)
@@ -233,13 +199,7 @@ class Toolbar:
         surf.blit(text, text_rect)
         return surf
 
-    def _update_visible_count(self):
-        """Обновляет количество видимых элементов"""
-        height = self.rect.height - self.top_padding - 10
-        self.visible_items = max(1, height // self.item_height)
-
     def get_selected_symbol(self):
-        """Возвращает выбранный символ"""
         if self.selected_index < len(self.items):
             item = self.items[self.selected_index]
             if item['type'] == 'item':
@@ -247,49 +207,39 @@ class Toolbar:
         return 'M'
 
     def handle_click(self, mouse_x, mouse_y):
-        """Обрабатывает клик"""
         if not self.rect.collidepoint(mouse_x, mouse_y):
             return False
 
-        # Относительная позиция (с учётом отступа сверху)
         rel_y = mouse_y - self.rect.y - self.top_padding + self.scroll_offset
         index = rel_y // self.item_height
 
         if 0 <= index < len(self.items):
             self.selected_index = index
-            item = self.items[index]
-            if item['type'] == 'item':
-                print(f"[Выбран] '{item['symbol']}' ({item['sub']})")
-            else:
-                print(f"[Раздел] {item['label']}")
             return True
 
         return False
 
     def scroll(self, delta):
-        """Прокрутка"""
         total_height = len(self.items) * self.item_height + self.top_padding + 5
         max_scroll = max(0, total_height - self.rect.height + 10)
         self.scroll_offset = max(0, min(max_scroll, self.scroll_offset + delta))
 
     def draw(self, screen):
-        """Отрисовка"""
-        # Фон
-        pygame.draw.rect(screen, (35, 35, 40), self.rect)
-        pygame.draw.rect(screen, (80, 80, 90), self.rect, 1)
+        pygame.draw.rect(screen, COLORS['panel_bg'], self.rect)
+        pygame.draw.rect(screen, COLORS['panel_border'], self.rect, 1)
 
         # Заголовок
         font_title = pygame.font.Font(None, 16)
         title = font_title.render("ОБЪЕКТЫ", True, (240, 240, 240))
-        screen.blit(title, (self.rect.x + 10, self.rect.y + 3))
+        screen.blit(title, (self.rect.x + 10, self.rect.y + 5))
 
         # Счётчик
-        font_count = pygame.font.Font(None, 11)
         item_count = sum(1 for i in self.items if i['type'] == 'item')
+        font_count = pygame.font.Font(None, 11)
         count_text = font_count.render(f"{item_count} объектов", True, (140, 140, 140))
-        screen.blit(count_text, (self.rect.x + 10, self.rect.y + 20))
+        screen.blit(count_text, (self.rect.x + 10, self.rect.y + 22))
 
-        # Список (со смещением на top_padding)
+        # Список
         y = self.rect.y + self.top_padding - self.scroll_offset
         font_sep = pygame.font.Font(None, 13)
         font_label = pygame.font.Font(None, 16)
@@ -303,23 +253,19 @@ class Toolbar:
             rect = pygame.Rect(self.rect.x + 5, y, self.rect.width - 10, self.item_height)
 
             if item['type'] == 'separator':
-                # Разделитель
                 pygame.draw.rect(screen, (50, 50, 60), rect)
                 text = font_sep.render(item['label'], True, (200, 200, 220))
                 screen.blit(text, (rect.x + 10, rect.y + 14))
             else:
-                # Элемент
                 if i == self.selected_index:
                     pygame.draw.rect(screen, (80, 80, 160), rect)
                 else:
                     pygame.draw.rect(screen, (45, 45, 50), rect)
 
-                # Иконка
                 if item['surface']:
                     icon_rect = item['surface'].get_rect(topleft=(rect.x + 6, rect.y + 8))
                     screen.blit(item['surface'], icon_rect)
 
-                # Символ и название
                 label_x = rect.x + 44
                 label_y = rect.y + 6
 
@@ -329,7 +275,6 @@ class Toolbar:
                 sub_text = font_sub.render(item['sub'], True, (160, 160, 180))
                 screen.blit(sub_text, (label_x, label_y + 22))
 
-                # Рамка
                 pygame.draw.rect(screen, (70, 70, 80), rect, 1)
 
             y += self.item_height
@@ -341,3 +286,4 @@ class Toolbar:
             scroll_ratio = self.scroll_offset / (total_height - self.rect.height)
             bar_y = self.rect.y + int((self.rect.height - bar_height) * scroll_ratio)
             pygame.draw.rect(screen, (120, 120, 140), (self.rect.right - 10, bar_y, 6, bar_height))
+            

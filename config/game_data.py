@@ -23,14 +23,14 @@ SYMBOLS_CONFIG = {
     'N': {'type': 'wall', 'texture': 'resources/textures/N.png'},
     
     # Предметы
-    'h': {
+    'health': {
         'type': 'item',
         'item_type': 'health',
         'amount': 25,
         'sprite': 'resources/items/health.png',
         'description': 'Аптечка (+25 HP)'
     },
-    'a': {
+    'armor': {
         'type': 'item',
         'item_type': 'armor',
         'amount': 25,
@@ -38,7 +38,7 @@ SYMBOLS_CONFIG = {
         'description': 'Броня (+25 Armor)'
     },
     
-    'k': {
+    'ak47': {
         'type': 'item',
         'item_type': 'weapon',
         'weapon_name': 'AK-47',
@@ -46,7 +46,7 @@ SYMBOLS_CONFIG = {
         'sprite': 'resources/weapons/AK47/icon.png',  # Используем готовую иконку из папки пушки!
         'description': 'Автомат АК-47 (+30 патронов)'
     },
-    'c': {
+    'colt': {
         'type': 'item',
         'item_type': 'weapon',
         'weapon_name': 'COLT',
@@ -54,7 +54,7 @@ SYMBOLS_CONFIG = {
         'sprite': 'resources/weapons/Colt/icon.png',  # Иконка Кольта
         'description': 'Пистолет Colt 1911 (+7 патронов)'
     },
-    'g': {
+    'shotgun': {
         'type': 'item',
         'item_type': 'weapon',
         'weapon_name': 'COCH',
@@ -62,7 +62,7 @@ SYMBOLS_CONFIG = {
         'sprite': 'resources/weapons/COCH/icon.png',  # Иконка двустволки
         'description': 'Двустволка Super Shotgun (+4 патрона)'
     },
-    'p': {
+    'plasmagun': {
         'type': 'item',
         'item_type': 'weapon',
         'weapon_name': 'PLASMA',
@@ -72,21 +72,65 @@ SYMBOLS_CONFIG = {
     },
 
     
-    # Дверь
-    'D': {'type': 'door', 'texture': 'resources/textures/D.png'},
-    
+ # --- СИСТЕМА ДВЕРЕЙ И СЕКРЕТОК С ТЕКСТУРАМИ ---
+    'door_normal': {
+        'type': 'door', 
+        'door_type': 'normal', 
+        'required_key': None,
+        'texture': 'resources/textures/door.png'       # Путь к текстуре обычной двери!
+    },
+    'door_red_key': {
+        'type': 'door', 
+        'door_type': 'locked', 
+        'required_key': 'red',
+        'texture': 'resources/textures/door_red.png'   # Путь к красной двери!
+    },
+    'door_blue_key': {
+        'type': 'door', 
+        'door_type': 'locked', 
+        'required_key': 'blue',
+        'texture': 'resources/textures/door_blue.png'
+    },
+    'door_yellow_key': {
+        'type': 'door', 
+        'door_type': 'locked', 
+        'required_key': 'yellow',
+        'texture': 'resources/textures/door_yellow.png'
+    },
+    'secret_wall': {
+        'type': 'door', 
+        'door_type': 'secret', 
+        'required_key': None,
+        'texture': 'resources/textures/brick.png'      # Дефолтная текстура секретки (на всякий случай)
+    },
+
+    # --- КЛЮЧИ ---
+    'key_red': {
+        'type': 'item', 'item_type': 'key', 'key_color': 'red',
+        'sprite': 'resources/items/key_red.png'
+    },
+    'key_blue': {
+        'type': 'item', 'item_type': 'key', 'key_color': 'blue',
+        'sprite': 'resources/items/key_blue.png'
+    },
+    'key_yellow': {
+        'type': 'item', 'item_type': 'key', 'key_color': 'yellow',
+        'sprite': 'resources/items/key_yellow.png'
+    },
+
+
     # Выход
-    'E': {'type': 'exit'},
+    'Exit': {'type': 'exit'},
     
     # Спавн игрока
-    'S': {'type': 'player_spawn'},
+    'Spawn': {'type': 'player_spawn'},
 }
 
 # ============================================================
 # КОНФИГУРАЦИЯ NPC
 # ============================================================
 NPC_CONFIG = {
-        '2': {
+        'AGG': {
         'name': 'AutoGunGuy',
         'speed': 0.28,
         'hp': 100,
@@ -98,7 +142,7 @@ NPC_CONFIG = {
         'shoot_delay': 1400,
         'sound_volume': 0.25,
     },
-        '3': {
+        'BS': {
         'name': 'BeamSolder',
         'speed': 0.28,
         'hp': 100,
@@ -110,7 +154,7 @@ NPC_CONFIG = {
         'shoot_delay': 2000,
         'sound_volume': 0.25,
     },
-        '4': {
+        'CM': {
         'name': 'ChaingunMajor',        # Должно строго совпадать с именем папки!
         'speed': 0.18,                 # Медлительный из-за тяжелого пулемета
         'hp': 150,                     # Живучий мини-босс
@@ -122,7 +166,7 @@ NPC_CONFIG = {
         'shoot_delay': 2200,           # Задержка МЕЖДУ длинными очередями
         'sound_volume': 0.3,
     },
-    'B': {
+    'HS': {
         'name': 'HellSmith',            # Имя папки со спрайтами и logic.py
         'speed': 0.15,                  # Идет медленно, но неумолимо, сотрясая пол
         'hp': 2000,                     # Огромный запас здоровья для долгого боя
@@ -134,7 +178,7 @@ NPC_CONFIG = {
         'shoot_delay': 1800,            # Кулдаун в миллисекундах МЕЖДУ его супер-атаками
         'sound_volume': 0.45,           # Слышно на весь уровень!
     },
-        '5': {
+        'SB': {
         'name': 'SuicideBomber',
         'speed': 0.48,        # Быстрый как пуля!
         'hp': 80,             # Мало здоровья, чтобы игрок успевал сбрить его на подлете

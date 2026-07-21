@@ -5,6 +5,7 @@ import math
 from setting import *
 from config.game_data import SYMBOLS_CONFIG
 from core.weapon import Weapon
+import os
 
 
 class Item:
@@ -258,5 +259,68 @@ class WeaponItem(Item):
 
             self.alive = False
             return True
+
+class KeyItem(Item):
+    """Цветная ключ-карта для запертых дверей"""
+
+    def __init__(self, game, x, y, key_color='red'):
+        self.key_color = str(key_color).strip().lower()
+        super().__init__(game, x, y, 'key', amount=0)
+
+    def _load_sprite(self):
+        """Загружает спрайт для конкретного цвета ключа"""
+        target_symbol = f"key_{self.key_color}"
+        
+        config = SYMBOLS_CONFIG.get(target_symbol)
+        if config:
+            sprite_path = config.get('sprite')
+            if sprite_path:
+                try:
+                    self.sprite = pygame.image.load(sprite_path).convert_alpha()
+                    self.sprite = pygame.transform.scale(self.sprite, (32, 32))
+                    self.sprite_width, self.sprite_height = self.sprite.get_size()
+                    self.sprite_ratio = self.sprite_width / self.sprite_height
+                    return
+                except Exception as e:
+                    print(f"[KeyItem] Ошибка загрузки {sprite_path}: {e}")
+
+        self._create_fallback_sprite()
+
+    def _create_fallback_sprite(self):
+        """Цветная заглушка для ключа"""
+        colors = {
+            'red': (200, 0, 0),
+            'blue': (0, 100, 200),
+            'yellow': (200, 200, 0),
+            'green': (0, 200, 0),
+        }
+        color = colors.get(self.key_color, (200, 200, 200))
+        
+        self.sprite = pygame.Surface((32, 32))
+        self.sprite.fill(color)
+        # Рисуем букву "K" для ключа
+        font = pygame.font.Font(None, 24)
+        text = font.render("K", True, (255, 255, 255))
+        text_rect = text.get_rect(center=(16, 16))
+        self.sprite.blit(text, text_rect)
+        
+        self.sprite_width, self.sprite_height = self.sprite.get_size()
+        self.sprite_ratio = self.sprite_width / self.sprite_height
+
+    def pick_up(self, player):
+        if not self.alive:
+            return False
+
+        if not hasattr(player, 'keys_inventory'):
+            player.keys_inventory = []
+
+        if self.key_color not in player.keys_inventory:
+            player.keys_inventory.append(self.key_color)
+            self.alive = False
+            print(f"[ИНВЕНТАРЬ] Подобрана {self.key_color.upper()} ключ-карта!")
+            return True
+
+        return False
+
 
 
