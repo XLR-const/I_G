@@ -7,6 +7,141 @@
 - MUSIC_CONFIG: пути к музыкальным трекам
 """
 
+
+# 🔥 РЕГИСТРАЦИЯ ВСЕХ ДЕКОРАЦИЙ ПО СТАРИНКЕ С РАЗМЕРАМИ И ОПИСАНИЕМ
+DECOR_CONFIG = {
+    # --- АКТ 1: ПЕРИМЕТР БАЗЫ ---
+    'prop_military_crate': {
+        'type': 'item', 
+        'item_type': 'decor', 
+        'sprite': 'resources/decorations/prop_military_crate.png',
+        'ammo': 50,  # Высота: 50% от стены (низкий кубический ящик)
+        'desc': 'Армейский ящик'
+    },
+    'prop_sandbag_wall': {
+        'type': 'item', 
+        'item_type': 'decor', 
+        'sprite': 'resources/decorations/prop_sandbag_wall.png',
+        'ammo': 40,  # Высота: 40% от стены (низкий бруствер укрытия)
+        'desc': 'Мешки с песком'
+    },
+    
+    # --- АКТ 2: КОЛЛЕКТОРЫ И ВЕНТИЛЯЦИЯ ---
+    'prop_sewage_pillar': {
+        'type': 'item', 
+        'item_type': 'decor', 
+        'sprite': 'resources/decorations/prop_sewage_pillar.png',
+        'ammo': 100, # Высота: 100% (монументальная бетонная опора до потолка)
+        'desc': 'Колонна коллектора'
+    },
+    
+    # --- АКТ 3: ЛАБОРАТОРИЯ ---
+    'prop_lab_capsule': {
+        'type': 'item', 
+        'item_type': 'decor', 
+        'sprite': 'resources/decorations/prop_lab_capsule.png',
+        'ammo': 85,  # Высота: 85% от стены (высокая колба содержания)
+        'desc': 'Био-капсула'
+    },
+    'prop_server_rack': {
+        'type': 'item', 
+        'item_type': 'decor', 
+        'sprite': 'resources/decorations/prop_server_rack.png',
+        'ammo': 100, # Высота: 100% (серверный шкаф в полный рост)
+        'desc': 'Серверная стойка'
+    },
+    
+    # --- АКТ 4: ГЛУБИНЫ ЛАБОРАТОРИИ ---
+    'prop_core_reactor': {
+        'type': 'item', 
+        'item_type': 'decor', 
+        'sprite': 'resources/decorations/prop_core_reactor.png',
+        'ammo': 90,  # Высота: 90% от стены (массивное круглое ядро бомбы)
+        'desc': 'Ядро реактора бомбы'
+    },
+    
+    # --- АКТ 5: ЭВАКУАЦИЯ И АНГАРЫ ---
+    'prop_cargo_container': {
+        'type': 'item', 
+        'item_type': 'decor', 
+        'sprite': 'resources/decorations/prop_cargo_container.png',
+        'ammo': 95,  # Высота: 95% от стены (тяжелый грузовой блок)
+        'desc': 'Грузовой контейнер'
+    },
+    'prop_hangar_frame': {
+        'type': 'item', 
+        'item_type': 'decor', 
+        'sprite': 'resources/decorations/prop_hangar_frame.png',
+        'ammo': 100, # Высота: 100% (промышленная несущая металлоконструкция)
+        'desc': 'Балка ангара'
+    },
+    'prop_sewage_pipe': {
+        'type': 'item', 'item_type': 'decor', 
+        'sprite': 'resources/decorations/prop_sewage_pipe.png',
+        'ammo': 100, 'desc': 'Сточная труба коллектора'
+    },
+    'prop_industrial_generator': {
+        'type': 'item', 'item_type': 'decor', 
+        'sprite': 'resources/decorations/prop_industrial_generator.png',
+        'ammo': 75,  'desc': 'Индустриальный генератор'
+    },
+    'prop_vent_fan': {
+        'type': 'item', 'item_type': 'decor', 
+        'sprite': 'resources/decorations/prop_vent_fan.png',
+        'ammo': 100, 'desc': 'Вентиляционная турбина'
+    },
+    'prop_bio_puddle': {
+        'type': 'item', 'item_type': 'decor', 
+        'sprite': 'resources/decorations/prop_bio_puddle.png',
+        'ammo': 15,  'desc': 'Лужа био-слизи'
+    },
+    'prop_microscope_bench': {
+        'type': 'item', 'item_type': 'decor', 
+        'sprite': 'resources/decorations/prop_microscope_bench.png',
+        'ammo': 65,  'desc': 'Лабораторный стол'
+    },
+    'prop_chemical_barrel': {
+        'type': 'item', 'item_type': 'decor', 
+        'sprite': 'resources/decorations/prop_chemical_barrel.png',
+        'ammo': 55,  'desc': 'Химическая бочка'
+    },
+    'prop_ceiling_lamp': {
+        'type': 'item', 'item_type': 'decor', 
+        'sprite': 'resources/decorations/prop_ceiling_lamp.png',
+        'ammo': 100, 'desc': 'Подвесной прожектор'
+    },
+    'prop_control_console': {
+        'type': 'item', 'item_type': 'decor', 
+        'sprite': 'resources/decorations/prop_control_console.png',
+        'ammo': 70,  'desc': 'Консоль управления'
+    },
+    'prop_laser_grid': {
+        'type': 'item', 'item_type': 'decor', 
+        'sprite': 'resources/decorations/prop_laser_grid.png',
+        'ammo': 100, 'desc': 'Лазерная перегородка'
+    },
+    'prop_ammo_crate': {
+        'type': 'item', 'item_type': 'decor', 
+        'sprite': 'resources/decorations/prop_ammo_crate.png',
+        'ammo': 45,  'desc': 'Ящик со снаряжением'
+    },
+    'prop_forklift': {
+        'type': 'item', 'item_type': 'decor', 
+        'sprite': 'resources/decorations/prop_forklift.png',
+        'ammo': 80,  'desc': 'Складской погрузчик'
+    }
+}
+
+# Твой основной SYMBOLS_CONFIG
+SYMBOLS_CONFIG = {
+    '1': {'type': 'wall', 'texture': 'resources/textures/brick.png'},
+    # ... твои старые стены и цветные двери под ключи ...
+}
+
+# Автоматически склеиваем словари при запуске
+SYMBOLS_CONFIG.update(DECOR_CONFIG)
+
+
 # ============================================================
 # КОНФИГУРАЦИЯ СИМВОЛОВ КАРТЫ
 # ============================================================
@@ -118,26 +253,14 @@ SYMBOLS_CONFIG = {
         'sprite': 'resources/items/key_yellow.png'
     },
 
-        # 🔥 НАША ТЕСТОВАЯ ДЕКОРАЦИЯ ПО СТАНДАРТНОЙ СХЕМЕ
-    'prop_cube': {
-        'type': 'item', 
-        'item_type': 'decor', 
-        'ammo': 50,
-        'sprite': 'resources/decorations/cube.png' # Твой файл cube.png
-    },
-    'prop_lab_capsule': {
-        'type': 'item', 
-        'item_type': 'decor', 
-        'sprite': 'resources/decorations/capsule.png',
-        'ammo': 90  # 90% от высоты стены (высокая колба)
-    },
-
     # Выход
     'Exit': {'type': 'exit'},
     
     # Спавн игрока
     'Spawn': {'type': 'player_spawn'},
 }
+
+SYMBOLS_CONFIG.update(DECOR_CONFIG)
 
 # ============================================================
 # КОНФИГУРАЦИЯ NPC
