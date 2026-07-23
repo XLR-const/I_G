@@ -137,6 +137,23 @@ class Player:
                     can_move_x = False
                 if math.hypot(self.x - npc.x, self.y + dy - npc.y) < collision_dist:
                     can_move_y = False
+                    
+        decor_collision_dist = 0.4 
+        
+        # Проверяем, что у левел-менеджера есть список предметов
+        if hasattr(self.game, 'level_manager') and hasattr(self.game.level_manager, 'items'):
+            for item in self.game.level_manager.items:
+                # Фильтруем предметы: проверяем только наши декорации ('decor')!
+                # Обычные аптечки и броню игрок должен подбирать, а не упираться в них
+                if getattr(item, 'item_type', '') == 'decor' and getattr(item, 'alive', True):
+                    
+                    # Проверяем смещение по оси X
+                    if math.hypot(self.x + dx - item.x, self.y - item.y) < decor_collision_dist:
+                        can_move_x = False
+                        
+                    # Проверяем смещение по оси Y
+                    if math.hypot(self.x - item.x, self.y + dy - item.y) < decor_collision_dist:
+                        can_move_y = False
 
         if can_move_x:
             self.x += dx

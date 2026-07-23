@@ -122,7 +122,14 @@ SYMBOLS_CONFIG = {
     'prop_cube': {
         'type': 'item', 
         'item_type': 'decor', 
+        'ammo': 50,
         'sprite': 'resources/decorations/cube.png' # Твой файл cube.png
+    },
+    'prop_lab_capsule': {
+        'type': 'item', 
+        'item_type': 'decor', 
+        'sprite': 'resources/decorations/capsule.png',
+        'ammo': 90  # 90% от высоты стены (высокая колба)
     },
 
     # Выход

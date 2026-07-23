@@ -125,7 +125,7 @@ class LevelManager:
                 from core.item import DecorItem
                 # Передаем в decor_name то, как ты упаковываешь имя предмета на карте
                 decor_name = str(amount).strip().lower()
-                item = DecorItem(self.game, x, y, decor_name=decor_name)
+                item = DecorItem(self.game, x, y, decor_name=decor_name, height_scale=ammo)
                 
             else:
                 continue

@@ -323,16 +323,16 @@ class KeyItem(Item):
         return False
 
 class DecorItem(Item):
-    """Класс для статичных декораций на полу в виде 3D спрайтов-биллбордов"""
+    """Класс для статичных декораций на полу в виде 3D спрайтов-биллбордов с кастомной высотой"""
 
-    def __init__(self, game, x, y, decor_name):
-        # 🔥 СНАЧАЛА СОХРАНЯЕМ ИМЯ: Чтобы метод _load_sprite() сразу его увидел при вызове из super()!
+    def __init__(self, game, x, y, decor_name, height_scale=100):
+        # Сохраняем имя для метода _load_sprite
         self.decor_name = str(decor_name).strip().lower()
         
-        # Вызываем базовый конструктор, передавая 'key' как временный тип (как у твоих ключей)
-        super().__init__(game, x, y, 'key', amount=0)
+        # Переводим проценты высоты из ammo в флоат-множитель (например, 50 -> 0.5)
+        self.height_scale = float(height_scale) / 100.0 if height_scale > 0 else 1.0
         
-        # Настраиваем стейты для совместимости с твоим менеджером объектов
+        super().__init__(game, x, y, 'key', amount=0)
         self.item_type = 'decor'
         self.type = self.decor_name
         self.alive = True
@@ -342,23 +342,82 @@ class DecorItem(Item):
         config = SYMBOLS_CONFIG.get(self.decor_name)
         if config:
             sprite_path = config.get('sprite')
-            if sprite_path:
+            if sprite_path and os.path.exists(sprite_path):
                 try:
                     self.sprite = pygame.image.load(sprite_path).convert_alpha()
                     self.sprite = pygame.transform.scale(self.sprite, (32, 32))
                     self.sprite_width, self.sprite_height = self.sprite.get_size()
                     self.sprite_ratio = self.sprite_width / self.sprite_height
-                    
-                    # Передаем картинку в image для твоего менеджера спрайтов
                     self.image = self.sprite
-                    return # Успех, выходим из метода!
+                    return 
                 except Exception as e:
                     print(f"[DecorItem] Ошибка загрузки {sprite_path}: {e}")
 
         self._create_fallback_sprite()
 
     def pick_up(self, player):
-        # Декорацию нельзя подобрать
         return False
+
+    # 🔥 ПЕРЕОПРЕДЕЛЯЕМ МЕТОД ОТРИСОВКИ РОДИТЕЛЯ СПЕЦИАЛЬНО ДЛЯ ДЕКОРА!
+    def draw(self):
+        if not self.alive or self.sprite is None:
+            return
+
+        dx = self.x - self.game.player.x
+        dy = self.y - self.game.player.y
+        dist = math.hypot(dx, dy)
+
+        if dist < 0.1:
+            return
+
+        theta = math.atan2(dy, dx)
+        delta = theta - self.game.player.angle
+        delta = (delta + math.pi) % math.tau - math.pi
+
+        if abs(delta) > HALF_FOV + 0.5:
+            return
+
+        dist_flat = dist * math.cos(delta)
+        if dist_flat < 0.1:
+            return
+
+        # 1. Расчёт БАЗОВЫХ размеров (как у обычной полной стены)
+        base_proj_height = int(SCREEN_DIST / dist_flat)
+        if base_proj_height < 2:
+            return
+
+        # 2. 🔥 ПРИМЕНЯЕМ НАШУ ВЫСОТУ: 
+        # Сжимаем или растягиваем высоту спрайта на экране согласно height_scale из ammo!
+        proj_height = int(base_proj_height * self.height_scale)
+        if proj_height < 2:
+            return
+
+        proj_width = int(proj_height * (self.sprite.get_width() / self.sprite.get_height()))
+
+        center_x = (HALF_NUM_RAYS + delta / DELTA_ANGLE) * SCALE
+        screen_x = int(center_x - proj_width // 2)
+
+        # 3. 🔥 ИДЕАЛЬНАЯ ПРИВЯЗКА К ПОЛУ ДЛЯ ЛЮБОЙ ВЫСОТЫ:
+        # Находим виртуальную линию пола (отталкиваясь от базовой высоты стены base_proj_height)
+        floor_y = int(HALF_HEIGHT + (SCREEN_DIST / dist_flat * 0.5))
+        
+        # Новую верхнюю точку спрайта Y отсчитываем строго вверх от линии пола!
+        # Благодаря этому ящики (height_scale=0.5) останутся лежать на земле, а не взлетят.
+        screen_y = floor_y - proj_height
+
+        # Масштабируем спрайт под новые кастомные размеры
+        scaled_sprite = pygame.transform.scale(self.sprite, (proj_width, proj_height))
+
+        # Твой родной пополосный рендеринг с проверкой Z-буфера работает без изменений!
+        for col in range(proj_width):
+            x_pos = screen_x + col
+
+            if 0 <= x_pos < WIDTH:
+                ray_idx = int(x_pos // SCALE)
+
+                if 0 <= ray_idx < NUM_RAYS:
+                    if dist_flat < self.game.raycasting.z_buffer[ray_idx]:
+                        sub_surface = scaled_sprite.subsurface(col, 0, 1, proj_height)
+                        self.game.screen.blit(sub_surface, (x_pos, screen_y))
 
 
