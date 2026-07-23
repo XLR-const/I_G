@@ -118,6 +118,12 @@ SYMBOLS_CONFIG = {
         'sprite': 'resources/items/key_yellow.png'
     },
 
+        # 🔥 НАША ТЕСТОВАЯ ДЕКОРАЦИЯ ПО СТАНДАРТНОЙ СХЕМЕ
+    'prop_cube': {
+        'type': 'item', 
+        'item_type': 'decor', 
+        'sprite': 'resources/decorations/cube.png' # Твой файл cube.png
+    },
 
     # Выход
     'Exit': {'type': 'exit'},

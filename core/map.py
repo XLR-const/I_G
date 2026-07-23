@@ -85,15 +85,20 @@ class Map:
                         item_type = SYMBOLS_CONFIG[char].get('item_type')
                         amount = SYMBOLS_CONFIG[char].get('amount', 0)
                         
-                        # 🔥 ХИРУРГИЧЕСКИЙ АПГРЕЙД ДЛЯ КЛЮЧЕЙ:
-                        # Если это ключ, мы записываем его цвет ('red', 'blue', 'yellow') в amount,
-                        # чтобы левел-менеджер прочитал его напрямую, без обращений к карте!
+                        # 🔥 ТВОЙ ХИРУРГИЧЕСКИЙ АПГРЕЙД ДЛЯ КЛЮЧЕЙ:
                         if item_type == 'key':
                             amount = SYMBOLS_CONFIG[char].get('key_color', 'red')
+                            
+                        # 🔥 ТАКОЙ ЖЕ ХИРУРГИЧЕСКИЙ АПГРЕЙД ДЛЯ ДЕКОРАЦИЙ ПО ТВОЕЙ СХЕМЕ:
+                        # Если это декор, мы записываем само имя ячейки (например, 'prop_military_crate') в amount!
+                        # Теперь левел-менеджер гарантированно прочитает правильное имя.
+                        elif item_type == 'decor':
+                            amount = char
                             
                         weapon_name = SYMBOLS_CONFIG[char].get('weapon_name', '')
                         ammo = SYMBOLS_CONFIG[char].get('ammo', 0)
                         self.item_positions.append((i, j, item_type, amount, weapon_name, ammo))
+
 
 
                 elif char in NPC_CONFIG:

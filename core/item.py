@@ -322,5 +322,43 @@ class KeyItem(Item):
 
         return False
 
+class DecorItem(Item):
+    """Класс для статичных декораций на полу в виде 3D спрайтов-биллбордов"""
+
+    def __init__(self, game, x, y, decor_name):
+        # 🔥 СНАЧАЛА СОХРАНЯЕМ ИМЯ: Чтобы метод _load_sprite() сразу его увидел при вызове из super()!
+        self.decor_name = str(decor_name).strip().lower()
+        
+        # Вызываем базовый конструктор, передавая 'key' как временный тип (как у твоих ключей)
+        super().__init__(game, x, y, 'key', amount=0)
+        
+        # Настраиваем стейты для совместимости с твоим менеджером объектов
+        self.item_type = 'decor'
+        self.type = self.decor_name
+        self.alive = True
+
+    def _load_sprite(self):
+        """Загружает спрайт для конкретного декора из SYMBOLS_CONFIG"""
+        config = SYMBOLS_CONFIG.get(self.decor_name)
+        if config:
+            sprite_path = config.get('sprite')
+            if sprite_path:
+                try:
+                    self.sprite = pygame.image.load(sprite_path).convert_alpha()
+                    self.sprite = pygame.transform.scale(self.sprite, (32, 32))
+                    self.sprite_width, self.sprite_height = self.sprite.get_size()
+                    self.sprite_ratio = self.sprite_width / self.sprite_height
+                    
+                    # Передаем картинку в image для твоего менеджера спрайтов
+                    self.image = self.sprite
+                    return # Успех, выходим из метода!
+                except Exception as e:
+                    print(f"[DecorItem] Ошибка загрузки {sprite_path}: {e}")
+
+        self._create_fallback_sprite()
+
+    def pick_up(self, player):
+        # Декорацию нельзя подобрать
+        return False
 
 
