@@ -129,7 +129,7 @@ class Renderer:
         pygame.draw.circle(self.game.screen, 'red', (WIDTH // 2, HEIGHT // 2), 4, 1)
 
     def draw_compass(self):
-        """Рисует компас с направлением к выходу"""
+        """Рисует компас в Sci-Fi стиле с полигональной скошенной рамкой под стиль HUD"""
         goal = self.game.map.exit_pos
         if goal is None:
             return
@@ -138,21 +138,45 @@ class Renderer:
         d_x, d_y = goal[0] - player[0], goal[1] - player[1]
         angle_to_goal = math.degrees(math.atan2(d_y, d_x))
 
+        # Исходные клетки из твоего конфига
         compass_col = 11
         compass_row = 0
         compass_width = 10
         compass_height = 1
 
-        compass_x = compass_col * CELL_W
-        compass_y = compass_row * CELL_H
-        compass_w = compass_width * CELL_W
-        compass_h = int(compass_height * CELL_H * 0.6)
+        # Базовые пиксельные границы ячеек сетки
+        x_start = compass_col * CELL_W
+        y_start = compass_row * CELL_H
+        w_total = compass_width * CELL_W
+        h_total = int(compass_height * CELL_H * 0.6)
+        x_end = x_start + w_total
+        y_end = y_start + h_total
 
-        pygame.draw.rect(self.game.screen, (100, 100, 100),
-                         (compass_x, compass_y, compass_w, compass_h), 2)
+        # ==================================================================
+        # 🔥 НОВАЯ Sci-Fi ПОЛИГОНАЛЬНАЯ РАМКА КОМПАСА (В СТИЛЕ РОМБОВ HUD)
+        # ==================================================================
+        # Делаем стильные скошенные углы по бокам, чтобы рамка выглядела агрессивно
+        bevel = 15  # Размер скоса углов в пикселях
+        compass_points = [
+            (x_start + bevel, y_start),     # Верхний левый после скоса
+            (x_end - bevel,   y_start),     # Верхний правый до скоса
+            (x_end,           y_start + bevel), # Переход на боковину справа
+            (x_end,           y_end),       # Нижний правый
+            (x_start,         y_end),       # Нижний левый
+            (x_start,         y_start + bevel)  # Переход на боковину слева
+        ]
+        
+        # Рисуем полупрозрачную темную подложку компаса
+        bg_surface = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
+        pygame.draw.polygon(bg_surface, (15, 20, 25, 160), compass_points)
+        self.game.screen.blit(bg_surface, (0, 0))
 
-        center_x = compass_x + compass_w // 2
-        center_y = compass_y + compass_h // 2
+        # Рисуем контур рамки фирменным неоново-бирюзовым цветом (0, 180, 255)
+        pygame.draw.polygon(self.game.screen, (0, 180, 255), compass_points, 2)
+
+        # Вычисляем математический центр панели для вывода делений
+        center_x = x_start + w_total // 2
+        center_y = y_start + h_total // 2
         player_angle_deg = math.degrees(self.game.player.angle)
 
         directions = [
@@ -162,8 +186,9 @@ class Renderer:
         ]
 
         visible_range = 120
-        pixels_per_degree = compass_w / visible_range
+        pixels_per_degree = w_total / visible_range
 
+        # Отрисовка направлений и меток
         for name, angle in directions:
             diff = angle - player_angle_deg
             while diff > 180:
@@ -174,32 +199,37 @@ class Renderer:
             if abs(diff) <= visible_range // 2:
                 x = center_x + diff * pixels_per_degree
 
-                if len(name) == 1 and name != '<!>':
-                    font_size = int(CELL_H * 0.45)
-                    color = (255, 255, 255)
-                elif name == '<!>':
-                    font_size = int(CELL_H * 0.95)
-                    color = 'yellow'
-                else:
-                    font_size = int(CELL_H * 0.3)
-                    color = (180, 180, 180)
+                # Защита текста от вылета за скошенные края рамки
+                if x_start + 10 <= x <= x_end - 10:
+                    if len(name) == 1 and name != '<!>':
+                        font_size = int(CELL_H * 0.45)
+                        color = (255, 255, 255)
+                    elif name == '<!>':
+                        font_size = int(CELL_H * 0.95)
+                        color = (0, 255, 255) # Метка выхода горит в цвет рамки
+                    else:
+                        font_size = int(CELL_H * 0.3)
+                        color = (140, 160, 180)
 
-                font = pygame.font.Font(None, font_size)
-                text = font.render(name, True, color)
-                text_rect = text.get_rect(center=(x, center_y))
-                self.game.screen.blit(text, text_rect)
+                    font = pygame.font.Font(None, font_size)
+                    text = font.render(name, True, color)
+                    text_rect = text.get_rect(center=(x, center_y))
+                    self.game.screen.blit(text, text_rect)
 
+        # Главная стрелка направления (Стильный неоново-оранжевый треугольник)
         triangle_points = [
-            (center_x, center_y - 15),
-            (center_x - 8, center_y + 5),
-            (center_x + 8, center_y + 5)
+            (center_x,     center_y - 12),
+            (center_x - 7, center_y + 6),
+            (center_x + 7, center_y + 6)
         ]
-        pygame.draw.polygon(self.game.screen, (255, 100, 0), triangle_points)
+        pygame.draw.polygon(self.game.screen, (255, 80, 0), triangle_points)
 
+        # Боковые неоновые насечки шкалы
         for offset in [-20, 20]:
-            pygame.draw.line(self.game.screen, (200, 200, 200),
-                             (center_x + offset, center_y - 10),
-                             (center_x + offset, center_y + 10), 2)
+            pygame.draw.line(self.game.screen, (0, 150, 220),
+                             (center_x + offset, center_y - 8),
+                             (center_x + offset, center_y + 8), 2)
+
 
     def draw_health_sprite(self, center_x, center_y):
         """Рисует иконку здоровья строго по переданным координатам центра ячейки сетки"""
@@ -223,7 +253,7 @@ class Renderer:
 
 
     def draw_interface(self):
-        """Рисует Sci-Fi HUD в левом углу: стрелки HP/AP заполняются вертикально (снизу вверх)"""
+        """Рисует Sci-Fi HUD в левом углу: неоновые цвета, вертикальное заполнение, привязка к сетке"""
         hp = max(0, min(100, self.game.player.hp))
         armor = max(0, min(100, self.game.player.armor))
         
@@ -239,10 +269,10 @@ class Renderer:
         # 1. СЕТОЧНЫЕ КООРДИНАТЫ ДЛЯ ЦЕНТРАЛЬНОГО УЗЛА (ГОЛОВЫ)
         # ==================================================================
         cx, cy = grid_to_pixel(5, 15, 'center')
-        cy += 8  # Опускаем панель чуть ближе к нижнему краю
+        cy += 8  # Опускаем панель ближе к нижнему краю экрана
 
         # ==================================================================
-        # 2. МАТЕМАТИКА ЛЕВОЙ СТРЕЛКИ ЗДОРОВЬЯ (ВЕРТИКАЛЬНОЕ ЗАПОЛНЕНИЕ)
+        # 2. МАТЕМАТИКА ЛЕВОЙ СТРЕЛКИ ЗДОРОВЬЯ (НЕОНОВОЕ КРЫЛО HP)
         # ==================================================================
         raw_hp_top_in  = grid_to_pixel(4, 14, 'midbottom')
         raw_hp_top_out = grid_to_pixel(3, 14, 'midbottom')
@@ -251,7 +281,6 @@ class Renderer:
         raw_hp_bot_in  = grid_to_pixel(4, 16, 'midtop')
         raw_hp_mid_in  = grid_to_pixel(2, 15, 'midright')
 
-        # Фиксируем вершины фоновой подложки с учетом вертикального растяжения
         p_hp_top_in  = (raw_hp_top_in[0],  raw_hp_top_in[1] - 10 + 8)
         p_hp_top_out = (raw_hp_top_out[0], raw_hp_top_out[1] - 10 + 8)
         p_hp_mid_out = (raw_hp_mid_out[0], cy)
@@ -260,32 +289,29 @@ class Renderer:
         p_hp_mid_in  = (raw_hp_mid_in[0],  cy)
 
         bg_hp_points = [p_hp_top_in, p_hp_top_out, p_hp_mid_out, p_hp_bot_out, p_hp_bot_in, p_hp_mid_in]
-        pygame.draw.polygon(self.game.screen, (50, 15, 15), bg_hp_points)
+        # Глубокий темный фон для контраста с неоном
+        pygame.draw.polygon(self.game.screen, (24, 14, 16), bg_hp_points)
         
-        # Честное вертикальное заполнение здоровья (снизу вверх)
         if hp > 0:
             hp_ratio = hp / 100.0
-            hp_color = (235, 25, 25) if hp <= 35 else (40, 230, 0)
+            # 🔥 НОВЫЕ НЕОНОВЫЕ ЦВЕТА ЗДОРОВЬЯ
+            # Кислотно-зеленый при нормальном ХП, неоново-алый при критическом
+            hp_color = (255, 16, 92) if hp <= 35 else (0, 240, 160)
             
-            # Находим "линию отсечки" по Y: чем меньше HP, тем ниже падает верхняя граница заполнения
-            # Считаем от самой нижней точки стрелки (p_hp_bot_in[1]) до самой верхней (p_hp_top_in[1])
             total_height = p_hp_bot_in[1] - p_hp_top_in[1]
             cutoff_y = p_hp_bot_in[1] - int(total_height * hp_ratio)
             
-            # Создаем динамические точки заполнения, срезая полигон по горизонтальной линии cutoff_y
             fill_hp_points = []
             for pt in bg_hp_points:
                 if pt[1] >= cutoff_y:
-                    # Если точка подложки ниже линии отсечки — забираем её полностью
                     fill_hp_points.append(pt)
                 else:
-                    # Если точка выше — проецируем её строго на линию отсечки по Y
                     fill_hp_points.append((pt[0], cutoff_y))
             
             pygame.draw.polygon(self.game.screen, hp_color, fill_hp_points)
 
         # ==================================================================
-        # 3. МАТЕМАТИКА ПРАВОЙ СТРЕЛКИ БРОНИ (ВЕРТИКАЛЬНОЕ ЗАПОЛНЕНИЕ)
+        # 3. МАТЕМАТИКА ПРАВОЙ СТРЕЛКИ БРОНИ (НЕОНОВОЕ КРЫЛО AP)
         # ==================================================================
         raw_ap_top_in  = grid_to_pixel(6, 14, 'midbottom')
         raw_ap_top_out = grid_to_pixel(7, 14, 'midbottom')
@@ -302,11 +328,15 @@ class Renderer:
         p_ap_mid_in  = (raw_ap_mid_in[0],  cy)
 
         bg_armor_points = [p_ap_top_in, p_ap_top_out, p_ap_mid_out, p_ap_bot_out, p_ap_bot_in, p_ap_mid_in]
-        pygame.draw.polygon(self.game.screen, (15, 15, 45), bg_armor_points)
+        # Глубокий темно-синий фон подложки
+        pygame.draw.polygon(self.game.screen, (12, 16, 26), bg_armor_points)
         
-        # Честное вертикальное заполнение брони (снизу вверх)
         if armor > 0:
             armor_ratio = armor / 100.0
+            # 🔥 НОВЫЙ НЕОНОВЫЙ ЦВЕТ БРОНИ
+            # Электрический бирюзовый/циан в тон контуру компаса
+            armor_color = (0, 140, 255)
+            
             total_height = p_ap_bot_in[1] - p_ap_top_in[1]
             cutoff_y = p_ap_bot_in[1] - int(total_height * armor_ratio)
             
@@ -317,9 +347,9 @@ class Renderer:
                 else:
                     fill_armor_points.append((pt[0], cutoff_y))
             
-            pygame.draw.polygon(self.game.screen, (0, 115, 240), fill_armor_points)
+            pygame.draw.polygon(self.game.screen, armor_color, fill_armor_points)
 
-        # Отрисовка лица игрока строго в центре ячейки (5, 15)
+        # Отрисовка головы игрока
         self.draw_health_sprite(cx, cy)
 
         # ==================================================================
@@ -331,7 +361,8 @@ class Renderer:
         font = pygame.font.Font(font_path, 48)
         text_weapon = font.render(current_weapon, True, (255, 255, 255))
         font = pygame.font.Font(font_path, 50)
-        text_ammo = font.render(str(ammo), True, (255, 200, 255))
+        # Подкрасим текст патронов в легкий неоново-пурпурный оттенок
+        text_ammo = font.render(str(ammo), True, (0, 240, 255))
 
         self.game.screen.blit(text_weapon, weapon_name_pos)
         self.game.screen.blit(text_ammo, weapon_ammo_pos)
