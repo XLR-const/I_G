@@ -120,6 +120,12 @@ class LevelManager:
                 key_color = str(amount).strip().lower()
                 # Создаем объект ключа точно так же, как аптечку или броню
                 item = KeyItem(self.game, x, y, key_color=key_color)
+            
+            elif item_type == 'decor':
+                from core.item import DecorItem
+                # Передаем в decor_name то, как ты упаковываешь имя предмета на карте
+                decor_name = str(amount).strip().lower()
+                item = DecorItem(self.game, x, y, decor_name=decor_name, height_scale=ammo)
                 
             else:
                 continue

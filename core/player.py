@@ -1,6 +1,7 @@
 import pygame
 import math
 from setting import *
+from config.game_data import *
 
 
 class Player:
@@ -137,6 +138,41 @@ class Player:
                     can_move_x = False
                 if math.hypot(self.x - npc.x, self.y + dy - npc.y) < collision_dist:
                     can_move_y = False
+                    
+        # ==================================================================
+        # 🔥 УЛЬТИМАТИВНАЯ КОЛЛИЗИЯ: КАСТOМНЫЙ РАДИУС + ТВОЙ БАЗОВЫЙ ФОЛБЕК
+        # ==================================================================
+        # Габаритные размеры тела игрока (0.2), чтобы не проваливаться в текстуру
+        player_size_x = scale if dx > 0 else -scale
+        player_size_y = scale if dy > 0 else -scale
+
+        if hasattr(self.game, 'level_manager') and hasattr(self.game.level_manager, 'items'):
+            # Безопасный локальный импорт конфига, защищающий от циклических крашей
+            from config.game_data import SYMBOLS_CONFIG
+            
+            for item in self.game.level_manager.items:
+                if getattr(item, 'item_type', '') == 'decor' and getattr(item, 'alive', True):
+                    
+                    # 1. ТВОЯ БАЗОВАЯ ПЕРЕМЕННАЯ (Дефолтное значение для всех предметов)
+                    decor_collision_dist = 1.0  
+                    
+                    # 2. ПЕРЕХВАТ КАСТOМНОГО РАДИУСA: Если в конфиге предмета прописан 'radius',
+                    # мы перезаписываем базовую единицу на индивидуальный размер!
+                    config = SYMBOLS_CONFIG.get(item.decor_name)
+                    if config and 'radius' in config:
+                        decor_collision_dist = float(config['radius'])
+                    
+                    # 3. МАТЕМАТИЧЕСКИЙ РАСЧЕТ С УЧЕТОМ ТЕЛА ИГРОКА
+                    # Проверяем расстояние по X
+                    if math.hypot(self.x + dx + player_size_x - item.x, self.y - item.y) < decor_collision_dist:
+                        can_move_x = False
+                        
+                    # Проверяем расстояние по Y
+                    if math.hypot(self.x - item.x, self.y + dy + player_size_y - item.y) < decor_collision_dist:
+                        can_move_y = False
+        # ==================================================================
+
+
 
         if can_move_x:
             self.x += dx

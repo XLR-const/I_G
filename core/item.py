@@ -35,7 +35,7 @@ class Item:
                     if sprite_path:
                         try:
                             self.sprite = pygame.image.load(sprite_path).convert_alpha()
-                            self.sprite = pygame.transform.scale(self.sprite, (32, 32))
+                            #self.sprite = pygame.transform.scale(self.sprite, (32, 32))
                             self.sprite_width, self.sprite_height = self.sprite.get_size()
                             self.sprite_ratio = self.sprite_width / self.sprite_height
                             return
@@ -203,7 +203,7 @@ class WeaponItem(Item):
                     if sprite_path:
                         try:
                             self.sprite = pygame.image.load(sprite_path).convert_alpha()
-                            self.sprite = pygame.transform.scale(self.sprite, (32, 32))
+                            #self.sprite = pygame.transform.scale(self.sprite, (32, 32))
                             self.sprite_width, self.sprite_height = self.sprite.get_size()
                             self.sprite_ratio = self.sprite_width / self.sprite_height
                             return
@@ -220,6 +220,86 @@ class WeaponItem(Item):
         pygame.draw.rect(self.sprite, (150, 150, 0), (4, 4, 24, 24))
         self.sprite_width, self.sprite_height = self.sprite.get_size()
         self.sprite_ratio = self.sprite_width / self.sprite_height
+    
+    def draw(self):
+        if not self.alive or self.sprite is None:
+            return
+
+        dx = self.x - self.game.player.x
+        dy = self.y - self.game.player.y
+        dist = math.hypot(dx, dy)
+
+        if dist < 0.1:
+            return
+
+        theta = math.atan2(dy, dx)
+        delta = theta - self.game.player.angle
+        delta = (delta + math.pi) % math.tau - math.pi
+
+        if abs(delta) > HALF_FOV + 0.5:
+            return
+
+        dist_flat = dist * math.cos(delta)
+        if dist_flat < 0.1:
+            return
+
+        # 1. Считаем базовую высоту стены
+        base_proj_height = int(SCREEN_DIST / dist_flat * 1.0)
+        if base_proj_height < 2:
+            return
+
+        # 2. МАСШТАБ ВЫСОТЫ ОРУЖИЯ (Оставляем низким, 25% от стены)
+        proj_height = int(base_proj_height * 0.25)
+        if proj_height < 2:
+            return
+
+        # 3. 🔥 ХИРУРГИЧЕСКИЙ ХАК ШИРИНЫ (УБИРАЕМ СЖАТОСТЬ ПО БОКАМ):
+        # Так как базовый класс сжал картинку в квадрат (32, 32), мы вручную
+        # задаем честное соотношение сторон (ширина / высота) для твоих пушек!
+        # Узнаем имя оружия (используем атрибут self.name или self.weapon_name, какой у тебя в классе)
+        w_name = getattr(self, 'name', getattr(self, 'weapon_name', '')).upper()
+        
+        # Задаем коэффициенты ширины: 
+        # Автоматы и плазма очень длинные (ширина больше высоты в 2 - 2.5 раза)
+        # Пистолеты покороче (ширина больше высоты в 1.5 - 1.8 раза)
+        if 'AK-47' in w_name or 'PLASMA' in w_name or 'COCH' in w_name:
+            sprite_ratio = 2.4  # Делает автомат широким на полу!
+        elif 'COLT' in w_name or 'PISTOL' in w_name:
+            sprite_ratio = 1.7  # Пропорции пистолета
+        else:
+            sprite_ratio = 2.0  # Дефолтное широкое соотношение для остальных пушек
+
+        # Вычисляем честную широкую проекцию ширины без сжатия!
+        proj_width = int(proj_height * sprite_ratio)
+
+        center_x = (HALF_NUM_RAYS + delta / DELTA_ANGLE) * SCALE
+        screen_x = int(center_x - proj_width // 2)
+
+        # 4. 🔥 КОРРЕКЦИЯ ВЫСОТЫ (ПРИПОДНИМАЕМ ИЛИ ОПУСКАЕМ ОРУЖИЕ):
+        # Находим линию земли
+        floor_y = int(HALF_HEIGHT + (SCREEN_DIST / dist_flat * 0.5))
+        
+        # Меняй этот множитель, чтобы регулировать высоту парения над полом!
+        # Чем МЕНЬШЕ вычитаем, тем НИЖЕ ложится оружие. 
+        # Сейчас мы вычитаем ровно proj_height (низ пушки касается пола) 
+        # и принудительно приподнимаем вверх на 5 пикселей для идеального баланса.
+        screen_y = floor_y - proj_height - 5
+
+        # Масштабируем спрайт оружия под новые, широкие пропорции
+        scaled_sprite = pygame.transform.scale(self.sprite, (proj_width, proj_height))
+
+        # Твой родной пополосный рендеринг с проверкой Z-буфера работает без изменений!
+        for col in range(proj_width):
+            x_pos = screen_x + col
+
+            if 0 <= x_pos < WIDTH:
+                ray_idx = int(x_pos // SCALE)
+
+                if 0 <= ray_idx < NUM_RAYS:
+                    if dist_flat < self.game.raycasting.z_buffer[ray_idx]:
+                        sub_surface = scaled_sprite.subsurface(col, 0, 1, proj_height)
+                        self.game.screen.blit(sub_surface, (x_pos, screen_y))
+
 
     def pick_up(self, player):
         if not self.alive:
@@ -322,5 +402,102 @@ class KeyItem(Item):
 
         return False
 
+class DecorItem(Item):
+    """Класс для статичных декораций на полу в виде 3D спрайтов-биллбордов с кастомной высотой"""
+
+    def __init__(self, game, x, y, decor_name, height_scale=100):
+        # Сохраняем имя для метода _load_sprite
+        self.decor_name = str(decor_name).strip().lower()
+        
+        # Переводим проценты высоты из ammo в флоат-множитель (например, 50 -> 0.5)
+        self.height_scale = float(height_scale) / 100.0 if height_scale > 0 else 1.0
+        
+        super().__init__(game, x, y, 'key', amount=0)
+        self.item_type = 'decor'
+        self.type = self.decor_name
+        self.alive = True
+
+    def _load_sprite(self):
+        """Загружает спрайт для конкретного декора из SYMBOLS_CONFIG"""
+        config = SYMBOLS_CONFIG.get(self.decor_name)
+        if config:
+            sprite_path = config.get('sprite')
+            if sprite_path and os.path.exists(sprite_path):
+                try:
+                    self.sprite = pygame.image.load(sprite_path).convert_alpha()
+                    #self.sprite = pygame.transform.scale(self.sprite, (32, 32))
+                    self.sprite_width, self.sprite_height = self.sprite.get_size()
+                    self.sprite_ratio = self.sprite_width / self.sprite_height
+                    self.image = self.sprite
+                    return 
+                except Exception as e:
+                    print(f"[DecorItem] Ошибка загрузки {sprite_path}: {e}")
+
+        self._create_fallback_sprite()
+
+    def pick_up(self, player):
+        return False
+
+    # 🔥 ПЕРЕОПРЕДЕЛЯЕМ МЕТОД ОТРИСОВКИ РОДИТЕЛЯ СПЕЦИАЛЬНО ДЛЯ ДЕКОРА!
+    def draw(self):
+        if not self.alive or self.sprite is None:
+            return
+
+        dx = self.x - self.game.player.x
+        dy = self.y - self.game.player.y
+        dist = math.hypot(dx, dy)
+
+        if dist < 0.1:
+            return
+
+        theta = math.atan2(dy, dx)
+        delta = theta - self.game.player.angle
+        delta = (delta + math.pi) % math.tau - math.pi
+
+        if abs(delta) > HALF_FOV + 0.5:
+            return
+
+        dist_flat = dist * math.cos(delta)
+        if dist_flat < 0.1:
+            return
+
+        # 1. Расчёт БАЗОВЫХ размеров (как у обычной полной стены)
+        base_proj_height = int(SCREEN_DIST / dist_flat)
+        if base_proj_height < 2:
+            return
+
+        # 2. 🔥 ПРИМЕНЯЕМ НАШУ ВЫСОТУ: 
+        # Сжимаем или растягиваем высоту спрайта на экране согласно height_scale из ammo!
+        proj_height = int(base_proj_height * self.height_scale)
+        if proj_height < 2:
+            return
+
+        proj_width = int(proj_height * (self.sprite.get_width() / self.sprite.get_height()))
+
+        center_x = (HALF_NUM_RAYS + delta / DELTA_ANGLE) * SCALE
+        screen_x = int(center_x - proj_width // 2)
+
+        # 3. 🔥 ИДЕАЛЬНАЯ ПРИВЯЗКА К ПОЛУ ДЛЯ ЛЮБОЙ ВЫСОТЫ:
+        # Находим виртуальную линию пола (отталкиваясь от базовой высоты стены base_proj_height)
+        floor_y = int(HALF_HEIGHT + (SCREEN_DIST / dist_flat * 0.5))
+        
+        # Новую верхнюю точку спрайта Y отсчитываем строго вверх от линии пола!
+        # Благодаря этому ящики (height_scale=0.5) останутся лежать на земле, а не взлетят.
+        screen_y = floor_y - proj_height
+
+        # Масштабируем спрайт под новые кастомные размеры
+        scaled_sprite = pygame.transform.scale(self.sprite, (proj_width, proj_height))
+
+        # Твой родной пополосный рендеринг с проверкой Z-буфера работает без изменений!
+        for col in range(proj_width):
+            x_pos = screen_x + col
+
+            if 0 <= x_pos < WIDTH:
+                ray_idx = int(x_pos // SCALE)
+
+                if 0 <= ray_idx < NUM_RAYS:
+                    if dist_flat < self.game.raycasting.z_buffer[ray_idx]:
+                        sub_surface = scaled_sprite.subsurface(col, 0, 1, proj_height)
+                        self.game.screen.blit(sub_surface, (x_pos, screen_y))
 
 
