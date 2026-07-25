@@ -60,7 +60,7 @@ WALL_COLORS = {
 }
 
 # Textures
-TEXTURE_SIZE = 128
+TEXTURE_SIZE = 512
 TEXTURES_PATH = "resources/textures/"
 USE_TEXTURES = True
 TEXTURE_NAMES = ['W', 'R', 'B', 'G', 'Y', 'P', 'O', 'C', 'S', 'M', "D", "^", "L"]

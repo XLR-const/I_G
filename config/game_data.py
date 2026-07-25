@@ -113,6 +113,7 @@ DECOR_CONFIG = {
     'prop_control_console': {
         'type': 'item', 'item_type': 'decor', 
         'sprite': 'resources/decorations/prop_control_console.png',
+        'fixed_angle': 70,
         'ammo': 70,  'desc': 'Консоль управления'
     },
     'prop_laser_grid': {
@@ -129,17 +130,58 @@ DECOR_CONFIG = {
         'type': 'item', 'item_type': 'decor', 
         'sprite': 'resources/decorations/prop_forklift.png',
         'ammo': 80,  'desc': 'Складской погрузчик'
+    },
+        # ==================================================================
+    # 🔥 НОВЕЙШИЙ ПАК 11 ДЕКОРАЦИЙ ДЛЯ СЮЖЕТНЫХ АКТОВ И СИКВЕЛА
+    # ==================================================================
+    'prop_searchlight': {
+        'type': 'item', 'item_type': 'decor', 'sprite': 'resources/decorations/prop_searchlight.png',
+        'ammo': 120, 'desc': 'Прожектор периметра базы (Высокая вышка)'
+    },
+    'prop_comm_antenna': {
+        'type': 'item', 'item_type': 'decor', 'sprite': 'resources/decorations/prop_comm_antenna.png',
+        'ammo': 110, 'desc': 'Спутниковая антенна связи скрытой организации'
+    },
+    'prop_sewage_pump': {
+        'type': 'item', 'item_type': 'decor', 'sprite': 'resources/decorations/prop_sewage_pump.png',
+        'ammo': 65,  'desc': 'Промышленный насос коллектора с вентилем'
+    },
+    'prop_toxic_waste': {
+        'type': 'item', 'item_type': 'decor', 'sprite': 'resources/decorations/prop_toxic_waste.png',
+        'ammo': 80,  'desc': 'Ржавый бак с подтекающими отходами'
+    },
+    'prop_hydraulic_press': {
+        'type': 'item', 'item_type': 'decor', 'sprite': 'resources/decorations/prop_hydraulic_press.png',
+        'ammo': 95,  'desc': 'Гидравлический компрессор поршневого типа'
+    },
+    'prop_autopsy_table': {
+        'type': 'item', 'item_type': 'decor', 'sprite': 'resources/decorations/prop_autopsy_table.png',
+        'ammo': 45,  'desc': 'Медицинский стол в крови после вскрытия мутантов'
+    },
+    'prop_decon_shower': {
+        'type': 'item', 'item_type': 'decor', 'sprite': 'resources/decorations/prop_decon_shower.png',
+        'ammo': 100, 'desc': 'Рамка шлюза дезинфекции и деконтаминации'
+    },
+    'prop_mainframe_wall': {
+        'type': 'item', 'item_type': 'decor', 'sprite': 'resources/decorations/prop_mainframe_wall.png',
+        'ammo': 100, 'desc': 'Стена суперкомпьютера злодея с лентами ОЗУ'
+    },
+    'prop_stasis_chamber': {
+        'type': 'item', 'item_type': 'decor', 'sprite': 'resources/decorations/prop_stasis_chamber.png',
+        'ammo': 95,  'desc': 'Стазис-инкубатор с силуэтом био-оружия'
+    },
+    'prop_fuel_tank': {
+        'type': 'item', 'item_type': 'decor', 'sprite': 'resources/decorations/prop_fuel_tank.png',
+        'ammo': 85,  'desc': 'Топливный бак заправщика ОГНЕОПАСНО'
+    },
+    'prop_cargo_pallet': {
+        'type': 'item', 'item_type': 'decor', 'sprite': 'resources/decorations/prop_cargo_pallet.png',
+        'ammo': 50,  'desc': 'Складской поддон паллета с замотанным грузом'
     }
+
 }
 
-# Твой основной SYMBOLS_CONFIG
-SYMBOLS_CONFIG = {
-    '1': {'type': 'wall', 'texture': 'resources/textures/brick.png'},
-    # ... твои старые стены и цветные двери под ключи ...
-}
 
-# Автоматически склеиваем словари при запуске
-SYMBOLS_CONFIG.update(DECOR_CONFIG)
 
 
 # ============================================================
@@ -156,6 +198,10 @@ SYMBOLS_CONFIG = {
     'W': {'type': 'wall', 'texture': 'resources/textures/W.png'},
     'I': {'type': 'wall', 'texture': 'resources/textures/I.png'},
     'N': {'type': 'wall', 'texture': 'resources/textures/N.png'},
+    'rocks': {
+        'type': 'wall',
+        'texture': 'resources/textures/rocks.png'
+    },
     
     # Предметы
     'health': {
