@@ -12,9 +12,10 @@ from numba import njit
 
 @njit
 def run_dda_numba(ox, oy, player_angle, numeric_grid, door_states, num_rays, 
-                  half_fov, delta_angle, screen_dist, texture_size, door_id):
+                  half_fov, delta_angle, screen_dist, door_id):
     z_buffer = np.zeros(num_rays, dtype=np.float32)
-    render_data = np.zeros((num_rays, 5), dtype=np.int32)
+    # Расширяем до 6 колонок для передачи mip_level и нормализованной координаты
+    render_data = np.zeros((num_rays, 6), dtype=np.int32)
     
     map_height, map_width = numeric_grid.shape
 
@@ -47,7 +48,7 @@ def run_dda_numba(ox, oy, player_angle, numeric_grid, door_states, num_rays,
         wall_hit = False
         side = 0
         wall_char_id = 0
-        tex_x_pixel = 0
+        t_x = 0.0
         dist = 999.0
 
         max_steps = 400  
@@ -67,18 +68,14 @@ def run_dda_numba(ox, oy, player_angle, numeric_grid, door_states, num_rays,
             if 0 <= x_map < map_width and 0 <= y_map < map_height:
                 cell_value = numeric_grid[y_map, x_map]
                 
-                # ЕСЛИ ВСТРЕТИЛИ ОБЫЧНУЮ СТЕНУ
                 if cell_value > 0 and cell_value != door_id:
                     wall_hit = True
                     wall_char_id = cell_value
                     
-                # ЕСЛИ ВСТРЕТИЛИ ДВЕРЬ
                 elif cell_value == door_id:
-                    # Вычисляем дистанцию до двери
                     if side == 0: dist = side_dist_x - delta_dist_x
                     else: dist = side_dist_y - delta_dist_y
                     
-                    # Находим точную текстурную координату на плоскости двери
                     if side == 0:
                         hit_y = oy + dist * sin_a
                         t_x = hit_y - math.floor(hit_y)
@@ -89,21 +86,14 @@ def run_dda_numba(ox, oy, player_angle, numeric_grid, door_states, num_rays,
                     if (side == 0 and cos_a > 0.0) or (side == 1 and sin_a < 0.0):
                         t_x = 1.0 - t_x
 
-                    # Получаем текущее смещение этой конкретной двери (от 0.0 до 1.0)
                     door_offset = door_states[y_map, x_map]
                     
-                    # Если луч попал в ту часть двери, которая уже уехала в стену — летим дальше!
                     if t_x < door_offset:
                         continue
                         
-                    # Если попал в видимое полотно двери — фиксируем удар!
                     wall_hit = True
                     wall_char_id = cell_value
-                    
-                    # Сдвигаем текстуру двери, чтобы она визуально уезжала вбок, а не сжималась
                     t_x = t_x - door_offset
-                    tex_x_pixel = int(t_x * texture_size)
-                    tex_x_pixel = max(0, min(tex_x_pixel, texture_size - 1))
             else:
                 wall_hit = True
                 wall_char_id = 0
@@ -124,28 +114,40 @@ def run_dda_numba(ox, oy, player_angle, numeric_grid, door_states, num_rays,
         if dist_corrected < 0.1: dist_corrected = 0.1
         proj_height = screen_dist / dist_corrected
 
-        # Если это была обычная стена, считаем tex_x стандартно
+        # РАСЧЕТ УРОВНЯ МИП-МАПА НА ОСНОВЕ ДИСТАНЦИИ
+        # Пороги (2.5, 5.5, 9.5 клеток) настроены под плавный переход
+        if dist_corrected < 2.5:
+            mip_level = 0
+        elif dist_corrected < 5.5:
+            mip_level = 1
+        elif dist_corrected < 9.5:
+            mip_level = 2
+        else:
+            mip_level = 3
+
         if wall_char_id != door_id:
             if side == 0:
                 hit_y = oy + dist * sin_a
-                tex_x = hit_y - math.floor(hit_y)
+                t_x = hit_y - math.floor(hit_y)
             else:
                 hit_x = ox + dist * cos_a
-                tex_x = hit_x - math.floor(hit_x)
+                t_x = hit_x - math.floor(hit_x)
 
             if (side == 0 and cos_a > 0.0) or (side == 1 and sin_a < 0.0):
-                tex_x = 1.0 - tex_x
+                t_x = 1.0 - t_x
 
-            tex_x_pixel = int(tex_x * texture_size)
-            tex_x_pixel = max(0, min(tex_x_pixel, texture_size - 1))
+        # Защита координат (0.0 - 1.0)
+        t_x = max(0.0, min(t_x, 0.9999))
 
         render_data[i, 0] = wall_char_id
         render_data[i, 1] = side
         render_data[i, 2] = x_map * 1000 + y_map 
         render_data[i, 3] = int(proj_height)
-        render_data[i, 4] = tex_x_pixel
+        render_data[i, 4] = int(t_x * 1000) # Кодируем дробную координату в int
+        render_data[i, 5] = mip_level
 
     return z_buffer, render_data
+
 
 class RayCasting:
     """Класс для рейкастинга и отрисовки стен
@@ -170,7 +172,7 @@ class RayCasting:
         self.load_textures()
 
     def load_textures(self):
-        """Загружает текстуры из SYMBOLS_CONFIG"""
+        """Загружает текстуры и создает цепочку мип-мапов"""
         if not USE_TEXTURES:
             return
 
@@ -179,10 +181,20 @@ class RayCasting:
             if texture_path:
                 try:
                     tex = pygame.image.load(texture_path).convert_alpha()
-                    self.textures[symbol] = pygame.transform.scale(tex, (TEXTURE_SIZE, TEXTURE_SIZE))
+                    base_tex = pygame.transform.scale(tex, (TEXTURE_SIZE, TEXTURE_SIZE))
+                    
+                    # Генерируем 4 уровня мип-маппинга (сглаженные копии)
+                    mip_0 = base_tex
+                    mip_1 = pygame.transform.smoothscale(base_tex, (TEXTURE_SIZE // 2, TEXTURE_SIZE // 2))
+                    mip_2 = pygame.transform.smoothscale(base_tex, (TEXTURE_SIZE // 4, TEXTURE_SIZE // 4))
+                    mip_3 = pygame.transform.smoothscale(base_tex, (TEXTURE_SIZE // 8, TEXTURE_SIZE // 8))
+                    
+                    # Сохраняем как список уровней
+                    self.textures[symbol] = [mip_0, mip_1, mip_2, mip_3]
                 except Exception as e:
                     print(f"Ошибка загрузки текстуры {texture_path}: {e}")
                     self.textures[symbol] = None
+
 
     def get_texture_slice(self, texture, tex_x, height):
         """Возвращает сглаженную вертикальную полоску текстуры из кэша"""
@@ -230,7 +242,7 @@ class RayCasting:
 
     
     def ray_cast(self):
-        """Выполняет DDA рейкастинг через Numba с поддержкой дверей, кэшем и пикселизацией"""
+        """Выполняет DDA рейкастинг через Numba с поддержкой дверей, кэшем и мип-маппингом"""
         if not hasattr(self.game.map, 'numeric_grid'):
             return
 
@@ -238,147 +250,125 @@ class RayCasting:
         door_id = getattr(self, 'door_id', -1)
         
         # 1. СИНХРОНИЗАЦИЯ ДВЕРЕЙ С NUMBA
-        # Полностью очищаем матрицу состояний перед новым кадром
         self.game.map.door_states.fill(0.0)
-        
-        # Переносим актуальные данные анимации из ваших объектов дверей
         for door in self.game.map.doors:
             dx = int(door.x)
             dy = int(door.y)
-            
-            # Проверяем, что координаты двери лежат внутри матрицы карты
             if 0 <= dx < self.game.map.door_states.shape[1] and 0 <= dy < self.game.map.door_states.shape[0]:
                 if hasattr(door, 'get_texture_offset'):
-                    # Исправлено: берем чистый коэффициент 0.0 - 1.0 напрямую из класса Door
                     offset_ratio = door.get_texture_offset()
                 else:
-                    # Если метода анимации нет, открываем мгновенно по триггеру коллизии
                     offset_ratio = 1.0 if not door.is_wall() else 0.0
-                
-                # Записываем точный коэффициент сдвига для Numba
                 self.game.map.door_states[dy, dx] = offset_ratio
-                
-                # Возвращаем физический ID двери в сетку DDA, 
-                # так как наше ядро Numba само пропустит луч через открытую часть!
                 self.game.map.numeric_grid[dy, dx] = door_id
 
-        # 2. ЗАПУСК ВЫСОКОСКОРОСТНОГО ЯДРА NUMBA
+        # 2. ЗАПУСК ЯДРА NUMBA (Без передачи TEXTURE_SIZE, так как размер теперь динамический)
         z_buffer_numba, render_data = run_dda_numba(
             ox, oy, self.game.player.angle, self.game.map.numeric_grid, self.game.map.door_states,
-            NUM_RAYS, HALF_FOV, DELTA_ANGLE, SCREEN_DIST, TEXTURE_SIZE, door_id
+            NUM_RAYS, HALF_FOV, DELTA_ANGLE, SCREEN_DIST, door_id
         )
 
-        # Записываем Z-буфер для сортировки аптечек, врагов и партиклов
         for i in range(NUM_RAYS):
             self.z_buffer[i] = z_buffer_numba[i]
 
-        # Получаем динамический словарь символов стен
         id_to_char = getattr(self, 'id_to_char', {})
-        
-        # Настраиваем аппаратный клиппинг Pygame по размерам экрана, чтобы срезать лишнее
         original_clip = self.game.screen.get_clip()
         self.game.screen.set_clip(pygame.Rect(0, 0, WIDTH, HEIGHT))
 
-        player_angle = self.game.player.angle
-        # 3. ЦИКЛ ОТРИСОВКИ СТЕН И ДВЕРЕЙ НА ЭКРАНЕ
+        # 3. ЦИКЛ ОТРИСОВКИ СТЕН И ДВЕРЕЙ С МИП-МАППИНГОМ
         for i in range(NUM_RAYS):
-            # 🔥 Изменили '_' на 'map_pos_id'
-            wall_char_id, side, map_pos_id, proj_height, tex_x = render_data[i]
+            wall_char_id, side, map_pos_id, proj_height, encoded_tx, mip_level = render_data[i]
             
-            # Если луч улетел в пустоту — просто ничего не рисуем (убирает баг с небом)
             if wall_char_id == 0 or proj_height <= 0:
                 continue
 
             x = int(i * SCALE)
-            
-            # Дефолтное имя из конфига Numba
             wall_char = id_to_char.get(wall_char_id, '1')
 
-            # ==================================================================
-            # 🔥 ИДЕАЛЬНЫЙ ПЕРЕХВАТ ТЕКСТУРЫ ДЛЯ СЕКРЕТКИ ПО БУКВЕ СИМВОЛА
-            # ==================================================================
+            # ПЕРЕХВАТ ДЛЯ СЕКРЕТНЫХ СТЕН И ДВЕРЕЙ
             if wall_char_id == door_id and map_pos_id > 0:
                 tile_x = map_pos_id // 1000
                 tile_y = map_pos_id % 1000
-                
                 if 0 <= tile_y < len(self.game.map.text_map) and 0 <= tile_x < len(self.game.map.text_map[tile_y]):
                     wall_char = str(self.game.map.text_map[tile_y][tile_x]).strip()
-                    
                     for door in self.game.map.doors:
                         if int(door.x) == tile_x and int(door.y) == tile_y:
                             if getattr(door, 'door_type', '') == 'secret':
                                 stolen_char = getattr(door, 'texture_id', None)
-                                # Если секретка успешно украла букву соседа (например, 'M' или 'C')
                                 if stolen_char:
-                                    wall_char = stolen_char # Подменяем 'secret_wall' на букву стены!
+                                    wall_char = stolen_char
                             break
-            # ==================================================================
 
-
-
-
-
-            # Вытаскиваем готовую Pygame-текстуру по её честному имени
-            texture = self.textures.get(wall_char)
-
+            # Получаем список мип-мапов для этой стены
+            mipmap_list = self.textures.get(wall_char)
+            texture_slice = None
             h = int(proj_height)
 
-            
-            # --- ПИКСЕЛИЗАЦИЯ СТЕН И ДВЕРЕЙ ВБЛИЗИ БЕЗ «ВОЛН» ---
-            if h > HEIGHT:
-                # Находим точный шаг и высоту обрезки текстуры
-                tex_step = TEXTURE_SIZE / h
-                tex_h = int(HEIGHT * tex_step)
-                tex_h = max(1, min(tex_h, TEXTURE_SIZE))
-                tex_y = int((TEXTURE_SIZE - tex_h) / 2)
+            if mipmap_list is not None and isinstance(mipmap_list, list):
+                # Гарантируем, что индекс мип-мапа не выйдет за границы списка
+                mip_level = max(0, min(mip_level, len(mipmap_list) - 1))
                 
-                h_render = HEIGHT
-                y = 0
-                
-                if texture is not None:
+                # --- ПИКСЕЛИЗАЦИЯ ВБЛИЗИ (Всегда используем качественный Mip-0 оригинал) ---
+                if h > HEIGHT:
+                    texture = mipmap_list[0] # Вблизи берем строго оригинал 64x64
+                    tex_x = int((encoded_tx / 1000.0) * TEXTURE_SIZE)
+                    tex_x = max(0, min(tex_x, TEXTURE_SIZE - 1))
+
+                    tex_step = TEXTURE_SIZE / h
+                    tex_h = int(HEIGHT * tex_step)
+                    tex_h = max(1, min(tex_h, TEXTURE_SIZE))
+                    tex_y = int((TEXTURE_SIZE - tex_h) / 2)
+                    
+                    h_render = HEIGHT
+                    y = 0
+                    
                     try:
-                        # Округляем высоту до четного числа для стабильной работы кэша
                         h_cache = (h_render // 2) * 2
-                        cache_key = (id(texture), tex_x, h_cache, tex_y, tex_h)
+                        cache_key = (id(texture), tex_x, h_cache, tex_y, tex_h, 0)
                         
                         if cache_key in self.texture_cache:
                             texture_slice = self.texture_cache[cache_key]
                         else:
-                            # Вырезаем видимую часть и масштабируем обычным быстрым scale
                             slice_surface = texture.subsurface((tex_x, tex_y, 1, tex_h))
                             texture_slice = pygame.transform.scale(slice_surface, (SCALE, h_render))
                             
-                            if len(self.texture_cache) > 4000:
+                            if len(self.texture_cache) > 5000:
                                 self.texture_cache.clear()
                             self.texture_cache[cache_key] = texture_slice
                     except:
                         texture_slice = None
-                else:
-                    texture_slice = None
-            else:
-                # Обычная стена или дверь вдалеке
-                y = int(HALF_HEIGHT - h // 2)
                 
-                if texture is not None:
+                # --- МИП-МАППИНГ ВДАЛЕКЕ (Берем уменьшенную сглаженную текстуру) ---
+                else:
+                    y = int(HALF_HEIGHT - h // 2)
+                    texture = mipmap_list[mip_level] # Достаем правильный мип-мап (64, 32, 16 или 8 пикселей)
+                    curr_tex_size = texture.get_width()
+                    
+                    # Пересчитываем нормализованную координату под ширину ТЕКУЩЕГО мип-мапа
+                    tex_x = int((encoded_tx / 1000.0) * curr_tex_size)
+                    tex_x = max(0, min(tex_x, curr_tex_size - 1))
+
                     try:
                         h_cache = (h // 2) * 2
-                        cache_key = (id(texture), tex_x, h_cache, 0, TEXTURE_SIZE)
+                        cache_key = (id(texture), tex_x, h_cache, 0, curr_tex_size, mip_level)
                         
                         if cache_key in self.texture_cache:
                             texture_slice = self.texture_cache[cache_key]
                         else:
-                            slice_surface = texture.subsurface((tex_x, 0, 1, TEXTURE_SIZE))
+                            # Нарезка полосы происходит из уже сжатой без шума текстуры!
+                            slice_surface = texture.subsurface((tex_x, 0, 1, curr_tex_size))
+                            # Сжатие до мелких h_cache на экране происходит мгновенно
                             texture_slice = pygame.transform.scale(slice_surface, (SCALE, h_cache))
                             
-                            if len(self.texture_cache) > 4000:
+                            if len(self.texture_cache) > 5000:
                                 self.texture_cache.clear()
                             self.texture_cache[cache_key] = texture_slice
                     except:
                         texture_slice = None
-                else:
-                    texture_slice = None
+            else:
+                texture_slice = None
+                y = int(HALF_HEIGHT - h // 2)
 
-            # Финальный вывод вертикальной полосы на экран
             # --- ФИНАЛЬНЫЙ ВЫВОД ВЕРТИКАЛЬНОЙ ПОЛОСЫ НА ЭКРАН ---
             if texture_slice is not None:
                 self.game.screen.blit(texture_slice, (x, y))
@@ -388,28 +378,15 @@ class RayCasting:
                     dark_surface.fill((0, 0, 0))
                     self.game.screen.blit(dark_surface, (x, y))
             else:
-                # 🔥 ИСПРАВЛЕНИЕ ЗАПАСНОЙ ЗАЛИВКИ:
-                # Если текстурный срез упал в ошибку из-за кэша subsurface,
-                # мы принудительно заставляем этот прямоугольник краситься в цвет соседа wall_char,
-                # а не в дефолтный серый цвет (200, 200, 200)!
+                # Запасная заливка при ошибках кэша
                 rect_y = max(0, y)
                 rect_h = min(HEIGHT, h)
-                
-                # Ищем цвет кирпича соседа в WALL_COLORS по букве ('M', 'C', '1'...), которую мы успешно украли!
                 color = WALL_COLORS.get(wall_char, (100, 100, 100))
-                
                 if side == 1:
                     color = (int(color[0] * 0.7), int(color[1] * 0.7), int(color[2] * 0.7))
-                    
                 pygame.draw.rect(self.game.screen, color, (x, rect_y, SCALE, rect_h))
 
-
-
-        # Восстанавливаем оригинальную область обрезки экрана для отрисовки пушки и HUD
         self.game.screen.set_clip(original_clip)
-
-
-
 
 
 
