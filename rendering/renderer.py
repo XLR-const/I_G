@@ -30,6 +30,9 @@ class Renderer:
         self.ceiling_texture = None
         self.floor_texture = None
         self.notifications = []
+        self.font_weapon = pygame.font.Font('resources/fonts/Fy.ttf', 48)
+        self.font_ammo = pygame.font.Font('resources/fonts/Fy.ttf', 50)
+
 
         try:
             self.nice_hp = pygame.image.load('resources/player/nice_hp.png').convert_alpha()
@@ -198,28 +201,32 @@ class Renderer:
                              (center_x + offset, center_y - 10),
                              (center_x + offset, center_y + 10), 2)
 
-    def draw_health_sprite(self):
-        """Рисует иконку здоровья"""
+    def draw_health_sprite(self, center_x, center_y):
+        """Рисует иконку здоровья строго по переданным координатам центра ячейки сетки"""
         hp = self.game.player.hp
 
         if hp >= 80:
             sprite = self.nice_hp
-            pos = self.hp_positions[-1]
         elif 50 <= hp < 80:
             sprite = self.average_hp
-            pos = self.hp_positions[-2]
         else:
             sprite = self.bad_hp
-            pos = self.hp_positions[-3]
+
+        # Идеальное центрирование спрайта головы на сетке
+        fw, fh = sprite.get_size()
+        pos = (center_x - fw // 2, center_y - fh // 2)
 
         try:
             self.game.screen.blit(sprite, pos)
         except Exception:
             pass
 
+
     def draw_interface(self):
-        """Рисует интерфейс: полоску здоровья, оружие, патроны"""
-        hp = self.game.player.hp
+        """Рисует Sci-Fi HUD в левом углу: стрелки HP/AP заполняются вертикально (снизу вверх)"""
+        hp = max(0, min(100, self.game.player.hp))
+        armor = max(0, min(100, self.game.player.armor))
+        
         if self.game.weapon:
             current_weapon = self.game.weapon.name
             ammo = self.game.weapon.ammo
@@ -227,29 +234,97 @@ class Renderer:
             current_weapon = "Fists"
             ammo = 0
         font_path = 'resources/fonts/Fy.ttf'
-        
-        health_bar_pos = grid_to_pixel(1, 16)
-        health_bar_width = 6 * CELL_W
-        health_bar_height = 1 * CELL_H
-        health_bar_progress = (hp / 100) * health_bar_width
 
-        if health_bar_progress > 6 * CELL_W:
-            health_bar_progress = 6 * CELL_W
-        
-        armor = self.game.player.armor
-        armor_bar_pos = grid_to_pixel(1, 17)
-        armor_bar_width = 6 * CELL_W
-        armor_bar_height = 1 * CELL_H
+        # ==================================================================
+        # 1. СЕТОЧНЫЕ КООРДИНАТЫ ДЛЯ ЦЕНТРАЛЬНОГО УЗЛА (ГОЛОВЫ)
+        # ==================================================================
+        cx, cy = grid_to_pixel(5, 15, 'center')
+        cy += 8  # Опускаем панель чуть ближе к нижнему краю
 
-        # Фон полоски брони
-        pygame.draw.rect(self.game.screen, (50, 50, 60),
-                        (armor_bar_pos[0], armor_bar_pos[1], armor_bar_width, armor_bar_height))
-        
-        # Заполнение полоски брони
-        armor_bar_progress = (armor / 100) * armor_bar_width
-        pygame.draw.rect(self.game.screen, (0, 100, 200),  # Синий цвет
-                        (armor_bar_pos[0], armor_bar_pos[1], armor_bar_progress, armor_bar_height))
+        # ==================================================================
+        # 2. МАТЕМАТИКА ЛЕВОЙ СТРЕЛКИ ЗДОРОВЬЯ (ВЕРТИКАЛЬНОЕ ЗАПОЛНЕНИЕ)
+        # ==================================================================
+        raw_hp_top_in  = grid_to_pixel(4, 14, 'midbottom')
+        raw_hp_top_out = grid_to_pixel(3, 14, 'midbottom')
+        raw_hp_mid_out = grid_to_pixel(1, 15, 'midright')
+        raw_hp_bot_out = grid_to_pixel(3, 16, 'midtop')
+        raw_hp_bot_in  = grid_to_pixel(4, 16, 'midtop')
+        raw_hp_mid_in  = grid_to_pixel(2, 15, 'midright')
 
+        # Фиксируем вершины фоновой подложки с учетом вертикального растяжения
+        p_hp_top_in  = (raw_hp_top_in[0],  raw_hp_top_in[1] - 10 + 8)
+        p_hp_top_out = (raw_hp_top_out[0], raw_hp_top_out[1] - 10 + 8)
+        p_hp_mid_out = (raw_hp_mid_out[0], cy)
+        p_hp_bot_out = (raw_hp_bot_out[0], raw_hp_bot_out[1] + 10 + 8)
+        p_hp_bot_in  = (raw_hp_bot_in[0],  raw_hp_bot_in[1] + 10 + 8)
+        p_hp_mid_in  = (raw_hp_mid_in[0],  cy)
+
+        bg_hp_points = [p_hp_top_in, p_hp_top_out, p_hp_mid_out, p_hp_bot_out, p_hp_bot_in, p_hp_mid_in]
+        pygame.draw.polygon(self.game.screen, (50, 15, 15), bg_hp_points)
+        
+        # Честное вертикальное заполнение здоровья (снизу вверх)
+        if hp > 0:
+            hp_ratio = hp / 100.0
+            hp_color = (235, 25, 25) if hp <= 35 else (40, 230, 0)
+            
+            # Находим "линию отсечки" по Y: чем меньше HP, тем ниже падает верхняя граница заполнения
+            # Считаем от самой нижней точки стрелки (p_hp_bot_in[1]) до самой верхней (p_hp_top_in[1])
+            total_height = p_hp_bot_in[1] - p_hp_top_in[1]
+            cutoff_y = p_hp_bot_in[1] - int(total_height * hp_ratio)
+            
+            # Создаем динамические точки заполнения, срезая полигон по горизонтальной линии cutoff_y
+            fill_hp_points = []
+            for pt in bg_hp_points:
+                if pt[1] >= cutoff_y:
+                    # Если точка подложки ниже линии отсечки — забираем её полностью
+                    fill_hp_points.append(pt)
+                else:
+                    # Если точка выше — проецируем её строго на линию отсечки по Y
+                    fill_hp_points.append((pt[0], cutoff_y))
+            
+            pygame.draw.polygon(self.game.screen, hp_color, fill_hp_points)
+
+        # ==================================================================
+        # 3. МАТЕМАТИКА ПРАВОЙ СТРЕЛКИ БРОНИ (ВЕРТИКАЛЬНОЕ ЗАПОЛНЕНИЕ)
+        # ==================================================================
+        raw_ap_top_in  = grid_to_pixel(6, 14, 'midbottom')
+        raw_ap_top_out = grid_to_pixel(7, 14, 'midbottom')
+        raw_ap_mid_out = grid_to_pixel(9, 15, 'midleft')
+        raw_ap_bot_out = grid_to_pixel(7, 16, 'midtop')
+        raw_ap_bot_in  = grid_to_pixel(6, 16, 'midtop')
+        raw_ap_mid_in  = grid_to_pixel(8, 15, 'midleft')
+
+        p_ap_top_in  = (raw_ap_top_in[0],  raw_ap_top_in[1] - 10 + 8)
+        p_ap_top_out = (raw_ap_top_out[0], raw_ap_top_out[1] - 10 + 8)
+        p_ap_mid_out = (raw_ap_mid_out[0], cy)
+        p_ap_bot_out = (raw_ap_bot_out[0], raw_ap_bot_out[1] + 10 + 8)
+        p_ap_bot_in  = (raw_ap_bot_in[0],  raw_ap_bot_in[1] + 10 + 8)
+        p_ap_mid_in  = (raw_ap_mid_in[0],  cy)
+
+        bg_armor_points = [p_ap_top_in, p_ap_top_out, p_ap_mid_out, p_ap_bot_out, p_ap_bot_in, p_ap_mid_in]
+        pygame.draw.polygon(self.game.screen, (15, 15, 45), bg_armor_points)
+        
+        # Честное вертикальное заполнение брони (снизу вверх)
+        if armor > 0:
+            armor_ratio = armor / 100.0
+            total_height = p_ap_bot_in[1] - p_ap_top_in[1]
+            cutoff_y = p_ap_bot_in[1] - int(total_height * armor_ratio)
+            
+            fill_armor_points = []
+            for pt in bg_armor_points:
+                if pt[1] >= cutoff_y:
+                    fill_armor_points.append(pt)
+                else:
+                    fill_armor_points.append((pt[0], cutoff_y))
+            
+            pygame.draw.polygon(self.game.screen, (0, 115, 240), fill_armor_points)
+
+        # Отрисовка лица игрока строго в центре ячейки (5, 15)
+        self.draw_health_sprite(cx, cy)
+
+        # ==================================================================
+        # 4. ВЫВОД ТЕКСТА ОРУЖИЯ И ПАТРОНОВ
+        # ==================================================================
         weapon_name_pos = grid_to_pixel(25, 15)
         weapon_ammo_pos = grid_to_pixel(25, 16)
 
@@ -258,15 +333,12 @@ class Renderer:
         font = pygame.font.Font(font_path, 50)
         text_ammo = font.render(str(ammo), True, (255, 200, 255))
 
-        pygame.draw.rect(self.game.screen, (200, 50, 50),
-                         (health_bar_pos[0], health_bar_pos[1], health_bar_width, health_bar_height))
-        pygame.draw.rect(self.game.screen, (50, 240, 0),
-                         (health_bar_pos[0], health_bar_pos[1], health_bar_progress, health_bar_height))
-
         self.game.screen.blit(text_weapon, weapon_name_pos)
         self.game.screen.blit(text_ammo, weapon_ammo_pos)
-        self.draw_health_sprite()
+        
         self.draw_compass()
+
+
         #self.draw_line_of_cells()
 
     def draw_line_of_cells(self):
