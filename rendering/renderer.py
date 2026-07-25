@@ -1,7 +1,7 @@
 import pygame
 import math
 from setting import *
-
+import os
 
 class Renderer:
     """Класс для отрисовки фона, интерфейса и компаса
@@ -44,6 +44,22 @@ class Renderer:
             self.hp_positions = tuple(grid_to_pixel(col, row) for col, row in ((1, 14), (3, 14), (5, 14)))
         except Exception:
             self.hp_positions = tuple(grid_to_pixel(col, row) for col, row in ((1, 14), (3, 14), (5, 14)))
+        
+        # --- ОПТИМИЗАЦИЯ ЗАГРУЗКИ КЛЮЧ-КАРТ ---
+        self.key_sprites = {}
+        key_types = ['red', 'blue', 'yellow']
+        
+        for k_color in key_types:
+            path = f'resources/items/key_{k_color}.png'
+            if os.path.exists(path):
+                try:
+                    img = pygame.image.load(path).convert_alpha()
+                    # Масштабируем под размер ячейки сетки (CELL_W x CELL_H)
+                    # Если ключи покажутся мелкими, можно сделать (int(CELL_W * 1.5), int(CELL_H * 1.5))
+                    self.key_sprites[k_color] = pygame.transform.scale(img, (CELL_W, CELL_H))
+                except Exception as e:
+                    print(f"[Renderer] Ошибка загрузки ключа {k_color}: {e}")
+
 
     def set_background(self, background_data):
         """Устанавливает фон для текущего уровня из JSON
@@ -367,6 +383,35 @@ class Renderer:
         self.game.screen.blit(text_weapon, weapon_name_pos)
         self.game.screen.blit(text_ammo, weapon_ammo_pos)
         
+        # ==================================================================
+        # 5. ОТРИСОВКА КЛЮЧ-КАРТ ИЗ ИНВЕНТАРЯ ИГРОКА (СПРАВА НА СЕТКЕ)
+        # ==================================================================
+        # Начальная стартовая колонка для первого найденного ключа
+        start_key_col = 4
+        key_row = 17
+        
+        # Проверяем, что инвентарь ключей существует и не пуст
+        if hasattr(self.game.player, 'keys_inventory') and self.game.player.keys_inventory:
+            for key_obj in self.game.player.keys_inventory:
+                # Определяем цвет ключа. Если в списке лежат объекты классов, берем их свойство (например, .color или .type)
+                # Если в инвентаре лежат просто строки 'red', 'blue', то используем саму переменную.
+                if isinstance(key_obj, str):
+                    key_color = key_obj.strip().lower()
+                else:
+                    # Модифицируйте под ваше свойство в классе ключа (например, key_obj.color или key_obj.type)
+                    key_color = getattr(key_obj, 'type', getattr(key_obj, 'color', 'red')).strip().lower()
+                
+                # Достаем заранее загруженный спрайт ключ-карты
+                key_img = self.key_sprites.get(key_color)
+                
+                if key_img:
+                    # Получаем пиксельную позицию для текущей колонки
+                    key_pos = grid_to_pixel(start_key_col, key_row, 'topleft')
+                    self.game.screen.blit(key_img, key_pos)
+                    
+                    # Сдвигаем следующую ключ-карту на 1 колонку вправо, чтобы они выстраивались в ряд
+                    start_key_col += 1
+
         self.draw_compass()
 
 
