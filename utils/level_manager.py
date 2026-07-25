@@ -145,6 +145,7 @@ class LevelManager:
             self.player.armor = 0
             self.player.angle = 0
             self.exit_pos = self.map.exit_pos
+            self.player.keys_inventory = []
         else:
             print("ОШИБКА: Нет спавна игрока на карте (символ 'S')")
             return False
