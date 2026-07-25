@@ -16,6 +16,7 @@ DECOR_CONFIG = {
         'item_type': 'decor', 
         'sprite': 'resources/decorations/prop_military_crate.png',
         'ammo': 50,  # Высота: 50% от стены (низкий кубический ящик)
+        'radius': 0.4,
         'desc': 'Армейский ящик'
     },
     'prop_sandbag_wall': {
@@ -66,6 +67,7 @@ DECOR_CONFIG = {
         'item_type': 'decor', 
         'sprite': 'resources/decorations/prop_cargo_container.png',
         'ammo': 95,  # Высота: 95% от стены (тяжелый грузовой блок)
+        'radius': 0.9,
         'desc': 'Грузовой контейнер'
     },
     'prop_hangar_frame': {
