@@ -16,6 +16,7 @@ from ui.ui_manager import UIManager
 from utils.save_system import SaveSystem
 from ui.console import DevConsole
 from utils.intro_player import IntroPlayer
+from core.weapon_selector import HalfLifeWeaponSelector
 
 
 class Game:
@@ -73,6 +74,7 @@ class Game:
         self.map = None
         self.npcs = []
         self.inventory = []
+        self.weapon_selector = HalfLifeWeaponSelector(self)
         self.items = []
         self.weapon = None
         self.particles = []
@@ -129,6 +131,7 @@ class Game:
         self.items = [item for item in self.items if item.alive]
 
         self.weapon.update_animation()
+        self.weapon_selector.update()
 
         mouse_buttons = pygame.mouse.get_pressed()
         if mouse_buttons[0]:
@@ -174,6 +177,7 @@ class Game:
 
         # Отрисовка оружия и UI
         self.weapon.draw()
+        self.weapon_selector.draw()
         self.renderer.draw_interface()
         self.renderer.draw_crosshair()
         self.console.draw(self.screen)
@@ -206,12 +210,22 @@ class Game:
 
                 if event.type == pygame.MOUSEBUTTONDOWN:
                     if event.button == 1:
-                        if not self.weapon.reloading and not self.weapon.is_continuous:
-                            self.weapon.fire()
+                        if hasattr(self, 'weapon_selector') and self.weapon_selector.active:
+                            pass
+                        else:
+                            if not self.weapon.reloading and not self.weapon.is_continuous:
+                                self.weapon.fire()
 
                 if event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_SPACE:
                         self.weapon.fire()
+                        
+                # 🔥 ХАК ПЕРЕХВАТА КНОПОК 1-4:
+                # Селектор сожрет нажатие цифры и не пустит его дальше, открыв каскадное меню!
+                if self.weapon_selector.check_input(event):
+                    continue
+                if self.weapon_selector.check_mouse_click(event):
+                    continue
 
                 if event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_1:

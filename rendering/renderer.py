@@ -274,8 +274,12 @@ class Renderer:
         armor = max(0, min(100, self.game.player.armor))
         
         if self.game.weapon:
-            current_weapon = self.game.weapon.name
-            ammo = self.game.weapon.ammo
+            cur_weapon = self.game.weapon
+            current_weapon = cur_weapon.name
+            if cur_weapon.is_infinite:
+                ammo = '∞'
+            else:
+                ammo = self.game.weapon.ammo
         else:
             current_weapon = "Fists"
             ammo = 0

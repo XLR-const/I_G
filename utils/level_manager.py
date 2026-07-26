@@ -153,11 +153,11 @@ class LevelManager:
         self.inventory = []
         
         # Читаем инвентарь из JSON. Если ключа нет — по умолчанию выдаем список с 'Colt'
-        start_weapons = level_data.get('inventory', ['Colt'])
+        start_weapons = level_data.get('inventory', ['KNIFE'])
         
         # Защита на случай, если в JSON ключ 'inventory' есть, но он записан как пустой массив []
         if not start_weapons:
-            start_weapons = ['Colt']
+            start_weapons = ['KNIFE']
         
         for weapon_name in start_weapons:
             # Проверяем, существует ли вообще такая пушка в нашем WEAPON_CONFIG
@@ -168,8 +168,8 @@ class LevelManager:
 
         # Финальная защита: если инвентарь все еще пуст (например, 'Colt' удален из WEAPON_CONFIG)
         if not self.inventory:
-            if 'Colt' in WEAPON_CONFIG:
-                self.inventory.append(Weapon(self.game, 'Colt'))
+            if 'KNIFE' in WEAPON_CONFIG:
+                self.inventory.append(Weapon(self.game, 'KNIFE'))
             else:
                 # Берем первую попавшуюся пушку из конфига, чтобы игра никогда не падала
                 first_weapon_name = list(WEAPON_CONFIG.keys())[0]

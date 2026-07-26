@@ -23,6 +23,7 @@ class Weapon:
         self.is_continuous = config.get('continuous', False)
         self.ammo_start = config.get('ammo_start', 0)
         self.max_distance = config.get('max_distance', 5)
+        self.is_infinite = config.get('infinite_ammo', False)
 
         # Параметры для спрайт-листов
         self.folder_name = config.get('folder_name', None)
@@ -217,7 +218,10 @@ class Weapon:
             self.sprite = self.fire_frames[0]  # Гарантированно берем ПЕРВЫЙ кадр выстрела (вспышку)
 
         self.sound.play()
-        self.ammo -= 1
+        if self.is_infinite:
+            pass
+        else:
+            self.ammo -= 1
 
         # Запускаем луч выстрела (DDA)
         hit_x, hit_y, dist, side = self._get_hit_pos()

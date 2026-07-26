@@ -441,7 +441,19 @@ WEAPON_CONFIG = {
             'sprite_prefix': 'PLASMA',
             'ammo_start': 1
             
-        }
+        },
+    'KNIFE': {
+        'name': 'Knife',
+        'slot': 1,
+        'damage': 40,
+        'reload_time': 500,        # Время перезарядки строго под длину анимации!
+        'continuous': True,       # Одиночные выстрелы
+        'max_distance': 0.5,
+        'folder_name': 'KNIFE',
+        'sprite_prefix': 'KNFG',
+        'ammo_start': 10,
+        'infinite_ammo': True
+    },
 
 
 }
