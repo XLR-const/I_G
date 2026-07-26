@@ -16,6 +16,7 @@ from ui.ui_manager import UIManager
 from utils.save_system import SaveSystem
 from ui.console import DevConsole
 from utils.intro_player import IntroPlayer
+from core.weapon_selector import HalfLifeWeaponSelector
 
 
 class DevGame:
@@ -42,6 +43,7 @@ class DevGame:
 
         pygame.mixer.init(frequency=22050, size=-16, channels=2, buffer=512)
         
+        self.weapon_selector = HalfLifeWeaponSelector(self)
         # UI Manager
         self.ui_manager = None
         if config.get('ui_manager', True):
@@ -154,6 +156,7 @@ class DevGame:
         # Оружие
         if self.weapon:
             self.weapon.update_animation()
+        self.weapon_selector.update()
 
         # Стрельба
         mouse_buttons = pygame.mouse.get_pressed()
@@ -217,6 +220,7 @@ class DevGame:
         # Консоль
         if self.console:
             self.console.draw(self.screen)
+        self.weapon_selector.draw()
 
         pygame.display.flip()
 
@@ -257,6 +261,13 @@ class DevGame:
                         print("[DevMode] Выход по ESC")
                         pygame.quit()
                         sys.exit()
+                        
+            # 🔥 ХАК ПЕРЕХВАТА КНОПОК 1-4:
+            # Селектор сожрет нажатие цифры и не пустит его дальше, открыв каскадное меню!
+            if self.weapon_selector.check_input(event):
+                continue
+            if self.weapon_selector.check_mouse_click(event):
+                continue
 
             # Игровые события
             if event.type == pygame.KEYDOWN:

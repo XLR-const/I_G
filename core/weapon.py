@@ -17,6 +17,7 @@ class Weapon:
         # Читаем конфигурацию из game_data.py
         config = WEAPON_CONFIG.get(weapon_name, {})
         self.name = config.get('name', weapon_name)
+        self.slot = config.get('slot', 4)
         self.damage = config.get('damage', 10)
         self.reload_time = config.get('reload_time', 150)
         self.is_continuous = config.get('continuous', False)
