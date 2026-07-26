@@ -261,6 +261,14 @@ SYMBOLS_CONFIG = {
         'sprite': 'resources/weapons/PLASMA/icon.png',
         'description': 'PLASMA'
     },
+        'knife2': {
+        'type': 'item',
+        'item_type': 'weapon',
+        'weapon_name': 'KNIFE2',
+        'ammo': 1,
+        'sprite': 'resources/weapons/KNIFE2/icon.png',
+        'description': 'PLASMA'
+    },
 
     
  # --- СИСТЕМА ДВЕРЕЙ И СЕКРЕТОК С ТЕКСТУРАМИ ---
@@ -450,6 +458,18 @@ WEAPON_CONFIG = {
         'continuous': True,       # Одиночные выстрелы
         'max_distance': 0.5,
         'folder_name': 'KNIFE',
+        'sprite_prefix': 'KNFS',
+        'ammo_start': 10,
+        'infinite_ammo': True
+    },
+        'KNIFE2': {
+        'name': 'Knife2',
+        'slot': 1,
+        'damage': 40,
+        'reload_time': 500,        # Время перезарядки строго под длину анимации!
+        'continuous': True,       # Одиночные выстрелы
+        'max_distance': 0.5,
+        'folder_name': 'KNIFE2',
         'sprite_prefix': 'KNFG',
         'ammo_start': 10,
         'infinite_ammo': True
