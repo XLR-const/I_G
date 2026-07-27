@@ -287,128 +287,118 @@ class Renderer:
         font_path = 'resources/fonts/Fy.ttf'
 
         # ==================================================================
-        # 1. СЕТОЧНЫЕ КООРДИНАТЫ ДЛЯ ЦЕНТРАЛЬНОГО УЗЛА (ГОЛОВЫ)
+        # 1. СЕТОЧНЫЕ КООРДИНАТЫ (ПО КЛЕТКАМ СЕТКИ ИНТЕРФЕЙСА)
         # ==================================================================
-        cx, cy = grid_to_pixel(5, 15, 'center')
-        cy += 8  # Позиция приборов в нижнем левом углу
+        # 🔥 СДВИГ ГОЛОВЫ: Ставим центр лица игрока на 3-ю колонку сетки
+        cx, cy = grid_to_pixel(3, 15, 'center')
+        cy += 8  # Смещение по вертикали для прижатия к низу экрана
 
         # Базовое время игры для анимации волн и вращения
         time_ms = pygame.time.get_ticks()
 
-        # ==================================================================
-        # 2. МАТЕМАТИКА СИНУСОИДЫ ЗДОРОВЬЯ (ПЛАВНЫЙ ДИНАМИЧЕСКИЙ ПЕРИОД)
-        # ==================================================================
-        hp_box_w = 160
-        hp_box_h = 50
-        hp_start_x = cx - hp_box_w - 20
-        hp_center_y = cy
+        # Габариты приборных коробок
+        box_w = 140  
+        box_h = 32  
+        
+        # 🔥 СДВИГ БАРОВ ПО КЛЕТКАМ: Берем координату X начала 5-й колонки сетки!
+        # Это отодвинет бары вправо от лица ровно на расстояние клеток.
+        pan_x, _ = grid_to_pixel(5, 15, 'topleft')
 
-        # Фон прибора
-        pygame.draw.rect(self.game.screen, (16, 8, 10), (hp_start_x, hp_center_y - hp_box_h//2, hp_box_w, hp_box_h), 0, 4)
-        pygame.draw.rect(self.game.screen, (40, 20, 25), (hp_start_x, hp_center_y - hp_box_h//2, hp_box_w, hp_box_h), 1, 4)
+        # 🔥 СДВИГ ЦИФР ПО КЛЕТКАМ: Очки HP и AP будут выводиться строго с 8-й колонки!
+        text_x, _ = grid_to_pixel(8, 15, 'topleft')
+
+        # Шрифты для неонового вывода цифр рядом с приборами
+        font_stats = pygame.font.Font(font_path, 28)
+
+        # Рисуем голову игрока
+        self.draw_health_sprite(cx, cy)
+
+        # ==================================================================
+        # 2. МАТЕМАТИКА СИНУСОИДЫ ЗДОРОВЬЯ (НИЖНИЙ ЯРУС + СЕТОЧНЫЕ ЦИФРЫ)
+        # ==================================================================
+        hp_center_y = cy + 20
+
+        # Фон прибора здоровья
+        pygame.draw.rect(self.game.screen, (16, 8, 10), (pan_x, hp_center_y - box_h//2, box_w, box_h), 0, 4)
+        pygame.draw.rect(self.game.screen, (40, 20, 25), (pan_x, hp_center_y - box_h//2, box_w, box_h), 1, 4)
 
         if hp > 0:
-            # 🔥 ТВОЁ ТРЕБОВАНИЕ: Плавное, непрерывное изменение периода!
-            # Рассчитываем частоту (обратную периоду). 
-            # При 1 HP частота = 0.012 (длинная, растянутая волна).
-            # При 100 HP частота = 0.075 (ультра-сжатый, частый пульс).
-            frequency = 0.012 + 0.063 * (hp / 100.0)
-            
-            # Динамическая скорость бега волны (при высоком HP пульс бежит быстрее)
-            wave_speed = 0.005 + 0.02 * (hp / 100.0)
-            
-            # Плавная амплитуда (высота колебаний)
-            amplitude = 3 + 15 * (hp / 100.0)
-            
-            # Плавный градиент цвета от алого (0) через оранжевый (50) к неоново-зеленому (100)
-            # Никаких ифов, честное вычисление RGB каналов!
-            if hp <= 50:
-                # От красного к желтому
-                r = 255
-                g = int(16 + (200 - 16) * (hp / 50.0))
-                b = int(50 * (1.0 - hp / 50.0))
-            else:
-                # От желтого к кислотно-зеленому
-                r = int(255 * (1.0 - (hp - 50) / 50.0))
-                g = int(200 + (240 - 200) * ((hp - 50) / 50.0))
-                b = int(160 * ((hp - 50) / 50.0))
-            hp_color = (max(0, min(255, r)), max(0, min(255, g)), max(0, min(255, b)))
-
-            pulse_points = []
-            for pixel_x in range(hp_start_x + 4, hp_start_x + hp_box_w - 4):
-                # Базовая бегущая синусоида с динамическим сжатием периода (frequency)
-                wave_y = hp_center_y + amplitude * math.sin((pixel_x * frequency) - (time_ms * wave_speed))
+            try:
+                frequency = 0.012 + 0.063 * (hp / 100.0)
+                wave_speed = 0.005 + 0.02 * (hp / 100.0)
+                amplitude = 2 + 10 * (hp / 100.0)
                 
-                # Добавляем честные физиологические пики кардиограммы (R-зубцы)
-                # Период спавна пиков тоже динамически завязан на уровень здоровья!
-                heart_rate_period = int(120 - 50 * (hp / 100.0)) # Чем больше ХП, тем ближе пики друг к другу
-                if int(pixel_x - time_ms * (wave_speed * 10)) % heart_rate_period in (0, 1, 2):
-                    wave_y -= amplitude * 1.4 # Сочный всплеск вверх
+                if hp <= 30: hp_color = (255, 16, 50)
+                elif hp <= 65: hp_color = (255, 200, 0)
+                else: hp_color = (0, 240, 160)
+
+                pulse_points = []
+                for pixel_x in range(pan_x + 4, pan_x + box_w - 4):
+                    wave_y = hp_center_y + amplitude * math.sin((pixel_x * frequency) - (time_ms * wave_speed))
                     
-                pulse_points.append((pixel_x, wave_y))
-            
-            if len(pulse_points) > 1:
-                pygame.draw.lines(self.game.screen, hp_color, False, pulse_points, 3)
+                    heart_rate_period = int(120 - 50 * (hp / 100.0))
+                    if int(pixel_x - time_ms * (wave_speed * 10)) % heart_rate_period in (0, 1, 2):
+                        wave_y -= amplitude * 1.3
+                        
+                    pulse_points.append((pixel_x, wave_y))
+                
+                if len(pulse_points) > 1:
+                    pygame.draw.lines(self.game.screen, hp_color, False, pulse_points, 2)
+            except:
+                pass
+
+        # 🔥 ВЫВОД ОЧКОВ ЗДОРОВЬЯ ПО СЕТКЕ: Используем строго сеточную координату text_x!
+        hp_val_text = font_stats.render(f"{int(hp)} HP", True, hp_color if hp > 0 else (100, 100, 100))
+        self.game.screen.blit(hp_val_text, (text_x, hp_center_y - 14))
 
         # ==================================================================
-        # 3. МАТЕМАТИКА ЦИКЛОТРОНА БРОНИ (ИЗОЛИРОВАННЫЙ МНОГООРБИТАЛЬНЫЙ ФИКС)
+        # 3. МАТЕМАТИКА ЦИКЛОТРОНА БРОНИ (ВЕРХНИЙ ЯРУС + СЕТОЧНЫЕ ЦИФРЫ)
         # ==================================================================
-        ap_box_w = 160
-        ap_box_h = 50
-        ap_start_x = cx + 20
-        ap_center_y = cy
+        ap_center_y = cy - 20
 
         # Фон прибора брони
-        pygame.draw.rect(self.game.screen, (8, 12, 20), (ap_start_x, ap_center_y - ap_box_h//2, ap_box_w, ap_box_h), 0, 4)
-        pygame.draw.rect(self.game.screen, (20, 30, 50), (ap_start_x, ap_center_y - ap_box_h//2, ap_box_w, ap_box_h), 1, 4)
+        pygame.draw.rect(self.game.screen, (8, 12, 20), (pan_x, ap_center_y - box_h//2, box_w, box_h), 0, 4)
+        pygame.draw.rect(self.game.screen, (20, 30, 50), (pan_x, ap_center_y - box_h//2, box_w, box_h), 1, 4)
 
         if armor > 0:
             try:
-                # Скорость вращения частиц силового щита
                 rotation_speed = 0.002 + 0.006 * (armor / 100.0)
                 armor_color = (0, 150, 255)
                 
-                # Ограничиваем максимальное число точек в одном кольце, чтобы не было каши
                 base_dots = int(8 + 16 * (armor / 100.0))
-                
-                # Количество независимых квантовых орбит (1, 2 или 3 в зависимости от прочности)
                 num_orbits = 1 if armor <= 40 else (2 if armor <= 75 else 3)
                 
                 for orbit_idx in range(num_orbits):
                     orbit_phase_shift = orbit_idx * (math.pi / 3)
-                    orbit_tilt = 1.0 - (orbit_idx * 0.2) # Слегка сплющиваем внутренние кольца
+                    orbit_tilt = 1.0 - (orbit_idx * 0.15) 
                     
-                    # 🔥 ЖЕСТКИЙ ФИКС: Изолируем имена переменных, чтобы они не затирали глобальные координаты!
                     ap_prev_x, ap_prev_y = None, None
                     
                     for dot_idx in range(base_dots):
                         angle = (dot_idx * (math.tau / base_dots)) + (time_ms * rotation_speed) + orbit_phase_shift
                         
-                        radius_x = 42 + 4 * math.sin(time_ms * 0.002 + orbit_idx)
-                        radius_y = int(13 * orbit_tilt)
+                        radius_x = 35 + 4 * math.sin(time_ms * 0.002 + orbit_idx)
+                        radius_y = int(9 * orbit_tilt)
                         
-                        dot_x = ap_start_x + ap_box_w // 2 + int(radius_x * math.cos(angle))
+                        dot_x = pan_x + box_w // 2 + int(radius_x * math.cos(angle))
                         dot_y = ap_center_y + int(radius_y * math.sin(angle))
                         
                         is_front = math.sin(angle) > 0
-                        dot_radius = 3 if is_front else 1
+                        dot_radius = 2 if is_front else 1
                         
                         current_color = armor_color if is_front else (0, 75, 130)
                         pygame.draw.circle(self.game.screen, current_color, (dot_x, dot_y), dot_radius)
                         
-                        # Соединяем лазерными связями только лицевые точки
                         if ap_prev_x is not None and is_front and armor > 30:
                             pygame.draw.line(self.game.screen, (0, 180, 255), (ap_prev_x, ap_prev_y), (dot_x, dot_y), 1)
                             
                         ap_prev_x, ap_prev_y = dot_x, dot_y
             except:
-                # Если где-то произошел тригонометрический сбой, блок try мягко пропустит его,
-                # не дав Питону оборвать метод draw_interface на полуслове!
                 pass
 
-        # 🔥 ГАРАНТИРОВАННЫЙ ВОЗВРАТ ЛИЦА:
-        # Теперь управление точно доходит до этой строчки, и голова встает на место!
-        self.draw_health_sprite(cx, cy)
+        # 🔥 ВЫВОД ОЧКОВ БРОНИ ПО СЕТКЕ: Выравниваем строго по вертикали с text_x!
+        ap_val_text = font_stats.render(f"{int(armor)} AP", True, (0, 180, 255) if armor > 0 else (60, 80, 100))
+        self.game.screen.blit(ap_val_text, (text_x, ap_center_y - 14))
 
 
 
