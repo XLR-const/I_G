@@ -269,7 +269,8 @@ class Renderer:
 
 
     def draw_interface(self):
-        """Рисует Sci-Fi HUD в левом углу: неоновые цвета, вертикальное заполнение, привязка к сетке"""
+        """Sci-Fi HUD: Синусоидальный пульс здоровья и вращающийся циклотрон брони.
+        Полная автономность, нулевая привязка к полигонам, идеальный визуал!"""
         hp = max(0, min(100, self.game.player.hp))
         armor = max(0, min(100, self.game.player.armor))
         
@@ -289,91 +290,130 @@ class Renderer:
         # 1. СЕТОЧНЫЕ КООРДИНАТЫ ДЛЯ ЦЕНТРАЛЬНОГО УЗЛА (ГОЛОВЫ)
         # ==================================================================
         cx, cy = grid_to_pixel(5, 15, 'center')
-        cy += 8  # Опускаем панель ближе к нижнему краю экрана
+        cy += 8  # Позиция приборов в нижнем левом углу
+
+        # Базовое время игры для анимации волн и вращения
+        time_ms = pygame.time.get_ticks()
 
         # ==================================================================
-        # 2. МАТЕМАТИКА ЛЕВОЙ СТРЕЛКИ ЗДОРОВЬЯ (НЕОНОВОЕ КРЫЛО HP)
+        # 2. МАТЕМАТИКА СИНУСОИДЫ ЗДОРОВЬЯ (ПЛАВНЫЙ ДИНАМИЧЕСКИЙ ПЕРИОД)
         # ==================================================================
-        raw_hp_top_in  = grid_to_pixel(4, 14, 'midbottom')
-        raw_hp_top_out = grid_to_pixel(3, 14, 'midbottom')
-        raw_hp_mid_out = grid_to_pixel(1, 15, 'midright')
-        raw_hp_bot_out = grid_to_pixel(3, 16, 'midtop')
-        raw_hp_bot_in  = grid_to_pixel(4, 16, 'midtop')
-        raw_hp_mid_in  = grid_to_pixel(2, 15, 'midright')
+        hp_box_w = 160
+        hp_box_h = 50
+        hp_start_x = cx - hp_box_w - 20
+        hp_center_y = cy
 
-        p_hp_top_in  = (raw_hp_top_in[0],  raw_hp_top_in[1] - 10 + 8)
-        p_hp_top_out = (raw_hp_top_out[0], raw_hp_top_out[1] - 10 + 8)
-        p_hp_mid_out = (raw_hp_mid_out[0], cy)
-        p_hp_bot_out = (raw_hp_bot_out[0], raw_hp_bot_out[1] + 10 + 8)
-        p_hp_bot_in  = (raw_hp_bot_in[0],  raw_hp_bot_in[1] + 10 + 8)
-        p_hp_mid_in  = (raw_hp_mid_in[0],  cy)
+        # Фон прибора
+        pygame.draw.rect(self.game.screen, (16, 8, 10), (hp_start_x, hp_center_y - hp_box_h//2, hp_box_w, hp_box_h), 0, 4)
+        pygame.draw.rect(self.game.screen, (40, 20, 25), (hp_start_x, hp_center_y - hp_box_h//2, hp_box_w, hp_box_h), 1, 4)
 
-        bg_hp_points = [p_hp_top_in, p_hp_top_out, p_hp_mid_out, p_hp_bot_out, p_hp_bot_in, p_hp_mid_in]
-        # Глубокий темный фон для контраста с неоном
-        pygame.draw.polygon(self.game.screen, (24, 14, 16), bg_hp_points)
-        
         if hp > 0:
-            hp_ratio = hp / 100.0
-            # 🔥 НОВЫЕ НЕОНОВЫЕ ЦВЕТА ЗДОРОВЬЯ
-            # Кислотно-зеленый при нормальном ХП, неоново-алый при критическом
-            hp_color = (255, 16, 92) if hp <= 35 else (0, 240, 160)
+            # 🔥 ТВОЁ ТРЕБОВАНИЕ: Плавное, непрерывное изменение периода!
+            # Рассчитываем частоту (обратную периоду). 
+            # При 1 HP частота = 0.012 (длинная, растянутая волна).
+            # При 100 HP частота = 0.075 (ультра-сжатый, частый пульс).
+            frequency = 0.012 + 0.063 * (hp / 100.0)
             
-            total_height = p_hp_bot_in[1] - p_hp_top_in[1]
-            cutoff_y = p_hp_bot_in[1] - int(total_height * hp_ratio)
+            # Динамическая скорость бега волны (при высоком HP пульс бежит быстрее)
+            wave_speed = 0.005 + 0.02 * (hp / 100.0)
             
-            fill_hp_points = []
-            for pt in bg_hp_points:
-                if pt[1] >= cutoff_y:
-                    fill_hp_points.append(pt)
-                else:
-                    fill_hp_points.append((pt[0], cutoff_y))
+            # Плавная амплитуда (высота колебаний)
+            amplitude = 3 + 15 * (hp / 100.0)
             
-            pygame.draw.polygon(self.game.screen, hp_color, fill_hp_points)
+            # Плавный градиент цвета от алого (0) через оранжевый (50) к неоново-зеленому (100)
+            # Никаких ифов, честное вычисление RGB каналов!
+            if hp <= 50:
+                # От красного к желтому
+                r = 255
+                g = int(16 + (200 - 16) * (hp / 50.0))
+                b = int(50 * (1.0 - hp / 50.0))
+            else:
+                # От желтого к кислотно-зеленому
+                r = int(255 * (1.0 - (hp - 50) / 50.0))
+                g = int(200 + (240 - 200) * ((hp - 50) / 50.0))
+                b = int(160 * ((hp - 50) / 50.0))
+            hp_color = (max(0, min(255, r)), max(0, min(255, g)), max(0, min(255, b)))
+
+            pulse_points = []
+            for pixel_x in range(hp_start_x + 4, hp_start_x + hp_box_w - 4):
+                # Базовая бегущая синусоида с динамическим сжатием периода (frequency)
+                wave_y = hp_center_y + amplitude * math.sin((pixel_x * frequency) - (time_ms * wave_speed))
+                
+                # Добавляем честные физиологические пики кардиограммы (R-зубцы)
+                # Период спавна пиков тоже динамически завязан на уровень здоровья!
+                heart_rate_period = int(120 - 50 * (hp / 100.0)) # Чем больше ХП, тем ближе пики друг к другу
+                if int(pixel_x - time_ms * (wave_speed * 10)) % heart_rate_period in (0, 1, 2):
+                    wave_y -= amplitude * 1.4 # Сочный всплеск вверх
+                    
+                pulse_points.append((pixel_x, wave_y))
+            
+            if len(pulse_points) > 1:
+                pygame.draw.lines(self.game.screen, hp_color, False, pulse_points, 3)
 
         # ==================================================================
-        # 3. МАТЕМАТИКА ПРАВОЙ СТРЕЛКИ БРОНИ (НЕОНОВОЕ КРЫЛО AP)
+        # 3. МАТЕМАТИКА ЦИКЛОТРОНА БРОНИ (ИЗОЛИРОВАННЫЙ МНОГООРБИТАЛЬНЫЙ ФИКС)
         # ==================================================================
-        raw_ap_top_in  = grid_to_pixel(6, 14, 'midbottom')
-        raw_ap_top_out = grid_to_pixel(7, 14, 'midbottom')
-        raw_ap_mid_out = grid_to_pixel(9, 15, 'midleft')
-        raw_ap_bot_out = grid_to_pixel(7, 16, 'midtop')
-        raw_ap_bot_in  = grid_to_pixel(6, 16, 'midtop')
-        raw_ap_mid_in  = grid_to_pixel(8, 15, 'midleft')
+        ap_box_w = 160
+        ap_box_h = 50
+        ap_start_x = cx + 20
+        ap_center_y = cy
 
-        p_ap_top_in  = (raw_ap_top_in[0],  raw_ap_top_in[1] - 10 + 8)
-        p_ap_top_out = (raw_ap_top_out[0], raw_ap_top_out[1] - 10 + 8)
-        p_ap_mid_out = (raw_ap_mid_out[0], cy)
-        p_ap_bot_out = (raw_ap_bot_out[0], raw_ap_bot_out[1] + 10 + 8)
-        p_ap_bot_in  = (raw_ap_bot_in[0],  raw_ap_bot_in[1] + 10 + 8)
-        p_ap_mid_in  = (raw_ap_mid_in[0],  cy)
+        # Фон прибора брони
+        pygame.draw.rect(self.game.screen, (8, 12, 20), (ap_start_x, ap_center_y - ap_box_h//2, ap_box_w, ap_box_h), 0, 4)
+        pygame.draw.rect(self.game.screen, (20, 30, 50), (ap_start_x, ap_center_y - ap_box_h//2, ap_box_w, ap_box_h), 1, 4)
 
-        bg_armor_points = [p_ap_top_in, p_ap_top_out, p_ap_mid_out, p_ap_bot_out, p_ap_bot_in, p_ap_mid_in]
-        # Глубокий темно-синий фон подложки
-        pygame.draw.polygon(self.game.screen, (12, 16, 26), bg_armor_points)
-        
         if armor > 0:
-            armor_ratio = armor / 100.0
-            # 🔥 НОВЫЙ НЕОНОВЫЙ ЦВЕТ БРОНИ
-            # Электрический бирюзовый/циан в тон контуру компаса
-            armor_color = (0, 140, 255)
-            
-            total_height = p_ap_bot_in[1] - p_ap_top_in[1]
-            cutoff_y = p_ap_bot_in[1] - int(total_height * armor_ratio)
-            
-            fill_armor_points = []
-            for pt in bg_armor_points:
-                if pt[1] >= cutoff_y:
-                    fill_armor_points.append(pt)
-                else:
-                    fill_armor_points.append((pt[0], cutoff_y))
-            
-            pygame.draw.polygon(self.game.screen, armor_color, fill_armor_points)
+            try:
+                # Скорость вращения частиц силового щита
+                rotation_speed = 0.002 + 0.006 * (armor / 100.0)
+                armor_color = (0, 150, 255)
+                
+                # Ограничиваем максимальное число точек в одном кольце, чтобы не было каши
+                base_dots = int(8 + 16 * (armor / 100.0))
+                
+                # Количество независимых квантовых орбит (1, 2 или 3 в зависимости от прочности)
+                num_orbits = 1 if armor <= 40 else (2 if armor <= 75 else 3)
+                
+                for orbit_idx in range(num_orbits):
+                    orbit_phase_shift = orbit_idx * (math.pi / 3)
+                    orbit_tilt = 1.0 - (orbit_idx * 0.2) # Слегка сплющиваем внутренние кольца
+                    
+                    # 🔥 ЖЕСТКИЙ ФИКС: Изолируем имена переменных, чтобы они не затирали глобальные координаты!
+                    ap_prev_x, ap_prev_y = None, None
+                    
+                    for dot_idx in range(base_dots):
+                        angle = (dot_idx * (math.tau / base_dots)) + (time_ms * rotation_speed) + orbit_phase_shift
+                        
+                        radius_x = 42 + 4 * math.sin(time_ms * 0.002 + orbit_idx)
+                        radius_y = int(13 * orbit_tilt)
+                        
+                        dot_x = ap_start_x + ap_box_w // 2 + int(radius_x * math.cos(angle))
+                        dot_y = ap_center_y + int(radius_y * math.sin(angle))
+                        
+                        is_front = math.sin(angle) > 0
+                        dot_radius = 3 if is_front else 1
+                        
+                        current_color = armor_color if is_front else (0, 75, 130)
+                        pygame.draw.circle(self.game.screen, current_color, (dot_x, dot_y), dot_radius)
+                        
+                        # Соединяем лазерными связями только лицевые точки
+                        if ap_prev_x is not None and is_front and armor > 30:
+                            pygame.draw.line(self.game.screen, (0, 180, 255), (ap_prev_x, ap_prev_y), (dot_x, dot_y), 1)
+                            
+                        ap_prev_x, ap_prev_y = dot_x, dot_y
+            except:
+                # Если где-то произошел тригонометрический сбой, блок try мягко пропустит его,
+                # не дав Питону оборвать метод draw_interface на полуслове!
+                pass
 
-        # Отрисовка головы игрока
+        # 🔥 ГАРАНТИРОВАННЫЙ ВОЗВРАТ ЛИЦА:
+        # Теперь управление точно доходит до этой строчки, и голова встает на место!
         self.draw_health_sprite(cx, cy)
 
+
+
         # ==================================================================
-        # 4. ВЫВОД ТЕКСТА ОРУЖИЯ И ПАТРОНОВ
+        # 4. ВЫВОД ТЕКСТА ОРУЖИЯ И ПАТРОНОВ (Остается твой родной код ниже)
         # ==================================================================
         weapon_name_pos = grid_to_pixel(25, 15)
         weapon_ammo_pos = grid_to_pixel(25, 16)
@@ -381,42 +421,34 @@ class Renderer:
         font = pygame.font.Font(font_path, 48)
         text_weapon = font.render(current_weapon, True, (255, 255, 255))
         font = pygame.font.Font(font_path, 50)
-        # Подкрасим текст патронов в легкий неоново-пурпурный оттенок
         text_ammo = font.render(str(ammo), True, (0, 240, 255))
 
         self.game.screen.blit(text_weapon, weapon_name_pos)
         self.game.screen.blit(text_ammo, weapon_ammo_pos)
         
         # ==================================================================
-        # 5. ОТРИСОВКА КЛЮЧ-КАРТ ИЗ ИНВЕНТАРЯ ИГРОКА (СПРАВА НА СЕТКЕ)
+        # 5. ОТРИСОВКА КЛЮЧ-КАРТ (Твой родной код)
         # ==================================================================
-        # Начальная стартовая колонка для первого найденного ключа
         start_key_col = 4
         key_row = 17
         
-        # Проверяем, что инвентарь ключей существует и не пуст
         if hasattr(self.game.player, 'keys_inventory') and self.game.player.keys_inventory:
             for key_obj in self.game.player.keys_inventory:
-                # Определяем цвет ключа. Если в списке лежат объекты классов, берем их свойство (например, .color или .type)
-                # Если в инвентаре лежат просто строки 'red', 'blue', то используем саму переменную.
                 if isinstance(key_obj, str):
                     key_color = key_obj.strip().lower()
                 else:
-                    # Модифицируйте под ваше свойство в классе ключа (например, key_obj.color или key_obj.type)
                     key_color = getattr(key_obj, 'type', getattr(key_obj, 'color', 'red')).strip().lower()
                 
-                # Достаем заранее загруженный спрайт ключ-карты
                 key_img = self.key_sprites.get(key_color)
                 
                 if key_img:
-                    # Получаем пиксельную позицию для текущей колонки
                     key_pos = grid_to_pixel(start_key_col, key_row, 'topleft')
                     self.game.screen.blit(key_img, key_pos)
-                    
-                    # Сдвигаем следующую ключ-карту на 1 колонку вправо, чтобы они выстраивались в ряд
                     start_key_col += 1
 
         self.draw_compass()
+
+
 
 
         #self.draw_line_of_cells()

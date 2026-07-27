@@ -454,7 +454,7 @@ WEAPON_CONFIG = {
         'name': 'Knife',
         'slot': 1,
         'damage': 40,
-        'reload_time': 500,        # Время перезарядки строго под длину анимации!
+        'reload_time': 1000,        # Время перезарядки строго под длину анимации!
         'continuous': True,       # Одиночные выстрелы
         'max_distance': 0.5,
         'folder_name': 'KNIFE',
@@ -466,7 +466,7 @@ WEAPON_CONFIG = {
         'name': 'Knife2',
         'slot': 1,
         'damage': 40,
-        'reload_time': 500,        # Время перезарядки строго под длину анимации!
+        'reload_time': 1000,        # Время перезарядки строго под длину анимации!
         'continuous': True,       # Одиночные выстрелы
         'max_distance': 0.5,
         'folder_name': 'KNIFE2',
