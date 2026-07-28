@@ -525,7 +525,7 @@ class Renderer:
 
 
 
-        self.draw_line_of_cells()
+        #self.draw_line_of_cells()
 
     def draw_line_of_cells(self):
         """Рисует линии сетки (для отладки)"""

@@ -16,7 +16,7 @@ from ui.ui_manager import UIManager
 from utils.save_system import SaveSystem
 from ui.console import DevConsole
 from utils.intro_player import IntroPlayer
-from core.weapon_selector import HalfLifeWeaponSelector
+from core.weapon_selector import WeaponSelector
 
 
 class Game:
@@ -74,7 +74,7 @@ class Game:
         self.map = None
         self.npcs = []
         self.inventory = []
-        self.weapon_selector = HalfLifeWeaponSelector(self)
+        self.weapon_selector = WeaponSelector(self)
         self.items = []
         self.weapon = None
         self.particles = []
@@ -111,6 +111,10 @@ class Game:
 
     def update(self):
         """Обновляет состояние игры"""
+        self.weapon_selector.update()
+        if self.weapon_selector.active:
+            return 
+        
         self.player.update()
         self.level_manager.check_exit()
 
@@ -131,7 +135,7 @@ class Game:
         self.items = [item for item in self.items if item.alive]
 
         self.weapon.update_animation()
-        self.weapon_selector.update()
+
 
         mouse_buttons = pygame.mouse.get_pressed()
         if mouse_buttons[0]:
@@ -224,8 +228,13 @@ class Game:
                 # Селектор сожрет нажатие цифры и не пустит его дальше, открыв каскадное меню!
                 if self.weapon_selector.check_input(event):
                     continue
-                if self.weapon_selector.check_mouse_click(event):
-                    continue
+                    
+                # 2. 🔥 ЖЕСТКАЯ БЛОКИРОВКА КУРКА В ПАУЗЕ:
+                # Твой код стрельбы должен срабатывать ТОЛЬКО когда колесо закрыто!
+                if not self.weapon_selector.active:
+                    if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                        if not self.weapon.reloading and not self.weapon.is_continuous:
+                            self.weapon.fire()
 
                 if event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_1:

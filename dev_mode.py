@@ -16,7 +16,7 @@ from ui.ui_manager import UIManager
 from utils.save_system import SaveSystem
 from ui.console import DevConsole
 from utils.intro_player import IntroPlayer
-from core.weapon_selector import HalfLifeWeaponSelector
+from core.weapon_selector import WeaponSelector
 
 
 class DevGame:
@@ -43,7 +43,7 @@ class DevGame:
 
         pygame.mixer.init(frequency=22050, size=-16, channels=2, buffer=512)
         
-        self.weapon_selector = HalfLifeWeaponSelector(self)
+        self.weapon_selector = WeaponSelector(self)
         # UI Manager
         self.ui_manager = None
         if config.get('ui_manager', True):

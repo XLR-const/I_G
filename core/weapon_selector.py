@@ -2,7 +2,7 @@ import pygame
 import math
 from setting import *
 
-class HalfLifeWeaponSelector:
+class WeaponSelector:
     def __init__(self, game):
         self.game = game
         self.active = False          # Открыто ли колесо оружия
@@ -16,6 +16,7 @@ class HalfLifeWeaponSelector:
         # Виртуальные координаты джойстика мыши
         self.vx = 0
         self.vy = 0
+        self.icon_cache = {}
 
     def check_input(self, event):
         """Обрабатывает зажатие/отпускание клавиш и прокрутку колесика мыши"""
@@ -111,25 +112,84 @@ class HalfLifeWeaponSelector:
         pygame.mouse.set_pos(cx, cy)
 
     def draw_weapon_vector_icon(self, surface, w_key, cx, cy, color):
-        """Рисует неоновые силуэты пушек геометрией на лету"""
+        """🔥 СПРАЙТОВЫЙ МОДЕРНИЗИРОВАННЫЙ МЕТОД: Автоматически подгружает и кэширует
+        реальные файлы icon.png из папок пушек и блитит их строго по центру ячеек!"""
+        import os
         key = str(w_key).upper()
-        
-        if 'KNIFE' in key:
-            pygame.draw.rect(surface, (100, 100, 100), (cx - 16, cy - 3, 8, 6))
-            pygame.draw.polygon(surface, color, [(cx - 8, cy - 4), (cx + 16, cy - 4), (cx + 22, cy), (cx + 16, cy + 3), (cx - 8, cy + 3)])
-        elif 'COCH' in key or 'SHOTGUN' in key:
-            pygame.draw.polygon(surface, (120, 80, 50), [(cx - 20, cy + 4), (cx - 8, cy + 2), (cx - 8, cy - 2), (cx - 20, cy - 1)])
-            pygame.draw.rect(surface, color, (cx - 8, cy - 4, 28, 3))
-            pygame.draw.rect(surface, color, (cx - 8, cy, 28, 3))
-        elif 'PLASMA' in key:
-            pygame.draw.rect(surface, (80, 90, 100), (cx - 16, cy - 5, 12, 10))
-            pygame.draw.rect(surface, color, (cx - 4, cy - 3, 22, 6))
-            pygame.draw.circle(surface, color, (cx + 4, cy), 5, 1)
-            pygame.draw.circle(surface, color, (cx + 12, cy), 5, 1)
-        else:
-            pygame.draw.rect(surface, color, (cx - 14, cy - 3, 30, 5))
-            pygame.draw.rect(surface, (130, 70, 40), (cx - 22, cy - 1, 8, 4))
-            pygame.draw.polygon(surface, color, [(cx - 4, cy + 2), (cx - 1, cy + 10), (cx + 3, cy + 10), (cx, cy + 2)])
+
+        # 1. Проверяем, загружен ли уже этот спрайт в кэш селектора
+        if key not in self.icon_cache:
+            try:
+                from config.game_data import WEAPON_CONFIG
+                w_data = WEAPON_CONFIG.get(key, {})
+                
+                # Достаем имя папки оружия из твоего конфига (например, 'KNIFE', 'COCH', 'PLASMA')
+                folder_name = w_data.get('folder_name', key)
+                base_dir = os.path.join('resources', 'weapons', folder_name)
+                icon_path = None
+                
+                # Сканируем дисковые расширения с защитой от любого регистра букв (.png / .PNG)
+                for possible_name in ('icon.png', 'icon.PNG', 'Icon.png', 'ICON.PNG'):
+                    test_path = os.path.join(base_dir, possible_name)
+                    if os.path.exists(test_path):
+                        icon_path = test_path
+                        break
+                
+                # 2. Если файл icon.png найден — бережно загружаем его
+                if icon_path:
+                    loaded_icon = pygame.image.load(icon_path).convert_alpha()
+                    
+                    # 🔥 ДИНАМИЧЕСКИЙ МАСШТАБ ИКОНКИ: Считаем размеры от текущих клеток экрана!
+                    grid_h = getattr(self.game, 'GRID_H', 18)
+                    cell_h = HEIGHT // grid_h
+                    
+                    # Задаем идеальные габариты иконки внутри сектора (примерно 1.2 x 0.8 клетки)
+                    max_w = int(cell_h * 1.2)
+                    max_h = int(cell_h * 0.8)
+                    
+                    # Пропорционально ужимаем картинку, чтобы силуэт пушки не растягивало
+                    if loaded_icon.get_width() > max_w or loaded_icon.get_height() > max_h:
+                        aspect = loaded_icon.get_width() / loaded_icon.get_height()
+                        if aspect > (max_w / max_h):
+                            new_w = max_w
+                            new_h = int(max_w / aspect)
+                        else:
+                            new_h = max_h
+                            new_w = int(max_h * aspect)
+                        loaded_icon = pygame.transform.smoothscale(loaded_icon, (new_w, new_h))
+                    
+                    self.icon_cache[key] = loaded_icon
+                    print(f"🖼️ [Колесо] Иконка {key} успешно закэширована из: {icon_path}")
+                else:
+                    # Файла нет на диске — уходим в красивый фолбек, чтобы игра не крашилась
+                    icon_path = None
+            except Exception as e:
+                print(f"❌ [Колесо] Ошибка загрузки ассета для {key}: {e}")
+                icon_path = None
+
+            # 3. 🔥 ВСТРОЕННЫЙ НЕОНОВЫЙ ПРЕДОХРАНИТЕЛЬ:
+            # Если ты добавляешь новую пушку и забыл положить ей icon.png — селектор НЕ упадет!
+            # Он на лету сгенерирует маленькую цифровую бирюзовую плашку с текстом "NO IMG".
+            if not icon_path:
+                grid_h = getattr(self.game, 'GRID_H', 18)
+                cell_h = HEIGHT // grid_h
+                fw, fh = int(cell_h * 1.1), int(cell_h * 0.5)
+                
+                fallback_surf = pygame.Surface((fw, fh), pygame.SRCALPHA)
+                pygame.draw.rect(fallback_surf, (0, 140, 255, 40), (0, 0, fw, fh), 0, 3)
+                pygame.draw.rect(fallback_surf, (0, 240, 255, 160), (0, 0, fw, fh), 1, 3)
+                
+                f_font = pygame.font.SysFont('Arial', int(fh * 0.5), bold=True)
+                f_txt = f_font.render("NO IMG", True, (0, 255, 255))
+                fallback_surf.blit(f_txt, f_txt.get_rect(center=(fw // 2, fh // 2)))
+                self.icon_cache[key] = fallback_surf
+
+        # 4. ВЫВОД ГОТОВОГО СПРАЙТА НА ЭКРАН:
+        # Извлекаем картинку (или заглушку) из ОЗУ и центрируем ровно по координатам сектора
+        icon_surface = self.icon_cache.get(key)
+        if icon_surface:
+            icon_rect = icon_surface.get_rect(center=(cx, cy))
+            surface.blit(icon_surface, icon_rect)
 
     def draw(self):
         """Рендерит динамическое круговое меню, где ВСЕ размеры и радиусы
