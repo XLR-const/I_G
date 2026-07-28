@@ -132,6 +132,75 @@ class Renderer:
             # Начинаем прямоугольник чуть выше (HALF_HEIGHT - 5), а высоту увеличиваем на 5
             pygame.draw.rect(self.game.screen, self.floor_color, (0, HALF_HEIGHT - 5, WIDTH, HALF_HEIGHT + 5))
 
+    def draw_background_panoram(self):
+        """Рисует динамический узорный пол и потолок из квадратных текстур
+        с ультра-медленным движением, без сдвига мыши по вертикали и с мягким поворотом"""
+        player = self.game.player
+        time_ms = pygame.time.get_ticks()
+        
+        # 🔥 1. УЛЬТРА-МИНИМАЛЬНАЯ СКОРОСТЬ ПРИ ХОДЬБЕ (Едва заметное скольжение):
+        # Снизили с 3.5 до 1.2. Плиты под ногами теперь движутся максимально благородно,
+        # создавая глубокое 3D ощущение пространства без малейшего намека на кашу.
+        tile_scale = 1.2
+
+        # 📐 ВЕКТОРНАЯ МАТЕМАТИКА НАПРАВЛЕНИЯ ИГРОКА (ДЛЯ ШАГОВ ВПЕРЕД-НАЗАД):
+        cos_a = math.cos(player.angle)
+        sin_a = math.sin(player.angle)
+        
+        forward_movement = (player.x * cos_a + player.y * sin_a) * tile_scale
+        strafe_movement = (-player.x * sin_a + player.y * cos_a) * tile_scale
+
+        # 🔥 2. ФИКС СКОРОСТИ МЫШИ (Мягкое олдскульное вращение панорамы):
+        # Раньше мы делили на math.tau и умножали на WIDTH, из-за чего текстура летела со свистом.
+        # Теперь мы привязываем сдвиг к углу через деликатный коэффициент (например, 80 пикселей на радиан).
+        # Повороты мыши влияют СТРОГО на горизонтальную ось X, ось Y прибора заблокирована (никакого вверх-низ)!
+        mouse_turn_offset = int(player.angle * 80.0)
+
+        # ==================================================================
+        # 1. ПОТОЛОК (УЛЬТРА-ПЛАВНЫЙ СЕГОДНЯШНИЙ ТАЙЛИНГ)
+        # ==================================================================
+        if self.ceiling_texture:
+            try:
+                tex_w = self.ceiling_texture.get_width()
+                tex_h = self.ceiling_texture.get_height()
+                
+                # Итоговый сдвиг плит потолка по осям экрана
+                # X — мягкие повороты и стрейфы, Y — строго вертикальный тайлинг от шагов вперед-назад
+                move_x = int(mouse_turn_offset + strafe_movement) % tex_w
+                move_y = int(forward_movement) % tex_h
+                
+                for x in range(-move_x, WIDTH + tex_w, tex_w):
+                    for y in range(-move_y, HALF_HEIGHT + 5 + tex_h, tex_h):
+                        if y < HALF_HEIGHT + 5:
+                            self.game.screen.blit(self.ceiling_texture, (x, y))
+            except:
+                pygame.draw.rect(self.game.screen, self.ceiling_color, (0, 0, WIDTH, HALF_HEIGHT + 5))
+        else:
+            pygame.draw.rect(self.game.screen, self.ceiling_color, (0, 0, WIDTH, HALF_HEIGHT + 5))
+
+        # ==================================================================
+        # 2. ПОЛ (УЛЬТРА-ПЛАВНЫЙ СЕГОДНЯШНИЙ ТАЙЛИНГ)
+        # ==================================================================
+        if self.floor_texture:
+            try:
+                tex_w = self.floor_texture.get_width()
+                tex_h = self.floor_texture.get_height()
+                
+                # Инвертируем forward_movement для пола, чтобы узор уходил честно ПОД ноги игроку
+                move_x = int(mouse_turn_offset + strafe_movement) % tex_w
+                move_y = int(-forward_movement) % tex_h
+                
+                floor_start_y = HALF_HEIGHT - 5
+                
+                for x in range(-move_x, WIDTH + tex_w, tex_w):
+                    for y in range(floor_start_y - move_y, HEIGHT + tex_h, tex_h):
+                        if y >= floor_start_y:
+                            self.game.screen.blit(self.floor_texture, (x, y))
+            except:
+                pygame.draw.rect(self.game.screen, self.floor_color, (0, HALF_HEIGHT - 5, WIDTH, HALF_HEIGHT + 5))
+        else:
+            pygame.draw.rect(self.game.screen, self.floor_color, (0, HALF_HEIGHT - 5, WIDTH, HALF_HEIGHT + 5))
+
 
     def draw_fps(self):
         """Рисует счётчик FPS"""

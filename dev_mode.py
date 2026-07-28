@@ -173,7 +173,7 @@ class DevGame:
     def draw(self):
         """Отрисовывает игру"""
         if self.renderer:
-            self.renderer.draw_background()
+            self.renderer.draw_background_panoram()
 
         if self.raycasting:
             self.raycasting.ray_cast()
