@@ -262,12 +262,16 @@ class DevGame:
                         pygame.quit()
                         sys.exit()
                         
-            # 🔥 ХАК ПЕРЕХВАТА КНОПОК 1-4:
-            # Селектор сожрет нажатие цифры и не пустит его дальше, открыв каскадное меню!
+            # 🔥 ОБНОВЛЕННЫЙ ТАКТИЧЕСКИЙ ПЕРЕХВАТ:
+            # Селектор теперь слушает и нажатия (для открытия), и отпускания (для закрытия/выбора)
             if self.weapon_selector.check_input(event):
                 continue
-            if self.weapon_selector.check_mouse_click(event):
-                continue
+                
+            # Логика твоей стандартной стрельбы по ЛКМ (Блок else)
+            if not self.weapon_selector.active:
+                if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                    if not self.weapon.reloading and not self.weapon.is_continuous:
+                        self.weapon.fire()
 
             # Игровые события
             if event.type == pygame.KEYDOWN:
