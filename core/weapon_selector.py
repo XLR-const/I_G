@@ -101,14 +101,15 @@ class HalfLifeWeaponSelector:
             has_weapons = len(weapons) > 0
             
             if slot == self.selected_slot:
-                color_bg = (240, 130, 0, 190)     # Оранжевый активный слот
+                # 🔥 ЭЛЕКТРИЧЕСКИЙ ЦИАН ДЛЯ АКТИВНОГО СЛОТА
+                color_bg = (0, 150, 255, 190)     
                 color_text = (255, 255, 255)
             elif has_weapons:
-                color_bg = (40, 45, 50, 140)      # Доступный слот
-                color_text = (200, 200, 200)
+                color_bg = (15, 35, 50, 140)      # Темно-бирюзовая полупрозрачная подложка
+                color_text = (160, 200, 230)
             else:
-                color_bg = (20, 22, 25, 40)       # Заблокированный слот
-                color_text = (70, 70, 70)
+                color_bg = (10, 15, 22, 40)       
+                color_text = (50, 65, 80)
 
             box_surf = pygame.Surface((slot_width, box_h), pygame.SRCALPHA)
             box_surf.fill(color_bg)
@@ -126,11 +127,12 @@ class HalfLifeWeaponSelector:
                     sub_y = y + box_h + 6 + idx * (box_h + 4)
                     
                     if idx == self.selected_index:
-                        sub_bg = (255, 150, 0, 230)
+                        # 🔥 ЯРКО-БИРЮЗОВЫЙ ФОКУС НА КОНКРЕТНУЮ ПУШКУ
+                        sub_bg = (0, 190, 255, 230)
                         sub_text_c = (255, 255, 255)
                     else:
-                        sub_bg = (25, 28, 30, 180)
-                        sub_text_c = (170, 180, 190)
+                        sub_bg = (12, 22, 32, 180)
+                        sub_text_c = (140, 175, 200)
 
                     sub_surf = pygame.Surface((slot_width, box_h), pygame.SRCALPHA)
                     sub_surf.fill(sub_bg)
