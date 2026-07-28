@@ -5,16 +5,23 @@ class HalfLifeWeaponSelector:
     def __init__(self, game):
         self.game = game
         self.active = False          # Открыто ли колесо оружия
-        self.hovered_index = 0       # Подсвеченный сектор пушки
         
-        # Виртуальные координаты прицела внутри колеса (чтобы мышь не улетала за экран)
+        # Мы жестко фиксируем 6 секторов-слотов на круге!
+        self.NUM_SLOTS = 6
+        self.hovered_slot = 1        # На какой слот (1-6) сейчас наведена мышь
+        
+        # Словарь, который хранит текущий выбранный под-индекс пушки внутри каждого слота.
+        # По умолчанию выбран 0-й элемент (первая пушка в категории).
+        self.sub_indices = {1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0}
+        
+        # Виртуальные координаты прицела (джойстика) внутри колеса
         self.vx = 0
         self.vy = 0
 
     def check_input(self, event):
-        """Перехватывает ЗАЖАТИЕ и ОТПУСКАНИЕ клавиш для олдскульного кругового меню"""
-        # Считываем клавиши 1-4 и Q
-        valid_keys = (pygame.K_1, pygame.K_2, pygame.K_3, pygame.K_4, pygame.K_q)
+        """Обрабатывает зажатие/отпускание клавиш и прокрутку колесика мыши"""
+        # Слушаем цифровые клавиши 1-6 и кнопку Q
+        valid_keys = (pygame.K_1, pygame.K_2, pygame.K_3, pygame.K_4, pygame.K_5, pygame.K_6, pygame.K_q)
         
         # 1. ЗАЖАЛИ КНОПКУ -> ОТКРЫВАЕМ КОЛЕСО
         if event.type == pygame.KEYDOWN:
@@ -23,151 +30,243 @@ class HalfLifeWeaponSelector:
                     self.active = True
                     self.vx = 0
                     self.vy = 0
-                    # Сбрасываем дельту мыши перед стартом, чтобы убрать резкий рывок
-                    pygame.mouse.get_rel() 
+                    pygame.mouse.get_rel() # Сброс дельты
                 return True
 
-        # 2. 🔥 ОТПУСТИЛИ КНОПКУ -> МГНОВЕННАЯ СМЕНА ПУШКИ (KeyUP хак)
+        # 2. ОТПУСТИЛИ КНОПКУ -> МГНОВЕННАЯ СМЕНА ПУШКИ
         if event.type == pygame.KEYUP:
             if event.key in valid_keys and self.active:
                 self.confirm_selection()
                 return True
 
+        # 3. 🔥 ПРОКРУТКА КОЛЕСИКА МЫШИ (ПЕРЕБОР ПУШЕК ВНУТРИ АКТИВНОГО СЕКТОРА)
+        if self.active and event.type == pygame.MOUSEBUTTONDOWN:
+            # Получаем список пушек, которые сейчас есть у игрока в ПОДСВЕЧЕННОМ слоте
+            weapons_in_hovered = self._get_weapons_in_slot(self.hovered_slot)
+            
+            if len(weapons_in_hovered) > 1:
+                if event.button == 4: # Скролл ВВЕРХ
+                    self.sub_indices[self.hovered_slot] = (self.sub_indices[self.hovered_slot] - 1) % len(weapons_in_hovered)
+                    return True
+                elif event.button == 5: # Скролл ВНИЗ
+                    self.sub_indices[self.hovered_slot] = (self.sub_indices[self.hovered_slot] + 1) % len(weapons_in_hovered)
+                    return True
+
         return False
 
     def check_mouse_click(self, event):
-        """Нам больше не нужны клики мыши, так как выбор происходит на отпускание кнопки!"""
+        """Клики ЛКМ/ПКМ глушим, так как колесико мыши обрабатывается в check_input"""
+        if self.active and event.type == pygame.MOUSEBUTTONDOWN and event.button in (1, 4, 5):
+            return True
         return False
 
     def confirm_selection(self):
-        """Берет подсвеченную пушку и жестко прописывает ее в твой инвентарь"""
-        inventory = getattr(self.game, 'inventory', [])
-        level_manager = getattr(self.game, 'level_manager', None)
+        """Берет выбранную пушку из активного слота и передает ее в инвентарь игры"""
+        weapons = self._get_weapons_in_slot(self.hovered_slot)
         
-        if inventory and level_manager is not None:
-            if 0 <= self.hovered_index < len(inventory):
-                # Твоя родная схема смены оружия из хэндлера
-                level_manager.current_weapon_index = self.hovered_index
-                self.game.weapon = inventory[self.hovered_index]
-                print(f"🎯 [ВЫБОР КОЛЕСА] Оружие успешно сменено на индекс: {self.hovered_index}")
+        if weapons:
+            # Защита: проверяем, что выбранный скроллом под-индекс не вылетел за границы массива пушек
+            chosen_sub_idx = min(self.sub_indices[self.hovered_slot], len(weapons) - 1)
+            chosen_sub_idx = max(0, chosen_sub_idx)
+            
+            # Достаем честный глобальный индекс пушки внутри твоего динамического self.inventory
+            target_inventory_idx = weapons[chosen_sub_idx]['inventory_index']
+            
+            game_obj = self.game
+            inventory = getattr(game_obj, 'inventory', [])
+            level_manager = getattr(game_obj, 'level_manager', None)
+            
+            if level_manager is not None and target_inventory_idx < len(inventory):
+                level_manager.current_weapon_index = target_inventory_idx
+                game_obj.weapon = inventory[target_inventory_idx]
+                print(f"🚀 [КОЛЕСО ДОСТАЛО СЛОТ {self.hovered_slot}] Пушка активирована под индексом: {target_inventory_idx}")
                 
         self.active = False
 
     def update(self):
-        """Каждый кадр считает виртуальный вектор смещения мыши (механика джойстика)"""
+        """Рассчитывает виртуальный вектор смещения мыши для 6 жестко зафиксированных секторов"""
         if not self.active:
             return
 
-        inventory = getattr(self.game, 'inventory', [])
-        num_weapons = len(inventory)
-        if num_weapons == 0:
-            return
-
-        # 🔥 ГЛАВНЫЙ ФИКС БЛОКИРОВКИ МЫШИ (Считываем относительную дельту get_rel):
-        # В 2.5D шутерах курсор скрыт и залочен. Мы берем чистую скорость движения руки!
         dx, dy = pygame.mouse.get_rel()
-        
-        # Накапливаем сдвиг в наши виртуальные координаты
         self.vx += dx
         self.vy += dy
         
-        # Находим расстояние от центра виртуального джойстика
         dist = math.hypot(self.vx, self.vy)
 
-        # Ограничиваем виртуальный курсор рамками невидимого круга (макс. радиус 150),
-        # чтобы пользователю не приходилось долго вести мышь обратно
         if dist > 150:
             self.vx = (self.vx / dist) * 150
             self.vy = (self.vy / dist) * 150
 
-        # Мертвая зона: если мышь едва сдвинулась, оставляем прошлый сектор
+        # Мышь определяет сектор только за пределами мертвой зоны (20 пикселей)
         if dist > 20:
-            # Считаем угол виртуального вектора в радианах
             mouse_angle = math.atan2(self.vy, self.vx)
             if mouse_angle < 0:
                 mouse_angle += math.tau
 
-            # Вычисляем, на какой сектор указывает рука игрока
-            sector_step = math.tau / num_weapons
+            # Шаг одного сектора для 6 слотов равен ровно 60 градусов (math.tau / 6)
+            sector_step = math.tau / self.NUM_SLOTS
+            
+            # Смещаем фазу, чтобы SLOT 1 находился ровно по центру на "12 часах"
             adjusted_angle = (mouse_angle + sector_step / 2) % math.tau
-            self.hovered_index = int(adjusted_angle / sector_step) % num_weapons
+            
+            # Магическая формула: находим номер слота от 1 до 6 на круге
+            # Прибавляем 1, так как слоты у нас начинаются с единицы, а не с нуля
+            self.hovered_slot = (int(adjusted_angle / sector_step) % self.NUM_SLOTS) + 1
 
     def draw(self):
-        """Рендерит футуристичное неоновое круговое колесо оружия DOOM-стиля"""
+        """Рендерит фиксированное 6-слойное круговое меню с каскадной прокруткой оружия"""
         if not self.active:
             return
 
-        inventory = getattr(self.game, 'inventory', [])
-        num_weapons = len(inventory)
-        if num_weapons == 0:
-            return
-
         font_title = pygame.font.SysFont('Arial', 18, bold=True)
-        font_weapon = pygame.font.SysFont('Arial', 14, bold=True)
+        font_weapon = pygame.font.SysFont('Arial', 13, bold=True)
+        font_slot = pygame.font.SysFont('Arial', 11, bold=True)
 
         screen_w = self.game.screen.get_width()
         screen_h = self.game.screen.get_height()
         cx, cy = screen_w // 2, screen_h // 2
 
-        # Кинематографичное затемнение заднего фона лабиринта
+        # Кинематографичное киберпанк затемнение фона
         dim_surf = pygame.Surface((screen_w, screen_h), pygame.SRCALPHA)
         dim_surf.fill((0, 0, 0, 140)) 
         self.game.screen.blit(dim_surf, (0, 0))
 
         base_radius = 110
-        sector_step = math.tau / num_weapons
+        sector_step = math.tau / self.NUM_SLOTS
 
-        # Отрисовка секторов векторов
-        for idx in range(num_weapons):
-            is_hovered = (idx == self.hovered_index)
+        # РИСУЕМ 6 НАМЕРТВО ЗАФИКСИРОВАННЫХ СЕКТОРОВ НА КРУГЕ
+        for i in range(self.NUM_SLOTS):
+            slot_num = i + 1 # Номер текущего слота от 1 до 6
+            is_hovered = (slot_num == self.hovered_slot)
             
-            radius = base_radius + 15 if is_hovered else base_radius
-            color_edge = (0, 240, 255) if is_hovered else (0, 90, 140)
-            color_fill = (0, 140, 255, 60) if is_hovered else (8, 15, 25, 130)
+            weapons = self._get_weapons_in_slot(slot_num)
+            has_weapons = len(weapons) > 0
 
-            angle_start = idx * sector_step - (sector_step / 2)
-            angle_end = (idx + 1) * sector_step - (sector_step / 2)
+            # Настройка сочных циановых неоновых цветов
+            if is_hovered:
+                color_edge = (0, 240, 255)
+                color_fill = (0, 140, 255, 65) if has_weapons else (0, 140, 255, 20)
+            elif has_weapons:
+                color_edge = (0, 90, 140)
+                color_fill = (8, 18, 28, 140)
+            else:
+                color_edge = (35, 45, 55)
+                color_fill = (10, 12, 14, 40) # Прозрачный пустой сектор, если оружия нет
+
+            # Границы дуги сектора
+            angle_start = i * sector_step - (sector_step / 2)
+            angle_end = (i + 1) * sector_step - (sector_step / 2)
 
             arc_points = [(cx, cy)]
             steps = 12
             for s in range(steps + 1):
                 curr_angle = angle_start + (angle_end - angle_start) * (s / steps)
-                px = cx + int(radius * math.cos(curr_angle))
-                py = cy + int(radius * math.sin(curr_angle))
+                radius_dist = base_radius + 15 if is_hovered else base_radius
+                px = cx + int(radius_dist * math.cos(curr_angle))
+                py = cy + int(radius_dist * math.sin(curr_angle))
                 arc_points.append((px, py))
 
             poly_surf = pygame.Surface((screen_w, screen_h), pygame.SRCALPHA)
             pygame.draw.polygon(poly_surf, color_fill, arc_points)
             self.game.screen.blit(poly_surf, (0, 0))
-
             pygame.draw.lines(self.game.screen, color_edge, True, arc_points, 2 if is_hovered else 1)
 
-            # Вывод текста названий пушек по краям
+            # Вычисляем центральный вектор направления текущего сектора для текста
             text_angle = angle_start + (sector_step / 2)
-            text_dist = radius + 25 if is_hovered else radius + 15
+            text_dist = (base_radius + 30) if is_hovered else (base_radius + 15)
             tx = cx + int(text_dist * math.cos(text_angle))
             ty = cy + int(text_dist * math.sin(text_angle))
 
-            weapon_obj = inventory[idx]
-            display_name = str(getattr(weapon_obj, 'name', f"WEAPON {idx}")).upper()
+            # ОТРИСОВКА НАЗВАНИЙ ОРУЖИЯ ВНУТРИ СЕКТОРОВ
+            if has_weapons:
+                # Берем пушку, выбранную скроллом мыши в этом слоте
+                current_sub_idx = self.sub_indices[slot_num] % len(weapons)
+                display_name = str(weapons[current_sub_idx]['display_name']).upper()
+                
+                # Если в слоте несколько пушек — добавляем красивый индикатор скролла "[+]"
+                if len(weapons) > 1:
+                    display_name = f"↕ {display_name}"
+                    
+                w_txt = font_weapon.render(display_name, True, (255, 255, 255) if is_hovered else (140, 180, 200))
+            else:
+                w_txt = font_weapon.render("EMPTY", True, (65, 75, 85))
 
-            w_txt = font_weapon.render(display_name, True, (255, 255, 255) if is_hovered else (150, 180, 200))
             txt_rect = w_txt.get_rect(center=(tx, ty))
             self.game.screen.blit(w_txt, txt_rect)
+            
+            # Маленькая подпись номера слота над названием пушки
+            slot_txt = font_slot.render(f"SLOT {slot_num}", True, (0, 200, 255) if is_hovered else (80, 95, 110))
+            slot_rect = slot_txt.get_rect(center=(tx, ty - 14))
+            self.game.screen.blit(slot_txt, slot_rect)
 
-        # Маленькое технологичное ядро по центру кольца
-        active_weapon_obj = inventory[self.hovered_index]
-        active_name = str(getattr(active_weapon_obj, 'name', "SELECT WEAPON")).upper()
+        # РЕНДЕР ЦЕНТРАЛЬНОГО НЕОНОВОГО ЯДРА СЕЛЕКТОРA
+        active_weapons = self._get_weapons_in_slot(self.hovered_slot)
+        if active_weapons:
+            active_sub_idx = self.sub_indices[self.hovered_slot] % len(active_weapons)
+            active_name = str(active_weapons[active_sub_idx]['display_name']).upper()
+            title_color = (0, 255, 255)
+        else:
+            active_name = f"SLOT {self.hovered_slot} EMPTY"
+            title_color = (100, 110, 120)
         
-        title_txt = font_title.render(active_name, True, (0, 255, 255))
+        title_txt = font_title.render(active_name, True, title_color)
         title_rect = title_txt.get_rect(center=(cx, cy))
         
-        pygame.draw.circle(self.game.screen, (10, 12, 16), (cx, cy), 40)
-        pygame.draw.circle(self.game.screen, (0, 180, 255), (cx, cy), 40, 1)
+        pygame.draw.circle(self.game.screen, (10, 12, 16), (cx, cy), 42)
+        pygame.draw.circle(self.game.screen, title_color, (cx, cy), 42, 1)
         
-        # Маленькая неоновая точка-прицел виртуального курсора, показывающая куда смещена мышь!
-        dot_x = cx + int(self.vx * 0.2)
-        dot_y = cy + int(self.vy * 0.2)
+        # Точка виртуального прицела мыши
+        dot_x = cx + int(self.vx * 0.18)
+        dot_y = cy + int(self.vy * 0.18)
+                # (Это самый конец метода draw...)
+        pygame.draw.circle(self.game.screen, (10, 12, 16), (cx, cy), 42)
+        pygame.draw.circle(self.game.screen, title_color, (cx, cy), 42, 1)
+        
+        # Точка виртуального прицела мыши
+        dot_x = cx + int(self.vx * 0.18)
+        dot_y = cy + int(self.vy * 0.18)
         pygame.draw.circle(self.game.screen, (0, 255, 255), (dot_x, dot_y), 3)
         
+        # Отрисовка названия пушки в центре колеса
         self.game.screen.blit(title_txt, title_rect)
+
+    # 🔥 ВСТАВЛЯЙ МЕТОД НИЖЕ СТРОГО С ДВУМЯ ОТСТУПАМИ (4 ПРОБЕЛА) ОТ КРАЯ КЛАССА:
+    def _get_weapons_in_slot(self, slot_num):
+        """ОБРАТНЫЙ СКАНЕР: Сканирует динамический инвентарь и раскидывает пушки
+        строго по слотам 1-6 на основе настроек WEAPON_CONFIG."""
+        valid_weapons = []
+        
+        try:
+            from config.game_data import WEAPON_CONFIG
+        except:
+            return []
+
+        inventory = getattr(self.game, 'inventory', [])
+        if not inventory:
+            return []
+
+        for inv_idx, weapon_obj in enumerate(inventory):
+            obj_display_name = getattr(weapon_obj, 'name', None)
+            if not obj_display_name:
+                continue
+                
+            obj_name_lower = str(obj_display_name).strip().lower()
+
+            for w_key, w_data in WEAPON_CONFIG.items():
+                config_name_lower = str(w_data.get('name', '')).strip().lower()
+                
+                if config_name_lower == obj_name_lower:
+                    # Читаем слот напрямую из конфига пушки
+                    slot = w_data.get('slot', 4)
+
+                    if slot == slot_num:
+                        valid_weapons.append({
+                            'key': w_key,
+                            'display_name': w_data.get('name', w_key),
+                            'inventory_index': inv_idx
+                        })
+                        break 
+
+        return valid_weapons
+
