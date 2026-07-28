@@ -209,10 +209,10 @@ class WeaponSelector:
         cell_h = HEIGHT // grid_h
 
         # 🔥 ДИНАМИЧЕСКИЙ МАСШТАБ ШРИФТОВ: Размеры букв плавно растут от высоты клетки!
-        font_slot = pygame.font.SysFont('Arial', int(cell_h * 0.35), bold=True)
-        font_weapon = pygame.font.SysFont('Arial', int(cell_h * 0.45), bold=True)
-        font_ammo = pygame.font.SysFont('Arial', int(cell_h * 0.38), bold=False)
-        font_center = pygame.font.SysFont('Arial', int(cell_h * 0.60), bold=True)
+        font_slot = pygame.font.SysFont('Arial', int(cell_h * 0.35))
+        font_weapon = pygame.font.Font('resources/fonts/Fy.ttf', int(cell_h * 0.45))
+        font_ammo = pygame.font.Font('resources/fonts/Fy.ttf', int(cell_h * 0.38))
+        font_center = pygame.font.SysFont('Arial', int(cell_h * 0.60))
 
         screen_w = self.game.screen.get_width()
         screen_h = self.game.screen.get_height()
@@ -303,7 +303,7 @@ class WeaponSelector:
 
                 display_name = str(w_data['display_name']).upper()
                 if len(weapons) > 1:
-                    display_name = f"↕ {display_name}"
+                    display_name = f"{display_name}"
 
                 # --- 1. ВЕКТОРНАЯ ИКОНКА (Точно в центре карточки) ---
                 self.draw_weapon_vector_icon(self.game.screen, w_key, card_cx, card_cy - int(cell_h * 0.1), icon_color)
