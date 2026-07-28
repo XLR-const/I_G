@@ -278,7 +278,7 @@ class Renderer:
             cur_weapon = self.game.weapon
             current_weapon = cur_weapon.name
             if cur_weapon.is_infinite:
-                ammo = '∞'
+                ammo = '-'
             else:
                 ammo = self.game.weapon.ammo
         else:
