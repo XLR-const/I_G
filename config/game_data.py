@@ -427,7 +427,7 @@ WEAPON_CONFIG = {
         'ammo_start': 30
     },
         'COCH': {
-        'name': 'Super Shotgun',
+        'name': 'Toz',
         'class_name': 'NewWeapon',       # Используем наш универсальный класс
         'slot': 2,
         'damage': 50,                    # Огромный урон вблизи
