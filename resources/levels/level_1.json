@@ -154,7 +154,7 @@
     "inventory": [],
     "starting_ammo": {},
     "background": {
-        "ceiling_texture": "resources/textures/ceiling.png",
+        "ceiling_texture": "resources/textures/fallen_sky.png",
         "floor_texture": null,
         "ceiling_color": [
             165,

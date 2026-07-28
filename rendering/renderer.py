@@ -116,6 +116,23 @@ class Renderer:
         self.ceiling_color = textures['ceiling_color']
         self.floor_color = textures['floor_color']
 
+    def draw_background(self):
+        """Рисует потолок и пол с защитой от микрощелей на горизонте"""
+        # 1. Потолок / Небо (рисуем на 5 пикселей НИЖЕ середины экрана)
+        if self.ceiling_texture:
+            self.game.screen.blit(self.ceiling_texture, (0, 0))
+        else:
+            pygame.draw.rect(self.game.screen, self.ceiling_color, (0, 0, WIDTH, HALF_HEIGHT + 5))
+
+        # 2. Пол (рисуем на 5 пикселей ВЫШЕ середины экрана, чтобы перекрыть щели)
+        if self.floor_texture:
+            # Смещаем координату Y на 5 пикселей вверх
+            self.game.screen.blit(self.floor_texture, (0, HALF_HEIGHT - 5))
+        else:
+            # Начинаем прямоугольник чуть выше (HALF_HEIGHT - 5), а высоту увеличиваем на 5
+            pygame.draw.rect(self.game.screen, self.floor_color, (0, HALF_HEIGHT - 5, WIDTH, HALF_HEIGHT + 5))
+
+
     def draw_background_panoram(self):
         """Рисует узорный пол и потолок с раздельной скоростью осей, 
         полной зависимостью от движения, БЕЗ СИНУСОИД и с правильным направлением WASD"""

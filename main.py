@@ -144,7 +144,7 @@ class Game:
 
     def draw(self):
         """Отрисовывает игру"""
-        self.renderer.draw_background()
+        self.renderer.draw_background_panoram()
         self.raycasting.ray_cast()
         self.renderer.draw_fps()
 
