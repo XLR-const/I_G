@@ -128,6 +128,10 @@ class DevGame:
 
     def update(self):
         """Обновляет состояние игры"""
+        self.weapon_selector.update()
+        if self.weapon_selector.active:
+            return
+        
         if self.player:
             self.player.update()
 
@@ -156,7 +160,7 @@ class DevGame:
         # Оружие
         if self.weapon:
             self.weapon.update_animation()
-        self.weapon_selector.update()
+        
 
         # Стрельба
         mouse_buttons = pygame.mouse.get_pressed()

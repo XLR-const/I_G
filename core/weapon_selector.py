@@ -80,6 +80,21 @@ class HalfLifeWeaponSelector:
                 level_manager.current_weapon_index = target_inventory_idx
                 game_obj.weapon = inventory[target_inventory_idx]
                 print(f"🚀 [КОЛЕСО ДОСТАЛО СЛОТ {self.hovered_slot}] Пушка активирована под индексом: {target_inventory_idx}")
+        
+        # ==================================================================
+        # 🔥 УЛЬТИМАТИВНЫЙ ДВОЙНОЙ СБРОС МЫШИ ДЛЯ 2.5D/3D РЕЖИМОВ
+        # ==================================================================
+        # 1. Находим точные координаты центра экрана
+        cx = self.game.screen.get_width() // 2
+        cy = self.game.screen.get_height() // 2
+        
+        # 2. Насильно телепортируем физический курсор мыши в идеальный центр!
+        # Когда на следующем кадре включится код игрока, он увидит мышь строго в центре
+        # и поймет, что никакого движения и разворота камеры совершать не нужно.
+        pygame.mouse.set_pos(cx, cy)
+        
+        # 3. Дополнительно «съедаем» относительную дельту, чтобы очистить буфер SDL
+        pygame.mouse.get_rel()
                 
         self.active = False
 
