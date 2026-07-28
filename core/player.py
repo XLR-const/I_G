@@ -23,6 +23,7 @@ class Player:
         self.game = game
         self.x, self.y = PLAYER_POS
         self.angle = PLAYER_ANGLE
+        self.speed = PLAYER_SPEED
         self.hp = 100
         self.armor = 0
         self.max_hp = 100

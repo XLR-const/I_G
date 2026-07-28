@@ -116,90 +116,88 @@ class Renderer:
         self.ceiling_color = textures['ceiling_color']
         self.floor_color = textures['floor_color']
 
-    def draw_background(self):
-        """Рисует потолок и пол с защитой от микрощелей на горизонте"""
-        # 1. Потолок / Небо (рисуем на 5 пикселей НИЖЕ середины экрана)
-        if self.ceiling_texture:
-            self.game.screen.blit(self.ceiling_texture, (0, 0))
-        else:
-            pygame.draw.rect(self.game.screen, self.ceiling_color, (0, 0, WIDTH, HALF_HEIGHT + 5))
-
-        # 2. Пол (рисуем на 5 пикселей ВЫШЕ середины экрана, чтобы перекрыть щели)
-        if self.floor_texture:
-            # Смещаем координату Y на 5 пикселей вверх
-            self.game.screen.blit(self.floor_texture, (0, HALF_HEIGHT - 5))
-        else:
-            # Начинаем прямоугольник чуть выше (HALF_HEIGHT - 5), а высоту увеличиваем на 5
-            pygame.draw.rect(self.game.screen, self.floor_color, (0, HALF_HEIGHT - 5, WIDTH, HALF_HEIGHT + 5))
-
     def draw_background_panoram(self):
-        """Рисует динамический узорный пол и потолок из квадратных текстур
-        с ультра-медленным движением, без сдвига мыши по вертикали и с мягким поворотом"""
+        """Рисует узорный пол и потолок с раздельной скоростью осей, 
+        полной зависимостью от движения, БЕЗ СИНУСОИД и с правильным направлением WASD"""
         player = self.game.player
-        time_ms = pygame.time.get_ticks()
         
-        # 🔥 1. УЛЬТРА-МИНИМАЛЬНАЯ СКОРОСТЬ ПРИ ХОДЬБЕ (Едва заметное скольжение):
-        # Снизили с 3.5 до 1.2. Плиты под ногами теперь движутся максимально благородно,
-        # создавая глубокое 3D ощущение пространства без малейшего намека на кашу.
-        tile_scale = 1.2
-
-        # 📐 ВЕКТОРНАЯ МАТЕМАТИКА НАПРАВЛЕНИЯ ИГРОКА (ДЛЯ ШАГОВ ВПЕРЕД-НАЗАД):
-        cos_a = math.cos(player.angle)
-        sin_a = math.sin(player.angle)
+        # 1. СТРОГАЯ ПРИВЯЗКА К БАЗОВОЙ СКОРОСТИ ИГРОКА
+        # Достаем честную скорость из твоего класса Player
+        base_speed = getattr(player, 'speed', 1.0)
         
-        forward_movement = (player.x * cos_a + player.y * sin_a) * tile_scale
-        strafe_movement = (-player.x * sin_a + player.y * cos_a) * tile_scale
+        # 2. БАЛАНСИРОВКА КОЭФФИЦИЕНТОВ СКОРОСТИ
+        # Горизонтальный масштаб (Стрейф) — делаем широким для динамики
+        scale_x = 48.0 * base_speed
+        # Вертикальный масштаб (Ходьба вперед) — срезаем в 3 раза относительно X, 
+        # чтобы убрать эффект бешеного поезда под ногами!
+        scale_y = 16.0 * base_speed 
 
-        # 🔥 2. ФИКС СКОРОСТИ МЫШИ (Мягкое олдскульное вращение панорамы):
-        # Раньше мы делили на math.tau и умножали на WIDTH, из-за чего текстура летела со свистом.
-        # Теперь мы привязываем сдвиг к углу через деликатный коэффициент (например, 80 пикселей на радиан).
-        # Повороты мыши влияют СТРОГО на горизонтальную ось X, ось Y прибора заблокирована (никакого вверх-низ)!
-        mouse_turn_offset = int(player.angle * 80.0)
+        # 3. МАТЕМАТИЧЕСКИЙ РАСЧЕТ СДВИГОВ ОСЕЙ БЕЗ СИНУСОИД
+        # Вертикаль застывает при вращении мыши на месте, работает только при WASD
+        y_movement = player.x * scale_y
+
+        # Горизонтальное смещение карты для стрейфа A/D
+        map_x_movement = -player.y * scale_x
+        
+        # 🔥 КАЛИБРОВКА МЫШИ (ПОВОРОТ НА 90° УВОДИТ ОБЛАКО ЗА ЭКРАН)
+        # Умножаем на (WIDTH * 4.0). Поскольку math.tau — это полный оборот 360°,
+        # то поворот ровно на 90° (четверть круга) сдвинет панораму ровно на WIDTH пикселей.
+        # Облако на 12 часах мгновенно улетит за левый или правый край экрана!
+        mouse_turn_offset = int((player.angle / math.tau) * (WIDTH * 4.0))
+        
+        # Результирующий горизонтальный сдвиг
+        x_movement = mouse_turn_offset + int(map_x_movement)
+
+        # Сохраняем оригинальный клиппинг экрана
+        original_clip = self.game.screen.get_clip()
 
         # ==================================================================
-        # 1. ПОТОЛОК (УЛЬТРА-ПЛАВНЫЙ СЕГОДНЯШНИЙ ТАЙЛИНГ)
+        # 1. ПОТОЛОК / НЕБО (СТРОГО В ВЕРХНЕЙ ПОЛОВИНЕ ЭКРАНА)
         # ==================================================================
+        self.game.screen.set_clip(pygame.Rect(0, 0, WIDTH, HALF_HEIGHT + 5))
+        
         if self.ceiling_texture:
             try:
                 tex_w = self.ceiling_texture.get_width()
                 tex_h = self.ceiling_texture.get_height()
                 
-                # Итоговый сдвиг плит потолка по осям экрана
-                # X — мягкие повороты и стрейфы, Y — строго вертикальный тайлинг от шагов вперед-назад
-                move_x = int(mouse_turn_offset + strafe_movement) % tex_w
-                move_y = int(forward_movement) % tex_h
+                move_x = int(x_movement) % tex_w
+                move_y = int(y_movement) % tex_h
                 
                 for x in range(-move_x, WIDTH + tex_w, tex_w):
                     for y in range(-move_y, HALF_HEIGHT + 5 + tex_h, tex_h):
-                        if y < HALF_HEIGHT + 5:
-                            self.game.screen.blit(self.ceiling_texture, (x, y))
+                        self.game.screen.blit(self.ceiling_texture, (x, y))
             except:
                 pygame.draw.rect(self.game.screen, self.ceiling_color, (0, 0, WIDTH, HALF_HEIGHT + 5))
         else:
             pygame.draw.rect(self.game.screen, self.ceiling_color, (0, 0, WIDTH, HALF_HEIGHT + 5))
 
         # ==================================================================
-        # 2. ПОЛ (УЛЬТРА-ПЛАВНЫЙ СЕГОДНЯШНИЙ ТАЙЛИНГ)
+        # 2. ПОЛ (СТРОГО В НИЖНЕЙ ПОЛОВИНЕ ЭКРАНА)
         # ==================================================================
+        floor_start_y = HALF_HEIGHT - 5
+        self.game.screen.set_clip(pygame.Rect(0, floor_start_y, WIDTH, HEIGHT - floor_start_y))
+        
         if self.floor_texture:
             try:
                 tex_w = self.floor_texture.get_width()
                 tex_h = self.floor_texture.get_height()
                 
-                # Инвертируем forward_movement для пола, чтобы узор уходил честно ПОД ноги игроку
-                move_x = int(mouse_turn_offset + strafe_movement) % tex_w
-                move_y = int(-forward_movement) % tex_h
-                
-                floor_start_y = HALF_HEIGHT - 5
+                move_x = int(x_movement) % tex_w
+                # Инвертируем вертикаль для пола, чтобы узор уходил под ноги, а не наползал сверху
+                move_y = int(-y_movement) % tex_h
                 
                 for x in range(-move_x, WIDTH + tex_w, tex_w):
                     for y in range(floor_start_y - move_y, HEIGHT + tex_h, tex_h):
-                        if y >= floor_start_y:
-                            self.game.screen.blit(self.floor_texture, (x, y))
+                        self.game.screen.blit(self.floor_texture, (x, y))
             except:
-                pygame.draw.rect(self.game.screen, self.floor_color, (0, HALF_HEIGHT - 5, WIDTH, HALF_HEIGHT + 5))
+                pygame.draw.rect(self.game.screen, self.floor_color, (0, floor_start_y, WIDTH, HEIGHT - floor_start_y))
         else:
-            pygame.draw.rect(self.game.screen, self.floor_color, (0, HALF_HEIGHT - 5, WIDTH, HALF_HEIGHT + 5))
+            pygame.draw.rect(self.game.screen, self.floor_color, (0, floor_start_y, WIDTH, HEIGHT - floor_start_y))
+
+        # Восстанавливаем оригинальную область обрезки экрана
+        self.game.screen.set_clip(original_clip)
+
 
 
     def draw_fps(self):
