@@ -202,7 +202,8 @@ class Weapon:
 
 
     def fire(self):
-        """Выполняет выстрел с использованием честного луча DDA"""
+        """Выполняет выстрел с использованием честного луча DDA 
+        и динамического разброса веера пуль строго по слотам!"""
         if self.reloading or self.ammo <= 0:
             if self.ammo <= 0:
                 self.sound_empty_ammo.play()
@@ -218,28 +219,73 @@ class Weapon:
             self.sprite = self.fire_frames[0]  # Гарантированно берем ПЕРВЫЙ кадр выстрела (вспышку)
 
         self.sound.play()
-        if self.is_infinite:
-            pass
-        else:
+        if not self.is_infinite:
             self.ammo -= 1
 
-        # Запускаем луч выстрела (DDA)
-        hit_x, hit_y, dist, side = self._get_hit_pos()
+        # ==================================================================
+        # 📐 ЧИТАЕМ ПАРАМЕТРЫ РАЗБРОСА ИЗ КОНФИГА ПУШКИ
+        # ==================================================================
+        try:
+            from config.game_data import WEAPON_CONFIG
+            w_data = WEAPON_CONFIG.get(self.key, {})
+        except:
+            w_data = {}
 
-        # Спавним искры или кровь в точке попадания
+        # Значения по умолчанию, если в конфиге пусто
+        spread = w_data.get('spread', 0.02)
+        slot_num = w_data.get('slot', 2)
+
+        # Переменная для возврата координат попадания (для совместимости)
+        last_hit_data = None
+
+        # ==================================================================
+        # 🔥 РАСЧЕТ РАЗБРОСА ПУЛЬ ПО КАТЕГОРИЯМ СЛОТОВ
+        # ==================================================================
+        # Если оружие принадлежит к Слоту 3 (Категория Дробовиков) — стреляем веером дроби!
+        if slot_num == 3:
+            # Считываем количество дробин из конфига (или ставим 10 по умолчанию)
+            num_pellets = w_data.get('pellets', 10)
+            
+            for _ in range(num_pellets):
+                # Каждая дробина получает свой случайный микро-сдвиг угла в пределах конуса spread
+                pellet_angle = self.game.player.angle + uniform(-spread, spread)
+                
+                # Запускаем DDA-луч для каждой дробины отдельно!
+                last_hit_data = self._spawn_bullet_hit(pellet_angle, side_blood_logic=True)
+        else:
+            # Для точечного оружия (Кольт, Автомат) летит одна пуля с микро-разбросом
+            bullet_angle = self.game.player.angle + uniform(-spread, spread)
+            last_hit_data = self._spawn_bullet_hit(bullet_angle, side_blood_logic=False)
+
+        return last_hit_data
+
+    def _spawn_bullet_hit(self, shot_angle, side_blood_logic=False):
+        """Вспомогательный метод: просчитывает DDA-луч под кастомным углом 
+        и спавнит искры/кровь в точке соприкосновения со стеной"""
+        # Вызываем твой DDA-луч, передавая ему вычисленный угол разброса пули!
+        # Метод _get_hit_pos(shot_angle) должен принимать этот аргумент angle=None
+        hit_x, hit_y, dist, side = self._get_hit_pos(shot_angle)
+
+        # Выбираем цвет партиклей: кровь (-1) или искры от стены
         particle_color = (200, 0, 0) if side == -1 else (255, 200, 50)
         
-        for _ in range(10):
+        # Спавним искры в точке попадания текущей пули/дробины
+        # Уменьшили число партиклей для дробовика до 3, чтобы 10 дробин не вешали игру
+        num_sparks = 3 if side_blood_logic else 10
+        for _ in range(num_sparks):
             p_x = hit_x + uniform(-0.02, 0.02)
             p_y = hit_y + uniform(-0.02, 0.02)
             self.game.particles.append(
                 Particle(self.game, (p_x, p_y), particle_color, uniform(0.001, 0.005))
             )
-
+            
         return hit_x, hit_y, dist, side
 
-    def _get_hit_pos(self):
+
+    def _get_hit_pos(self, angle=None):
         """Улучшенный DDA алгоритм: считает точку попадания пули с учетом стен и врагов"""
+        if angle is None:
+            angle = self.game.player.angle
         ox, oy = self.game.player.x, self.game.player.y
         x_map, y_map = int(ox), int(oy)
         angle = self.game.player.angle

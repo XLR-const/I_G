@@ -403,7 +403,9 @@ WEAPON_CONFIG = {
         'AK-47': {
         'name': 'AK-47',
         #'class_name': 'NewWeapon',       # Используем наш новый универсальный класс
-        'slot': 3,
+        'slot': 4,
+        'spread': 0.06,      # Ощутимый разброс при зажиме
+        'recoil': 0.04,
         'damage': 25,
         'reload_time': 240,              # 4 кадра анимации * 60 мс скорость = 240 мс
         'continuous': True,              # Автоматическая стрельба (зажим)
@@ -416,7 +418,9 @@ WEAPON_CONFIG = {
         'COLT': {
         'name': 'Colt 1911',
         #'class_name': 'NewWeapon',
-        'slot': 1,
+        'slot': 2,
+        'spread': 0.02,
+        'recoil': 0.03,
         'damage': 15,
         'reload_time': 270,        # Время перезарядки строго под длину анимации!
         'continuous': False,       # Одиночные выстрелы
@@ -429,7 +433,9 @@ WEAPON_CONFIG = {
         'COCH': {
         'name': 'Toz',
         'class_name': 'NewWeapon',       # Используем наш универсальный класс
-        'slot': 2,
+        'slot': 3,
+        'spread': 0.18,      # Широкий веер дроби!
+        'recoil': 0.12,
         'damage': 50,                    # Огромный урон вблизи
         'reload_time': 350,              # 5 кадров анимации * 70 мс скорость = 350 мс
         'continuous': False,             # Одиночные выстрелы
@@ -440,7 +446,9 @@ WEAPON_CONFIG = {
     },
         'PLASMA': {
             'name': 'Plasma Gun',
-            'slot': 4,
+            'slot': 5,
+            'spread': 0.06,      # Ощутимый разброс при зажиме
+            'recoil': 0.04,
             'damage': 75,
             'reload_time': 350,
             'continuous': False,
