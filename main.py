@@ -17,6 +17,7 @@ from utils.save_system import SaveSystem
 from ui.console import DevConsole
 from utils.intro_player import IntroPlayer
 from core.weapon_selector import WeaponSelector
+from rendering.flashlight import FlashlightMask
 
 
 class Game:
@@ -65,6 +66,8 @@ class Game:
         pygame.mixer.init(frequency=22050, size=-16, channels=2, buffer=512)
         self.ui_manager = UIManager(self)
         self.console = DevConsole(self)
+        self.flashlight = FlashlightMask(self)
+        self.flashlight.active = True
 
         self.music_manager = MusicManager()
 
