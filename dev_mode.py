@@ -17,6 +17,7 @@ from utils.save_system import SaveSystem
 from ui.console import DevConsole
 from utils.intro_player import IntroPlayer
 from core.weapon_selector import WeaponSelector
+from rendering.flashlight import FlashlightMask
 
 
 class DevGame:
@@ -28,6 +29,7 @@ class DevGame:
             config: dict с настройками компонентов
         """
         self.config = config
+
         
         pygame.mouse.set_visible(False)
         self.screen = pygame.display.set_mode(RES, pygame.SCALED | pygame.FULLSCREEN)
@@ -82,6 +84,8 @@ class DevGame:
         # Загружаем уровень
         if self.level_manager:
             self.load_level(self.current_level)
+        self.flashlight = FlashlightMask(self)
+        self.flashlight.active = True
 
         self._print_status()
 

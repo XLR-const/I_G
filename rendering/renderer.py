@@ -413,6 +413,8 @@ class Renderer:
     def draw_interface(self):
         """Sci-Fi HUD: Синусоидальный пульс здоровья и вращающийся циклотрон брони.
         Полная автономность, нулевая привязка к полигонам, идеальный визуал!"""
+        if hasattr(self.game, 'flashlight'):
+            self.game.flashlight.draw()
         hp = max(0, min(100, self.game.player.hp))
         armor = max(0, min(100, self.game.player.armor))
         
