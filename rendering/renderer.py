@@ -225,66 +225,102 @@ class Renderer:
         self.game.screen.blit(fps_render, (x, y))
 
     def draw_crosshair(self):
-        """Рисует динамический круглый неоновый Sci-Fi прицел, 
-        который физически расширяется от честного разброса текущей пушки"""
+        """Рисует тонкий пунктирный прицел, считывая разброс СТРОГО по номерам слотов,
+        полностью исключая баги с дефисами и именами пушек в конфиге!"""
         cx, cy = WIDTH // 2, HEIGHT // 2
-        neon_color = (0, 240, 255)
         
-        # Базовый (минимальный) радиус круга в пикселях для точного оружия
-        base_radius = 4 
+        color_neon = (0, 240, 255)    
+        color_accent = (255, 100, 0)  
+        color_white = (255, 255, 255) 
+        color_black = (10, 14, 18)    
+        
+        base_radius = 4
 
-        # ==================================================================
-        # 🔥 ПУЛЕНЕПРОБИВАЕМЫЙ ПОИСК ТЕКУЩЕГО РАЗБРОСА ОРУЖИЯ
-        # Сканируем объект self.game.weapon по всем возможным параметрам
-        # ==================================================================
-        weapon_spread = 0.02 # Дефолтное значение
+        # Дефолтные значения на случай, если пушка не определена
+        weapon_spread = 0.02
+        is_firing = False
+        has_hit_enemy = False
         
         if hasattr(self.game, 'weapon') and self.game.weapon:
             w_obj = self.game.weapon
             
-            # Проверяем все возможные варианты, где пушка может хранить свой ключ/имя
-            raw_key = getattr(w_obj, 'key', getattr(w_obj, 'name', None))
+            # Ловим самый первый кадр вспышки выстрела
+            if getattr(w_obj, 'reloading', False) and getattr(w_obj, 'frame_index', 0) == 0:
+                is_firing = True
+                if hasattr(w_obj, 'last_side') and w_obj.last_side == -1:
+                    has_hit_enemy = True
+
+            # 🔥 ГЛАВНЫЙ АРХИТЕКТУРНЫЙ ФИКС: ЧИТАЕМ РАЗБРОС НАПРЯМУЮ ПО СЛОТУ!
+            # Узнаем номер слота текущего оружия в руках (1, 2, 3, 4...)
+            current_slot = getattr(w_obj, 'slot', 2)
             
-            if raw_key:
-                # Переводим в верхний регистр и очищаем от пробелов для сверки с конфигом
-                search_key = str(raw_key).upper().strip()
+            try:
+                from config.game_data import WEAPON_CONFIG
                 
-                try:
-                    from config.game_data import WEAPON_CONFIG
-                    # Если нашли пушку в конфиге — забираем её честный spread!
-                    if search_key in WEAPON_CONFIG:
-                        weapon_spread = WEAPON_CONFIG[search_key].get('spread', 0.02)
-                    else:
-                        # Если ключ в конфиге записан иначе, ищем по совпадению красивого имени
-                        for cfg_key, cfg_data in WEAPON_CONFIG.items():
-                            if str(cfg_data.get('name', '')).upper().strip() == search_key:
-                                weapon_spread = cfg_data.get('spread', 0.02)
-                                break
-                except:
-                    pass
+                # Просто перебираем твой WEAPON_CONFIG и ищем пушку, у которой совпадает номер слота.
+                # Это на 100% страхует от любых нестыковок в именах 'AK-47', 'Toz' или 'COCH'!
+                for cfg_data in WEAPON_CONFIG.values():
+                    if cfg_data.get('slot') == current_slot:
+                        weapon_spread = cfg_data.get('spread', 0.02)
+                        break
+            except:
+                pass
 
-        # ==================================================================
-        # 📐 РАСЧЕТ МАСШТАБА КРУГА
-        # ==================================================================
-        # Умножаем радианы разброса на 180 пикселей.
-        # Для Ножа (spread 0.0) -> динамический радиус будет 0 пикселей.
-        # Для Кольта (spread 0.02) -> прибавится ~3 пикселя.
-        # Для Дробовика (spread 0.18) -> круг сочно расширится на +32 пикселя!
-        dynamic_radius_offset = int(weapon_spread * 180)
+        # Переводим радианы разброса в пиксели на экране.
+        # Множитель 180 откалиброван: 
+        # Для Калаша (slot 4, spread 0.05) -> палочки прыгнут всего на 9 пикселей (аккуратно и узко)
+        # Для Дробовика (slot 3, spread 0.38) -> палочки сочно улетят на 68 пикселей (огромный ромб)!
+        dynamic_offset = int(weapon_spread * 180)
+        R = base_radius + dynamic_offset
+
+        # --------------------------------==================================
+        # 🎨 ЧАСТЬ 1. ЦЕНТРАЛЬНАЯ МИНИ-ТОЧКА И КРЕСТИК
+        # --------------------------------==================================
+        pygame.draw.circle(self.game.screen, color_black, (cx, cy), 3)
+        pygame.draw.circle(self.game.screen, color_neon, (cx, cy), 1)
+
+        cross_gap = 3   
+        cross_len = 4   
+        pygame.draw.line(self.game.screen, color_black, (cx, cy - cross_gap), (cx, cy - cross_gap - cross_len), 3)
+        pygame.draw.line(self.game.screen, color_black, (cx, cy + cross_gap), (cx, cy + cross_gap + cross_len), 3)
+        pygame.draw.line(self.game.screen, color_black, (cx - cross_gap, cy), (cx - cross_gap - cross_len, cy), 3)
+        pygame.draw.line(self.game.screen, color_black, (cx + cross_gap, cy), (cx + cross_gap + cross_len, cy), 3)
         
-        # Итоговый живой радиус неонового кольца на экране
-        final_radius = base_radius + dynamic_radius_offset
+        center_color = color_accent if is_firing else color_neon
+        pygame.draw.line(self.game.screen, center_color, (cx, cy - cross_gap), (cx, cy - cross_gap - cross_len), 1)
+        pygame.draw.line(self.game.screen, center_color, (cx, cy + cross_gap), (cx, cy + cross_gap + cross_len), 1)
+        pygame.draw.line(self.game.screen, center_color, (cx - cross_gap, cy), (cx - cross_gap - cross_len, cy), 1)
+        pygame.draw.line(self.game.screen, center_color, (cx + cross_gap, cy), (cx + cross_gap + cross_len, cy), 1)
 
-        # ==================================================================
-        # 🎨 ОТРИСОВКА НЕОНОВОГО КРУГА ПО ЦЕНТРУ ЭКРАНА
-        # ==================================================================
-        # 1. Маленькая четкая точка в самом центре экрана для снайперского наведения
-        pygame.draw.circle(self.game.screen, neon_color, (cx, cy), 2)
+        # --------------------------------==================================
+        # 🎨 ЧАСТЬ 2. ДИНАМИЧЕСКИЕ ПАЛОЧКИ РАЗБРОСА (ТОЛЬКО ПРИ ВЫСТРЕЛЕ)
+        # ----------------------------------------------------------------==
+        if is_firing:
+            spread_lines = [
+                (cx, cy - R, cx, cy - R + 4), 
+                (cx, cy + R, cx, cy + R - 4), 
+                (cx - R, cy, cx - R + 4, cy), 
+                (cx + R, cy, cx + R - 4, cy)  
+            ]
+            for sx, sy, ex, ey in spread_lines:
+                pygame.draw.line(self.game.screen, color_black, (sx, sy), (ex, ey), 3)
+                pygame.draw.line(self.game.screen, color_accent, (sx, sy), (ex, ey), 1)
 
-        # 2. 🔥 ДИНАМИЧЕСКОЕ Sci-Fi КОЛЬЦО РАЗБРОСА:
-        # Толщину линии ставим 2 пикселя для сочности, а радиус плавно 
-        # меняется в зависимости от того, какое оружие сейчас выбрал игрок!
-        pygame.draw.circle(self.game.screen, neon_color, (cx, cy), final_radius, 2)
+        # --------------------------------==================================
+        # 🎨 ЧАСТЬ 3. БЕЛЫЙ МАРКЕР ПОПАДАНИЯ (HITMARKER "X")
+        # ----------------------------------------------------------------==
+        if has_hit_enemy:
+            h_gap = 3   
+            h_len = 5   
+            hit_lines = [
+                (cx - h_gap, cy - h_gap, cx - h_gap - h_len, cy - h_gap - h_len), 
+                (cx + h_gap, cy - h_gap, cx + h_gap + h_len, cy - h_gap - h_len), 
+                (cx - h_gap, cy + h_gap, cx - h_gap - h_len, cy - h_gap - h_len), # Поправлен кортеж
+                (cx + h_gap, cy + h_gap, cx + h_gap + h_len, cy + h_gap + h_len)  
+            ]
+            for sx, sy, ex, ey in hit_lines:
+                pygame.draw.line(self.game.screen, color_black, (sx, sy), (ex, ey), 3)
+                pygame.draw.line(self.game.screen, color_white, (sx, sy), (ex, ey), 1)
 
     def draw_compass(self):
         """Рисует компас в Sci-Fi стиле с полигональной скошенной рамкой под стиль HUD"""

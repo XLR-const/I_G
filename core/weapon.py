@@ -278,7 +278,7 @@ class Weapon:
             self.game.particles.append(
                 Particle(self.game, (p_x, p_y), particle_color, uniform(0.001, 0.005))
             )
-            
+        self.last_side = side
         return hit_x, hit_y, dist, side
 
 
