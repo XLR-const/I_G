@@ -3,51 +3,38 @@ import sys
 import json
 import math
 import random
+import argparse
 import numpy as np
 
 # Настройка путей импорта
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from config.biome_data import BIOME_DATABASE
 
-# ==================================================================
-# 📂 DATA-DRIVEN КОНФИГУРАЦИЯ С ХАРДКОЖЕННЫМИ НАЧАЛЬНЫМИ ПАРАМЕТРАМИ
-# ==================================================================
-CONFIG = {
-    "MAP_WIDTH": 100,         # Ширина карты ячеек
-    "MAP_HEIGHT": 100,        # Высота карты ячеек
-    "BIOME_STYLE": "out",     # Текущий биом из базы данных ('out', 'lab')
-    "SEED": "777888",         # Хардкоженный сид уровня (None для полного рандома)
-    "LEVEL_NUM": 4,           # Номер генерируемого уровня для файла
-    "MIN_ROOMS": 16,          # Количество бункеров-КПП на карте
-    "STARTING_WEAPONS": ["KNIFE", "COLT"],  # Начальное оружие игрока КАПСОМ строго по WEAPON_CONFIG
-    "STARTING_AMMO": {"KNIFE": 1, "COLT": 60}  # Начальный боезапас (подняли до 60)
-}
-
 
 class PipelineLevelGenerator:
-    def __init__(self, config=CONFIG):
-        """Инициализирует конвейер генератора на основе Data-Driven конфигурации"""
-        self.width = config["MAP_WIDTH"]
-        self.height = config["MAP_HEIGHT"]
-        self.style = config["BIOME_STYLE"]
-        self.level_num = config["LEVEL_NUM"]
-        self.config = config
+    def __init__(self, width=100, height=100, style='out', seed=None, level_num=4, min_rooms=16):
+        """Полностью Data-Driven инициализация с поддержкой внешних параметров интерактива"""
+        self.width = width
+        self.height = height
+        self.style = style
+        self.level_num = level_num
+        self.min_rooms = min_rooms
         
-        if config["SEED"] is None:
+        if seed is None:
             self.seed = str(random.randint(100000, 999999))
         else:
-            self.seed = str(config["SEED"])
+            self.seed = str(seed)
             
         random.seed(self.seed)
         
-        # Безопасно вытягиваем биом
+        # Безопасный вынос биома из базы данных
         self.biome = BIOME_DATABASE.get(self.style, next(iter(BIOME_DATABASE.values())))
         
-        # Забиваем карту стенами "1"
+        # Матрица забивается базовыми стенами "1"
         self.grid = [["1" for _ in range(self.width)] for _ in range(self.height)]
         self.spawned_counters = {}
-        self.rooms_meta = []  # Метаданные бункеров для умной врезки дверей
-        
+        self.rooms_meta = []  # Координаты бункеров для умных дверей
+
         # Кешируем имена стен биома
         w_cfg = self.biome.get('walls', {})
         self.primary_wall = w_cfg.get('primary', {}).get('char', 'rocks')
@@ -89,129 +76,53 @@ class PipelineLevelGenerator:
         return False
 
     # ==================================================================
-    # ⚙️ ПРОХОД 1: ВЫСШАЯ МАТЕМАТИКА — КОМБИНАТОР ЛАНДШАФТОВ И КОСЫХ ХОРД
-    # Уничтожает прямоугольную сетку, комбинируя Плато, Ущелья и Лабиринты!
+    # ⚙️ ПРОХОД 1: ГЕОМЕТРИЯ (ДИНАМИЧЕСКИЕ МАГИСТРАЛИ И БУНКЕРЫ-КПП)
     # ==================================================================
     def pass_geometry(self):
-        # По умолчанию заливаем карту монолитной стеной
-        self.grid = [["1" for _ in range(self.width)] for _ in range(self.height)]
-        self.rooms_meta = []
-
-        # --------------------------------------------------------------
-        # 🌊 МАТЕМАТИЧЕСКАЯ МАТРИЦА ШУМА (ГЕНЕРАЦИЯ КАРТЫ ЛАНДШАФТОВ)
-        # Мы используем интерполяцию синусоид разной частоты (Октавы),
-        # чтобы разделить карту 100х100 на органичные природные зоны.
-        # --------------------------------------------------------------
-        land_map = [[0.0 for _ in range(self.width)] for _ in range(self.height)]
+        """Прорубает сквозной скелет дорог, комнат и генерирует запертые секретки"""
+        path_channels = [self.width // 4, self.width // 2, (self.width // 4) * 3]
         
-        # Генерируем случайные фазовые сдвиги для уникальности сида
-        freq1, freq2 = random.uniform(0.03, 0.06), random.uniform(0.07, 0.12)
-        shift_x, shift_y = random.randint(0, 100), random.randint(0, 100)
-
-        for r in range(self.height):
-            for c in range(self.width):
-                # Смешиваем две октавы волн для получения фрактального природного шума
-                val1 = math.sin((r + shift_y) * freq1) * math.cos((c + shift_x) * freq1)
-                val2 = math.sin((r - shift_y) * freq2) * math.sin((c - shift_x) * freq2)
-                land_map[r][c] = (val1 * 0.7 + val2 * 0.3)
-
-        # --------------------------------------------------------------
-        # 🗺️ ВЫГРЫЗАНИЕ РЕЛЬЕФА НА ОСНОВЕ МАТРИЦЫ ШУМА (ПАТТЕРНЫ)
-        # --------------------------------------------------------------
-        for r in range(2, self.height - 2):
-            for c in range(2, self.width - 2):
-                h_val = land_map[r][c]
-
-                # 🏞️ ПАТТЕРН А: ОТКРЫТОЕ ПЛАТО / ДОЛИНА (Глубокие впадины шума)
-                # Если шум уходит в минус — мы полностью вычищаем огромные,
-                # органичные, округлые площади открытых уличных зон!
-                if h_val < -0.35:
-                    self.grid[r][c] = "_"
-
-                # 🪨 ПАТТЕРН Б: СКАЛИСТЫЙ ЛАБИРИНТ (Средние значения шума)
-                # В этой зоне мы нарезаем частую сетку ходов со случайным шансом,
-                # формируя изрезанные катакомбы и обходные петли
-                elif -0.10 < h_val < 0.25:
-                    # Рандомизируем проходы, чтобы уйти от строгих линий
-                    if (r % 3 == 0 and c % 2 == 0) or (c % 3 == 0 and r % 2 == 0):
-                        self.grid[r][c] = "_"
-
-        # --------------------------------------------------------------
-        # 🛣️ АЛГОРИТМ ИЗВИЛИСТЫХ УЩЕЛИЙ И КОСЫХ ХОРД (ЛУЧЕВЫЕ АГЕНТЫ)
-        # Мы запускаем 4-х блуждающих агентов от Старта к Финишу.
-        # Они прорубают извилистые сквозные каньоны, намертво связывая 
-        # Плато и Лабиринты в единый 100% проходимый граф!
-        # --------------------------------------------------------------
-        # Задаем стартовые точки для 4-х независимых ущелий-рукавов
-        start_positions = [
-            self.width // 6, 
-            self.width // 3, 
-            self.width // 2, 
-            (self.width // 3) * 2
-        ]
-
-        for start_x in start_positions:
-            curr_x = start_x
-            
-            # Агент идет сверху вниз по карте
+        # Прорубаем 3 магистрали
+        for center_x in path_channels:
             for r in range(1, self.height - 1):
-                # МАРКОВСКИЙ СДВИГ: с шансом 40% вектор ущелья изгибается вбок.
-                # Никаких прямых углов в 90 градусов! Коридор плавно виляет зигзагом.
-                if random.random() < 0.40:
-                    curr_x += random.choice([-2, -1, 1, 2])
-                    
-                # Жесткие границы, чтобы каньон не улетел за карту
-                curr_x = max(3, min(self.width - 4, curr_x))
+                self.grid[r][center_x] = "_"
+                self.grid[r][center_x + 1] = "_"
                 
-                # Прорубаем ущелье шириной в 3 клетки для свободы стрейфов
-                for offset in [-1, 0, 1]:
-                    self.grid[r][curr_x + offset] = "_"
-
-        # --------------------------------------------------------------
-        # 🚪 СЕКЦИОННЫЕ БУНКЕРЫ КАНЬОНА
-        # Генерируем 15 прямоугольных блокпостов, врезая их в стены ущелий
-        # --------------------------------------------------------------
-        num_rooms = 15
-        for i in range(num_rooms):
+        # Обходные петли-развилки
+        cross_junctions = [self.height // 5, self.height // 2, (self.height // 5) * 4]
+        for cross_y in cross_junctions:
+            for c in range(self.width // 4, (self.width // 4) * 3 + 2):
+                self.grid[cross_y][c] = "_"
+                self.grid[cross_y + 1][c] = "_"
+                
+        # Спавним секционные бункеры на основе переданного num_rooms
+        for i in range(self.min_rooms):
             rw, rh = random.randint(6, 11), random.randint(6, 11)
+            ry = random.randint(6, self.height - rh - 7)
+            target_channel = random.choice(path_channels)
+            rx = random.randint(target_channel - rw + 2, target_channel + i % 2)
             
-            # Равномерно распределяем бункеры по высоте карты Y
-            t = i / max(1, num_rooms - 1)
-            ry = int(8 + t * (self.height - rh - 16)) + random.randint(-2, 2)
+            self.rooms_meta.append((rx, ry, rw, rh, 'normal'))
             
-            # Привязываем X координату к случайному извилистому ходу на этой строке
-            valid_x_positions = [c for c in range(10, self.width - 15) if self.grid[ry][c] == "_"]
-            if not valid_x_positions:
-                continue
-                
-            rx = random.choice(valid_x_positions) - rw // 2
-            rx = max(3, min(self.width - rw - 4, rx))
-
-            # Запоминаем для герметичных одиночных дверей строго 4 элемента
-            self.rooms_meta.append((int(rx), int(ry), int(rw), int(rh)))
-            
-            # Вырезаем бункер
             for r in range(ry, ry + rh):
                 for c in range(rx, rx + rw):
-                    if 2 <= r < self.height - 2 and 2 <= c < self.width - 2:
+                    if 1 <= r < self.height - 1 and 1 <= c < self.width - 1:
                         self.grid[r][c] = "_"
 
-
-
-    def _spawn_hidden_key(self, key_char):
-        """Вспомогательный метод: Прячет синий ключ в первой трети карты 
-        (начальная зона) для открытия запертого ДОТа/бункера!"""
-        # Ищем пустую клетку в верхней части карты (r от 12 до трети высоты)
-        for r in range(12, self.height // 3):
-            for c in range(15, self.width - 15):
-                if self.grid[r][c] == "_":
-                    self.grid[r][c] = key_char
-                    print(f"🔑 [Секрет] Ключ '{key_char}' успешно спрятан на позиции Y:{r}, X:{c}!")
-                    return
-
+        # Врезаем 3 секретные комнаты, запечатанные стеной secret_wall
+        for _ in range(3):
+            s_x = random.randint(15, self.width - 15)
+            s_y = random.randint(15, self.height - 15)
+            if self.grid[s_y][s_x] == "1" and (self.grid[s_y + 1][s_x] == "_" or self.grid[s_y - 1][s_x] == "_"):
+                self.grid[s_y][s_x] = "_"
+                if self.grid[s_y + 1][s_x] == "_":
+                    self.grid[s_y][s_x] = "secret_wall"
+                else:
+                    self.grid[s_y][s_x] = "secret_wall"
+                self.rooms_meta.append((s_x, s_y, 2, 1, 'secret'))
 
     # ==================================================================
-    # ⚙️ ПРОХОД 2: ПРОПОРЦИОНАЛЬНОЕ ТЕКСТУРИРОВАНИЕ СТЕН
+    # ⚙️ ПРОХОД 2: ПРОПОРЦИОНАЛЬНОЕ ТЕКСТУРИРОВАНИЕ СТЕН БИОМА
     # ==================================================================
     def pass_textures(self):
         w_cfg = self.biome.get('walls', {})
@@ -224,218 +135,187 @@ class PipelineLevelGenerator:
                     self.grid[r][c] = random.choices(population, weights=weights)[0]
 
     # ==================================================================
-    # ⚙️ ПРОХОД 3: СТАРТ, ВЫХОД, ГАРАНТИРОВАННЫЙ СТАРТОВЫЙ COLT И ДВЕРИ
+    # ⚙️ ПРОХОД 3: СТАРТ, ВЫХОД, ГАРАНТИРОВАННЫЙ COLT И УМНЫЕ ДВЕРИ ПО ЦЕНТРУ
     # ==================================================================
     def pass_points_of_interest(self):
         center_x = self.width // 2
+        self.grid[3][center_x] = "Spawn"
+        self.grid[self.height - 5][center_x] = "Exit"
         
-        # Точки старта и финиша
-        self.grid[2][center_x] = "Spawn"
-        self.grid[self.height - 4][center_x] = "Exit"
-        
-        # 🔥 ИСПРАВЛЕНО: Клодём строго 'colt' маленькими буквами по твоей концепции!
-        if self.grid[3][center_x] == "_":
-            self.grid[3][center_x] = "colt"
-            print("🎯 [Баланс] Подбираемый предмет 'colt' успешно заспавнен под ногами игрока!")
-
-        door_normal = self.biome['doors']['normal']
-        door_locked = self.biome['doors']['locked']
+        if self.grid[4][center_x] == "_":
+            self.grid[4][center_x] = "COLT"
+            
+        doors_cfg = self.biome.get('doors', {})
+        door_normal = doors_cfg.get('normal', 'door_normal')
+        door_locked = doors_cfg.get('locked', 'door_blue_key').strip("'")
         locked_door_spawned = False
         
-        for rx, ry, rw, rh in self.rooms_meta:
-            door_placed = False
-            for c in range(rx + 2, rx + rw - 2):
-                if 0 <= c < self.width and 0 <= ry + rh < self.height:
-                    if self.grid[ry + rh][c] in ['rocks', 'metal_crunch_wall'] and self.grid[ry + rh + 1][c] == "_":
-                        if not locked_door_spawned and ry > self.height // 2:
-                            self.grid[ry + rh][c] = door_locked
-                            locked_door_spawned = True
-                            self._spawn_hidden_key('key_blue')
-                        else:
-                            self.grid[ry + rh][c] = door_normal
-                        door_placed = True
-                        break 
+        for rx, ry, rw, rh, r_type in self.rooms_meta:
+            if r_type == 'secret':
+                continue
             
-            if not door_placed:
-                for c in range(rx + 1, rx + rw - 1):
-                    if 0 <= c < self.width and 0 <= ry - 1 < self.height:
-                        if self.grid[ry - 1][c] in ['rocks', 'metal_crunch_wall'] and self.grid[ry - 2][c] == "_":
-                            self.grid[ry - 1][c] = door_normal
+            wall_options = ['south', 'north', 'east']
+            random.shuffle(wall_options)
+            door_placed = False
+            
+            for option in wall_options:
+                if door_placed:
+                    break
+                
+                if option == 'south':
+                    mid_c = rx + rw // 2
+                    if 0 <= mid_c < self.width and 0 <= ry + rh < self.height:
+                        if self.grid[ry + rh][mid_c] in self.valid_walls and self.grid[ry + rh + 1][mid_c] == "_":
+                            if not locked_door_spawned and ry > self.height // 2:
+                                self.grid[ry + rh][mid_c] = door_locked
+                                locked_door_spawned = True
+                                self._spawn_hidden_key('key_blue')
+                            else:
+                                self.grid[ry + rh][mid_c] = door_normal
                             door_placed = True
-                            break
                             
-            if not door_placed:
-                for r in range(ry + 1, ry + rh - 1):
-                    if 0 <= rx + rw < self.width and 0 <= r < self.height:
-                        if self.grid[r][rx + rw] in ['rocks', 'metal_crunch_wall'] and self.grid[r][rx + rw + 1] == "_":
-                            self.grid[r][rx + rw] = door_normal
-                            break
+                elif option == 'north':
+                    mid_c = rx + rw // 2
+                    if 0 <= mid_c < self.width and 0 <= ry - 1 < self.height:
+                        if self.grid[ry - 1][mid_c] in self.valid_walls and self.grid[ry - 2][mid_c] == "_":
+                            self.grid[ry - 1][mid_c] = door_normal
+                            door_placed = True
+                            
+                elif option == 'east':
+                    mid_r = ry + rh // 2
+                    if 0 <= rx + rw < self.width and 0 <= mid_r < self.height:
+                        if self.grid[mid_r][rx + rw] in self.valid_walls and self.grid[mid_r][rx + rw + 1] == "_":
+                            self.grid[mid_r][rx + rw] = door_normal
+                            door_placed = True
 
+    def _spawn_hidden_key(self, key_char):
+        for r in range(12, self.height // 3):
+            for c in range(15, self.width - 15):
+                if self.grid[r][c] == "_":
+                    self.grid[r][c] = key_char
+                    print(f"🔑 [Секрет] Ключ {key_char} успешно спрятан на уровне!")
+                    return
 
     # ==================================================================
-    # ⚙️ ПРОХОД 4: ДЕКОРАЦИИ С УТОПЛЕНИЕМ В ВЫЕМКИ СТЕН (WALL CARVING)
-    # Декорации больше никогда не спавнятся под ногами в коридорах!
+    # ⚙️ ПРОХОД 4: ДЕКОРАЦИИ ПО ЦЕПЯМ МАРКОВА С ПРИЖАТИЕМ К СТЕНАМ
     # ==================================================================
     def pass_decorations(self):
-        d_cfg = self.biome['decor_settings']
-        pool = d_cfg['pool']
+        d_cfg = self.biome.get('decor_settings', {})
+        pool = d_cfg.get('pool', {})
+        if not pool:
+            return
         
-        # 1. Считаем лимит декораций от общего числа пустых клеток
-        empty_count = sum(1 for r in range(self.height) for c in range(self.width) if self.grid[r][c] == "_")
-        max_decor = int(empty_count * d_cfg['density'])
+        empty_cells = [(r, c) for r in range(self.height) for c in range(self.width) 
+                       if self.grid[r][c] == "_" and self._is_adjacent_to_wall(r, c)]
+        if not empty_cells:
+            return
+        
+        max_decor = int(len(empty_cells) * d_cfg.get('density', 0.04))
         decor_count = 0
-        
         items = list(pool.keys())
         weights = [cfg['weight'] for cfg in pool.values()]
-
-        # 2. Ищем ВСЕ клетки, которые сейчас являются стенами, но граничат с пустым коридором
-        # Это идеальные кандидаты для выгрызания ниш!
-        wall_types = ['rocks', 'metal_crunch_wall']
+        random.shuffle(empty_cells)
         
-        attempts = 0
-        while decor_count < max_decor and attempts < 3000:
-            attempts += 1
-            
-            # Берем случайную координату на карте (пропуская самые крайние внешние границы)
-            r = random.randint(2, self.height - 3)
-            c = random.randint(2, self.width - 3)
-            
-            # Нам нужна строго клетка стены!
-            if self.grid[r][c] not in wall_types:
+        while decor_count < max_decor and empty_cells:
+            r, c = empty_cells.pop()
+            if self.grid[r][c] != "_":
                 continue
-
-            # Проверяем соседние клетки (вверх, вниз, влево, вправо)
-            # Нам нужно, чтобы стена граничила СТРОГО с пустым проходом '_', но не с дверями или игроком
-            neighbors = [
-                self.grid[r-1][c], self.grid[r+1][c], 
-                self.grid[r][c-1], self.grid[r][c+1]
-            ]
             
-            # Если эта стена глухая (вокруг только другие стены) или граничит с объектами — пропускаем
-            if "_" not in neighbors:
-                continue
-
-            # Выбираем декорацию по весу из паспорта биома
-            decor_key = random.choices(items, weights=weights)[0]
-            cfg = pool[decor_key]
-            char = decor_key
-
-            # Проверка жестких лимитов и радиусов исключения
-            if self.spawned_counters.get(char, 0) >= cfg['max_count']: continue
-            if not self._check_min_distance(r, c, char, cfg['min_dist']): continue
-
-            c_type = cfg['cluster_type']
-            c_size = cfg['cluster_size']
+            neighbors = []
+            for dr, dc in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+                if 0 <= r + dr < self.height and 0 <= c + dc < self.width:
+                    neighbors.append(self.grid[r + dr][c + dc])
             
-            if c_type == 'line' and random.random() < cfg['cluster_chance']:
-                # Для линий (баррикад мешков) выгрызаем нишу-полосу вдоль дороги
-                dr, dc = random.choice([(0, 1), (1, 0)])
-                for step in range(c_size):
-                    nr = r + dr * step
-                    nc = c + dc * step
-                    # Выгрызаем только если это блоки стен
-                    if 0 <= nr < self.height and 0 <= nc < self.width and self.grid[nr][nc] in wall_types:
-                        self.grid[nr][nc] = char
-                        decor_count += 1
-                self.spawned_counters[char] = self.spawned_counters.get(char, 0) + 1
+            if 'prop_sandbag_wall' in neighbors and random.random() < 0.85 and 'prop_sandbag_wall' in pool:
+                decor_key = 'prop_sandbag_wall'
+            elif 'prop_military_crate' in neighbors and random.random() < 0.70 and 'prop_military_crate' in pool:
+                decor_key = 'prop_military_crate'
             else:
-                # 🔥 ОДИНOЧНОЕ УТOПЛЕНИЕ: Превращаем блок стены в декорацию!
-                # Дорога остается нетронутой, а пропсы уходят вглубь стены
-                self.grid[r][c] = char
-                self.spawned_counters[char] = self.spawned_counters.get(char, 0) + 1
-                decor_count += 1
-
+                decor_key = random.choices(items, weights=weights)[0]
+            
+            cfg = pool[decor_key]
+            
+            if self.spawned_counters.get(decor_key, 0) >= cfg.get('max_count', 99):
+                continue
+            if not self._check_min_distance(r, c, decor_key, cfg.get('min_dist', 0)):
+                continue
+            
+            self.grid[r][c] = decor_key
+            self.spawned_counters[decor_key] = self.spawned_counters.get(decor_key, 0) + 1
+            decor_count += 1
 
     # ==================================================================
-    # ⚙️ ПРОХОД 5 И 6: СТОПРОЦЕНТНО ДИНАМИЧЕСКИЙ ЗОНАЛЬНЫЙ СПАВН (БЕЗ ХАРДКОДА)
-    # Автоматически высчитывает прогресс карты по Y для баланса сложности!
+    # ⚙️ ПРОХОД 5 и 6: МАРКОВСКИЙ КОНТРОЛЬ ПЛОТНОСТИ И ЗОНИРОВАНИЕ (NPC/ЛУТ)
     # ==================================================================
     def pass_entities(self, layer_type='npc'):
-        cfg_layer = self.biome['npc_settings'] if layer_type == 'npc' else self.biome['loot_settings']
-        pool = cfg_layer['pool']
-        
-        # Собираем пустые ячейки для спавна
-        empty_cells = [(r, c) for r in range(self.height) for c in range(self.width) if self.grid[r][c] == "_"]
-        if not empty_cells: 
+        cfg_layer = self.biome.get('npc_settings', {}) if layer_type == 'npc' else self.biome.get('loot_settings', {})
+        pool = cfg_layer.get('pool', {})
+        if not pool:
             return
-
-        max_spawn = int(len(empty_cells) * cfg_layer['density'])
-        spawn_count = 0
         
+        empty_cells = [(r, c) for r in range(self.height) for c in range(self.width) if self.grid[r][c] == "_"]
+        if not empty_cells:
+            return
+        
+        max_spawn = int(len(empty_cells) * cfg_layer.get('density', 0.02))
+        spawn_count = 0
         items = list(pool.keys())
         weights = [cfg['weight'] for cfg in pool.values()]
-
-        attempts = 0
-        while spawn_count < max_spawn and attempts < 2500 and empty_cells:
-            attempts += 1
-            r, c = random.choice(empty_cells)
-            if self.grid[r][c] != "_": 
+        random.shuffle(empty_cells)
+        
+        while spawn_count < max_spawn and empty_cells:
+            r, c = empty_cells.pop()
+            if self.grid[r][c] != "_":
                 continue
-
-            # Достаем случайный объект на основе весов
-            ent_key = random.choices(items, weights=weights)[0]
-            cfg = pool[ent_key]
-            char = ent_key
             
-            # =============================================================
-            # 📐 АВТОМАТИЧЕСКАЯ УМНАЯ МАТЕМАТИКА ЗОНИРОВАНИЯ СЛОЖНОСТИ:
-            # Считаем прогресс клетки от верха (0.0 - старт) до низа (1.0 - выход)
-            # =============================================================
+            neighbors = []
+            for dr, dc in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+                if 0 <= r + dr < self.height and 0 <= c + dc < self.width:
+                    neighbors.append(self.grid[r + dr][c + dc])
+            
             progress = r / self.height
             
-            # 1. Автоматический баланс ОРУЖИЯ и БОССОВ:
-            # Дробовики (shotgun) и пулеметчики (CM) могут родиться только в финальной трети карты!
-            if char in ['CM', 'shotgun'] and progress < 0.65:
-                continue
-                
-            # 2. Автоматы (ak47) появляются строго начиная со второй трети уровня
-            if char == 'ak47' and progress < 0.35:
-                continue
-                
-            # 3. Базовая защита спавна: броня (armor) не валяется прямо у входа
-            if char == 'armor' and progress < 0.20:
-                continue
-
-            # =============================================================
-            # 🧠 МАТЕМАТИЧЕСКИЙ ФИЛЬТР ЛОКАЛЬНОЙ ПЛОТНОСТИ (HEATMAP):
-            # Если это тяжелый юнит или оружие — лимит строго 1 штука на сектор,
-            # чтобы они не кучковались. Для рядовых врагов и аптечек — до 3.
-            # =============================================================
-            is_heavy_or_rare = char in ['CM', 'shotgun', 'ak47', 'armor']
-            max_local = 1 if is_heavy_or_rare else 3
+            if layer_type == 'npc':
+                if 'AGG' in neighbors and random.random() < 0.75 and 'AGG' in pool:
+                    ent_key = 'AGG'
+                elif 'prop_sandbag_wall' in neighbors and random.random() < 0.50 and 'AGG' in pool:
+                    ent_key = 'AGG'
+                else:
+                    ent_key = random.choices(items, weights=weights)[0]
+            else:
+                if ('ak47' in neighbors or 'shotgun' in neighbors) and random.random() < 0.85:
+                    available_loot = [k for k in ['health', 'armor'] if k in pool]
+                    ent_key = random.choice(available_loot) if available_loot else random.choices(items, weights=weights)[0]
+                else:
+                    ent_key = random.choices(items, weights=weights)[0]
             
+            cfg = pool[ent_key]
+            
+            if ent_key in ['CM', 'shotgun'] and progress < 0.60:
+                continue
+            if ent_key == 'ak47' and progress < 0.35:
+                continue
+            if ent_key == 'armor' and progress < 0.15:
+                continue
+            
+            max_local = 1 if ent_key in ['CM', 'shotgun', 'ak47', 'armor'] else 3
             if not self._check_local_density(r, c, radius=9, max_allowed=max_local):
                 continue
-
-            # Проверяем жесткий лимит штук на карту и минимальную дистанцию
-            if self.spawned_counters.get(char, 0) >= cfg['max_count']: 
+            
+            if self.spawned_counters.get(ent_key, 0) >= cfg.get('max_count', 99):
                 continue
-            if not self._check_min_distance(r, c, char, cfg['min_dist']): 
+            if not self._check_min_distance(r, c, ent_key, cfg.get('min_dist', 0)):
                 continue
-
-            # Логика геометрической кучности (circle)
-            c_type = cfg['cluster_type']
-            c_size = cfg['cluster_size']
-
-            if c_type == 'circle' and random.random() < cfg['cluster_chance']:
-                for dr in (-1, 0, 1):
-                    for dc in (-1, 0, 1):
-                        nr, nc = r + dr, c + dc
-                        if 0 <= nr < self.height and 0 <= nc < self.width and self.grid[nr][nc] == "_":
-                            if spawn_count < max_spawn:
-                                self.grid[nr][nc] = char
-                                spawn_count += 1
-                self.spawned_counters[char] = self.spawned_counters.get(char, 0) + 1
-            else:
-                self.grid[r][c] = char
-                self.spawned_counters[char] = self.spawned_counters.get(char, 0) + 1
-                spawn_count += 1
-
+            
+            self.grid[r][c] = ent_key
+            self.spawned_counters[ent_key] = self.spawned_counters.get(ent_key, 0) + 1
+            spawn_count += 1
 
     # ==================================================================
-    # 💾 ГЛАВНЫЙ СБОРЩИК КОНВЕЙЕРА И ЗАПИСЬ В JSON
+    # 💾 СБОРКА И ЗАПИСЬ РЕЗУЛЬТАТА В JSON ПАКЕТ СТРУКТУРЫ
     # ==================================================================
     def execute_pipeline_and_save(self):
+        """Запускает последовательный конвейер проходов"""
         self.pass_geometry()
         self.pass_textures()
         self.pass_points_of_interest()
@@ -443,7 +323,6 @@ class PipelineLevelGenerator:
         self.pass_entities(layer_type='npc')
         self.pass_entities(layer_type='loot')
         
-        # Форматируем красивую горизонтальную матрицу JSON
         formatted_map_lines = []
         for row in self.grid:
             json_row = json.dumps(row, ensure_ascii=False)
@@ -451,15 +330,15 @@ class PipelineLevelGenerator:
         
         map_json_string = "[\n" + ",\n".join(formatted_map_lines) + "\n  ]"
         
-        # Полностью Data-Driven вынос инвентаря на основе захардкоженного CONFIG
+        # Передаем хардкоженный COLT и KNIFE капсом строго по твоему ТЗ
         meta_data = {
-            "inventory": self.config["STARTING_WEAPONS"],
-            "starting_ammo": self.config["STARTING_AMMO"],
+            "inventory": ["KNIFE", "COLT"],
+            "starting_ammo": {"KNIFE": 1, "COLT": 60},
             "background": {
                 "ceiling_texture": "resources/textures/rocks.png",
                 "floor_texture": None,
                 "ceiling_color": None,
-                "floor_color": [20, 10, 10]
+                "floor_color": [20, 20, 25]
             },
             "generator_style": self.style,
             "generator_seed": self.seed
@@ -475,12 +354,85 @@ class PipelineLevelGenerator:
         with open(filename, "w", encoding="utf-8") as f:
             f.write(final_json_content)
         
-        print(f"🏁 [Пайплайн-Успех] Карта уровня {self.level_num} успешно создана!")
-        print(f"-> Файл сохранен: {filename}")
-        print(f"-> Итоговый баланс заспавненных штук: {self.spawned_counters}\n")
+        print(f"\n🏁 [Пайплайн-Успех] Карта уровня {self.level_num} успешно создана всеми 6-ю проходами!")
+        print(f"-> Файл: {filename}")
+        print(f"-> Биом: {self.style.upper()} | Параметры: {self.width}x{self.height}, Секторов: {self.min_rooms}")
+        print(f"-> Заспавненные объекты: {self.spawned_counters}\n")
 
 
 if __name__ == "__main__":
-    # Запуск генератора на основе Data-Driven настроек из CONFIG
-    generator = PipelineLevelGenerator(CONFIG)
-    generator.execute_pipeline_and_save()
+    # Проверяем, запущен ли скрипт в интерактивном консольном режиме
+    if len(sys.argv) == 1:
+        print("=== ИНТЕРАКТИВНЫЙ РЕЖИМ ГЕНЕРАТОРА ЦЕПЕЙ ===")
+        
+        while True:
+            try:
+                level_num = int(input("1. Введите номер уровня (например, 4): ").strip())
+                break
+            except ValueError:
+                print("Ошибка: введите целое число.")
+        
+        while True:
+            try:
+                width_input = input("2a. Укажите ШИРИНУ карты в клетках (мин. 10): ").strip()
+                width = int(width_input) if width_input else 100
+                height_input = input("2b. Укажите ВЫСОТУ карты в клетках (мин. 15): ").strip()
+                height = int(height_input) if height_input else 100
+                if width >= 10 and height >= 15:
+                    break
+                print("Ошибка: Минимальные размеры карты — 10x15.")
+            except ValueError:
+                print("Ошибка: введите целые числа.")
+        
+        while True:
+            try:
+                rooms_input = input("3. Введите количество комнат/секторов (2-30) [по умолчанию 16]: ").strip()
+                num_rooms = int(rooms_input) if rooms_input else 16
+                if 2 <= num_rooms <= 30:
+                    break
+                print("Ошибка: количество комнат должно быть от 2 до 30.")
+            except ValueError:
+                print("Ошибка: введите целое число.")
+        
+        styles = ["hall", "vent", "lab", "out", "hang"]
+        while True:
+            style = input(f"4. Выберите стиль генерации {styles}: ").strip().lower()
+            if style in styles:
+                break
+            print(f"Ошибка: стиль должен быть одним из {styles}")
+        
+        seed_input = input("5. Укажите сид (нажмите Enter для случайного): ").strip()
+        seed = seed_input if seed_input else None
+        
+        # Запуск полноценного 6-проходного генератора с полученными через интерактив данными!
+        generator = PipelineLevelGenerator(
+            width=width, height=height, style=style, seed=seed, 
+            level_num=level_num, min_rooms=num_rooms
+        )
+        generator.execute_pipeline_and_save()
+    
+    # Режим чтения флагов командной строки (из твоего файла интерактива)
+    else:
+        parser = argparse.ArgumentParser(description="Пайплайн-генератор уровней")
+        parser.add_argument("level_num", type=int, help="Номер уровня")
+        parser.add_argument("--width", type=int, default=100, help="Ширина карты")
+        parser.add_argument("--height", type=int, default=100, help="Высота карты")
+        parser.add_argument("--rooms", type=int, default=16, help="Количество комнат")
+        parser.add_argument("--style", type=str, choices=["hall", "vent", "lab", "out", "hang"], 
+                           default="out", help="Стиль биома")
+        parser.add_argument("--seed", type=str, default=None, help="Сид")
+        args = parser.parse_args()
+        
+        level_num = args.level_num
+        width = max(10, args.width)
+        height = max(15, args.height)
+        num_rooms = max(2, min(30, args.rooms))
+        style = args.style
+        seed = args.seed
+        
+        # Запуск полноценного 6-проходного генератора с полученными через интерактив данными!
+        generator = PipelineLevelGenerator(
+            width=width, height=height, style=style, seed=seed, 
+            level_num=level_num, min_rooms=num_rooms
+        )
+        generator.execute_pipeline_and_save()
