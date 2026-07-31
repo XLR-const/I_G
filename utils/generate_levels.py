@@ -1,195 +1,200 @@
+import os
 import sys
 import json
-import random
-import os
 import math
-import argparse
+import random
 
-class LevelGenerator:
-    def __init__(self, width=18, height=48):
+# Настройка путей импорта
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from config.biome_data import BIOME_DATABASE
+
+class PipelineLevelGenerator:
+    def __init__(self, width=100, height=100, style='out', seed=None, level_num=4):
         self.width = width
         self.height = height
-
-    def _carve_rect(self, grid, x, y, w, h):
-        for i in range(y, min(y + h, self.height - 2)):
-            for j in range(x, min(x + w, self.width - 2)):
-                if 1 <= j < self.width - 1 and 1 <= i < self.height - 1:
-                    grid[i][j] = "_"
-
-    def generate_and_save(self, level_num, seed, style, num_rooms):
-        if seed:
-            random.seed(seed)
+        self.style = style
+        self.level_num = level_num
+        
+        if seed is None:
+            self.seed = str(random.randint(100000, 999999))
         else:
-            seed = str(random.randint(100000, 999999))
-            random.seed(seed)
-        
-        # Заливаем карту монолитными стенами "1"
-        grid = [["1" for _ in range(self.width)] for _ in range(self.height)]
+            self.seed = str(seed)
+        random.seed(self.seed)
 
-        rooms_y_centers = []
-        start_y = 4
-        end_y = self.height - 5
-        playable_height = end_y - start_y
-        section_h = max(2, playable_height // num_rooms)
+        self.biome = BIOME_DATABASE.get(self.style, BIOME_DATABASE['out'])
+        self.grid = [["0" for _ in range(self.width)] for _ in range(self.height)]
+        self.spawned_counters = {}
 
-        # -------------------------------------------------------------
-        # ГЕНЕРАЦИЯ СТРУКТУРЫ ПО СТИЛЯМ (Динамический размер)
-        # -------------------------------------------------------------
-        
-        if style == "lab":
-            # Стиль ЛАБОРАТОРИЯ: Центральный сквозной коридор
-            center_corridor_x = self.width // 2 - 1
-            for y in range(2, self.height - 2):
-                grid[y][center_corridor_x] = "_"
-                grid[y][center_corridor_x + 1] = "_"
+    def _check_min_distance(self, r, c, char, min_dist):
+        if min_dist <= 0: return True
+        for dr in range(-min_dist, min_dist + 1):
+            for dc in range(-min_dist, min_dist + 1):
+                nr, nc = r + dr, c + dc
+                if 0 <= nr < self.height and 0 <= nc < self.width:
+                    if self.grid[nr][nc] == char: return False
+        return True
 
-            # Компактные боксы по бокам распределяются по высоте
-            for i in range(num_rooms):
-                t = i / max(1, num_rooms - 1) if num_rooms > 1 else 0.5
-                ry = int(start_y + t * (playable_height - 4))
-                rh = random.randint(3, max(4, section_h))
-                
-                # Ограничиваем высоту комнаты, чтобы не выйти за массив
-                rh = min(rh, self.height - ry - 3)
-                if rh < 3: continue
+    # ⚙️ ПРОХОД 1: ГЕОМЕТРИЯ (МАГИСТРАЛЬ + НАНИЗАННЫЕ КОМНАТЫ)
+    def pass_geometry(self):
+        self.grid = [["1" for _ in range(self.width)] for _ in range(self.height)]
+        center_x = self.width // 2
+        for r in range(1, self.height - 1):
+            self.grid[r][center_x - 1] = "_"
+            self.grid[r][center_x] = "_"
+            self.grid[r][center_x + 1] = "_"
 
-                if i % 2 == 0:  # Левый бокс
-                    rw = random.randint(3, max(4, self.width // 4))
-                    rx = 2
-                    self._carve_rect(grid, rx, ry, rw, rh)
-                    grid[ry + rh // 2][center_corridor_x - 1] = "_"
-                    grid[ry + rh // 2][center_corridor_x] = "_"
-                else:  # Правый бокс
-                    rw = random.randint(3, max(4, self.width // 4))
-                    rx = center_corridor_x + 2
-                    self._carve_rect(grid, rx, ry, rw, rh)
-                    grid[ry + rh // 2][center_corridor_x + 1] = "_"
-                    grid[ry + rh // 2][center_corridor_x + 2] = "_"
-                    
-                rooms_y_centers.append((center_corridor_x + 1, ry + rh // 2, ry, ry + rh))
-
-        elif style == "out":
-            # Стиль УЛИЦА: Очищаем весь внутренний полигон
-            self._carve_rect(grid, 1, 1, self.width - 2, self.height - 2)
+        num_rooms = 15
+        for i in range(num_rooms):
+            rw, rh = random.randint(6, 12), random.randint(6, 12)
+            ry = random.randint(5, self.height - rh - 6)
+            rx = random.randint(center_x - rw + 2, center_x - 2) if i % 2 == 0 else random.randint(center_x - 1, center_x + rw - 3)
             
-            # Возводим домики/бункеры пропорционально размерам карты
-            for i in range(num_rooms):
-                t = i / max(1, num_rooms - 1) if num_rooms > 1 else 0.5
-                by = int(start_y + t * (playable_height - 5)) + random.randint(-1, 1)
-                by = max(start_y, min(end_y - 4, by))
-                
-                bw = random.randint(3, max(4, self.width // 4))
-                bh = random.randint(3, max(4, self.height // 10))
-                bx = random.randint(2, max(3, self.width - bw - 2))
-                
-                # Проверка границ перед заливкой
-                if by + bh >= self.height - 1: bh = self.height - by - 2
-                if bh < 3 or bw < 3: continue
+            for r in range(ry, ry + rh):
+                for c in range(rx, rx + rw):
+                    if 1 <= r < self.height - 1 and 1 <= c < self.width - 1:
+                        self.grid[r][c] = "_"
 
-                for y in range(by, by + bh):
-                    for x in range(bx, bx + bw):
-                        if 1 <= x < self.width - 1 and 1 <= y < self.height - 1:
-                            grid[y][x] = "1"
+    # =============================================================
+    # ⚙️ ПРОХОД 2: ТЕКСТУРИРОВАНИЕ СТЕН (ИСПРАВЛЕНО НА СТРОКИ)
+    # =============================================================
+    def pass_textures(self):
+        w_cfg = self.biome['walls']
+        p_char, p_weight = w_cfg['primary']['char'], w_cfg['primary']['weight']
+        s_char, s_weight = w_cfg['secondary']['char'], w_cfg['secondary']['weight']
+        population, weights = [p_char, s_char], [p_weight, s_weight]
+
+        for r in range(self.height):
+            for c in range(self.width):
+                if self.grid[r][c] == "1":
+                    # 🔥 КРИТИЧЕСКИЙ ФИКС: Забираем строго нулевой элемент списка!
+                    # Теперь в матрицу запишется чистая строка "rocks" или "metal_crunch_wall"
+                    self.grid[r][c] = random.choices(population, weights=weights)[0]
+
+    # ⚙️ ПРОХОД 3: СТАРТ И ВЫХОД СТРОГО ПО PDF
+    def pass_points_of_interest(self):
+        center_x = self.width // 2
+        # Твои маркеры из PDF: 'Spawn' и 'Exit'
+        self.grid[4][center_x] = "Spawn"
+        self.grid[self.height - 5][center_x] = "Exit"
+
+    # ⚙️ ПРОХОД 4: ДЕКОРАЦИИ С ПОДДЕРЖКОЙ КУЧНОСТИ И ЛИНИЙ
+    def pass_decorations(self):
+        d_cfg = self.biome['decor_settings']
+        pool = d_cfg['pool']
+        empty_cells = [(r, c) for r in range(self.height) for c in range(self.width) if self.grid[r][c] == "_"]
+        if not empty_cells: return
+        
+        max_decor = int(len(empty_cells) * d_cfg['density'])
+        decor_count = 0
+        items, weights = list(pool.keys()), [cfg['weight'] for cfg in pool.values()]
+
+        attempts = 0
+        while decor_count < max_decor and attempts < 1500 and empty_cells:
+            attempts += 1
+            r, c = random.choice(empty_cells)
+            if self.grid[r][c] != "_": continue
+
+            decor_key = random.choices(items, weights=weights)[0]
+            cfg = pool[decor_key]
+            char = decor_key
+
+            if self.spawned_counters.get(char, 0) >= cfg['max_count']: continue
+            if not self._check_min_distance(r, c, char, cfg['min_dist']): continue
+
+            c_type = cfg['cluster_type']
+            c_size = cfg['cluster_size']
+            
+            if c_type == 'line' and random.random() < cfg['cluster_chance']:
+                # Извлекаем смещения по строкам (dr) и столбцам (dc) из выбранного кортежа направления
+                dr, dc = random.choice([(0, 1), (1, 0)]) # Горизонтально или вертикально
                 
-                # Вырезаем пол внутри бункера, если позволяют размеры
-                if bw > 3 and bh > 3:
-                    for y in range(by + 1, by + bh - 1):
-                        for x in range(bx + 1, bx + bw - 1):
-                            grid[y][x] = "_"
-                    grid[by + bh - 1][bx + bw // 2] = "_"  # Дверь
-                else:
-                    grid[by][bx] = "_"  # Микро-ниша
+                for step in range(c_size):
+                    # 🔥 ЧЕСТНЫЙ ИСПРАВЛЕННЫЙ РАСЧЕТ ВЕКТOРА ПО ОСЯМ:
+                    # Умножаем шаг на сдвиг отдельно для строк и отдельно для столбцов
+                    nr = r + dr * step
+                    nc = c + dc * step
                     
-                rooms_y_centers.append((bx + bw // 2, by + bh // 2, by, by + bh))
+                    if 0 <= nr < self.height and 0 <= nc < self.width and self.grid[nr][nc] == "_":
+                        self.grid[nr][nc] = char
+                        decor_count += 1
+                self.spawned_counters[char] = self.spawned_counters.get(char, 0) + 1
 
-        else:
-            # Стили HALL и VENT
-            for i in range(num_rooms):
-                t = i / max(1, num_rooms - 1) if num_rooms > 1 else 0.5
-                ry = int(start_y + t * (playable_height - 5)) + random.randint(-1, 1)
-                ry = max(start_y, min(end_y - 5, ry))
-                
-                if style == "hall":
-                    rw = random.randint(max(4, self.width // 3), self.width - 4)
-                    rh = random.randint(3, max(4, self.height // 10))
-                    rx = random.randint(2, max(3, self.width - rw - 2))
-                    self._carve_rect(grid, rx, ry, rw, rh)
-                else:  # vent
-                    rw = random.randint(3, max(4, self.width // 5))
-                    rh = random.randint(3, max(4, self.height // 12))
-                    rx = random.randint(2, max(3, self.width - rw - 2))
-                    self._carve_rect(grid, rx, ry, rw, rh)
-                    
-                rooms_y_centers.append((rx + rw // 2, ry + rh // 2, ry, ry + rh))
-
-            # Прокладка коридоров-дуг
-            for i in range(len(rooms_y_centers) - 1):
-                cx1, cy1, _, r1_bottom = rooms_y_centers[i]
-                cx2, cy2, r2_top, _ = rooms_y_centers[i+1]
-                s_y, e_y = r1_bottom, r2_top
-                
-                if s_y >= e_y:
-                    grid[s_y][cx1] = "_"
-                    grid[s_y][cx2] = "_"
-                    continue
-                    
-                for y in range(s_y, e_y + 1):
-                    progress = (y - s_y) / (e_y - s_y) if e_y != s_y else 0.5
-                    if style == "hall":
-                        amp = max(0.5, self.width * 0.05)
-                        center_x = int((cx1 + (cx2 - cx1) * progress) + amp * math.sin(progress * math.pi))
-                        center_x = max(2, min(self.width - 4, center_x))
-                        grid[y][center_x] = "_"
-                        if center_x + 1 < self.width - 1: grid[y][center_x + 1] = "_"
-                    else:  # vent
-                        amp = max(1.0, self.width * 0.12)
-                        center_x = int((cx1 + (cx2 - cx1) * progress) + amp * math.sin(progress * math.pi))
-                        center_x = max(1, min(self.width - 2, center_x))
-                        grid[y][center_x] = "_"
-
-        # -------------------------------------------------------------
-        # РАССТАНОВКА СТАРТА И ВЫХОДА
-        # -------------------------------------------------------------
-        if style in ["lab", "out"]:
-            grid[2][self.width // 2] = "S"
-            grid[self.height - 3][self.width // 2] = "E"
-        else:
-            if rooms_y_centers:
-                first_x, first_y = rooms_y_centers[0][0], rooms_y_centers[0][1]
-                grid[first_y][first_x] = "S"
-                last_x = rooms_y_centers[-1][0]
-                grid[self.height - 3][last_x] = "E"
             else:
-                grid[2][self.width // 2] = "S"
-                grid[self.height - 3][self.width // 2] = "E"
+                self.grid[r][c] = char
+                self.spawned_counters[char] = self.spawned_counters.get(char, 0) + 1
+                decor_count += 1
 
-        # Настройки палитры
-        r_ceil = max(50, 180 - level_num * 15)
-        g_ceil = max(30, 100 - level_num * 8)
-        b_ceil = max(30, 100 - level_num * 8)
-        r_floor = max(20, 60 - level_num * 5)
-        g_floor = max(10, 30 - level_num * 2)
-        b_floor = max(10, 30 - level_num * 2)
+    # ⚙️ ПРОХОД 5: ЗОНАЛЬНЫЙ УМНЫЙ СПАВН СТРОГО ПО PDF КЛЮЧАМ
+    def pass_entities(self, layer_type='npc'):
+        cfg_layer = self.biome['npc_settings'] if layer_type == 'npc' else self.biome['loot_settings']
+        pool = cfg_layer['pool']
+        empty_cells = [(r, c) for r in range(self.height) for c in range(self.width) if self.grid[r][c] == "_"]
+        if not empty_cells: return
 
-        # Построчное красивое форматирование для горизонтальной матрицы JSON
+        max_spawn = int(len(empty_cells) * cfg_layer['density'])
+        spawn_count = 0
+        items, weights = list(pool.keys()), [cfg['weight'] for cfg in pool.values()]
+
+        attempts = 0
+        while spawn_count < max_spawn and attempts < 1500 and empty_cells:
+            attempts += 1
+            r, c = random.choice(empty_cells)
+            if self.grid[r][c] != "_": continue
+
+            ent_key = random.choices(items, weights=weights)[0]
+            cfg = pool[ent_key]
+            char = ent_key
+            
+            progress = r / self.height
+            # Защита: тяжелый Бот CM и убер-пушка Shotgun спавнятся только в конце
+            if char in ['CM', 'shotgun'] and progress < 0.65: continue
+            if char == 'armor' and progress < 0.30: continue
+
+            if self.spawned_counters.get(char, 0) >= cfg['max_count']: continue
+            if not self._check_min_distance(r, c, char, cfg['min_dist']): continue
+
+            c_type = cfg['cluster_type']
+            c_size = cfg['cluster_size']
+
+            if c_type == 'circle' and random.random() < cfg['cluster_chance']:
+                for dr in (-1, 0, 1):
+                    for dc in (-1, 0, 1):
+                        nr, nc = r + dr, c + dc
+                        if 0 <= nr < self.height and 0 <= nc < self.width and self.grid[nr][nc] == "_":
+                            if spawn_count < max_spawn:
+                                self.grid[nr][nc] = char
+                                spawn_count += 1
+                self.spawned_counters[char] = self.spawned_counters.get(char, 0) + 1
+            else:
+                self.grid[r][c] = char
+                self.spawned_counters[char] = self.spawned_counters.get(char, 0) + 1
+                spawn_count += 1
+
+    def execute_pipeline_and_save(self):
+        self.pass_geometry()
+        self.pass_textures()
+        self.pass_points_of_interest()
+        self.pass_decorations()
+        self.pass_entities(layer_type='npc')
+        self.pass_entities(layer_type='loot')
+
         formatted_map_lines = []
-        for row in grid:
+        for row in self.grid:
             json_row = json.dumps(row, ensure_ascii=False)
             formatted_map_lines.append(f"    {json_row}")
-        
         map_json_string = "[\n" + ",\n".join(formatted_map_lines) + "\n  ]"
 
         meta_data = {
-            "inventory": ["Pistol", "Shotgun", "Machine Gun", "Plasma Gun"],
-            "starting_ammo": { "Pistol": 40, "Shotgun": 20, "Machine Gun": 400, "Plasma Gun": 15 },
+            "inventory": ["Knife", "Colt"],
+            "starting_ammo": { "Knife": 1, "Colt": 15 },
             "background": {
-                "ceiling_texture": "resources/textures/red_sky.png" if style == "out" else "resources/textures/ceiling.png",
+                "ceiling_texture": "resources/textures/rocks.png",
                 "floor_texture": None,
-                "ceiling_color": [r_ceil, g_ceil, b_ceil],
-                "floor_color": [r_floor, g_floor, b_floor]
+                "ceiling_color": (100, 100, 20),
+                "floor_color": [30, 15, 15]
             },
-            "generator_style": style,
-            "generator_seed": seed
+            "generator_style": self.style,
+            "generator_seed": self.seed
         }
 
         meta_json_string = json.dumps(meta_data, indent=2, ensure_ascii=False)
@@ -197,81 +202,15 @@ class LevelGenerator:
 
         output_dir = os.path.join("resources", "levels")
         os.makedirs(output_dir, exist_ok=True)
+        filename = os.path.join(output_dir, f"level_{self.level_num}.json")
         
-        filename = os.path.join(output_dir, f"level_{level_num}.json")
         with open(filename, "w", encoding="utf-8") as f:
             f.write(final_json_content)
-        
-        print(f"\n[Успех] Уровень {level_num} успешно сгенерирован!")
-        print(f"-> Файл: {filename}")
-        print(f"-> Геометрия: {self.width}x{self.height}, Комнат: {num_rooms}, Стиль: {style}\n")
 
+        print(f"🏁 [Пайплайн-Успех] Карта уровня {self.level_num} успешно создана!")
+        print(f"-> Файл: {filename}")
+        print(f"-> Использованы ключи: {list(self.spawned_counters.keys())}\n")
 
 if __name__ == "__main__":
-    if len(sys.argv) == 1:
-        print("=== ИНТЕРАКТИВНЫЙ РЕЖИМ ГЕНЕРАТОРА ===")
-        
-        # 1. Номер уровня
-        while True:
-            try:
-                level_num = int(input("1. Введите номер уровня (например, 1): ").strip())
-                break
-            except ValueError:
-                print("Ошибка: введите целое число.")
-        
-        # 2. Размеры карты (Ширина и Высота)
-        while True:
-            try:
-                width = int(input("2a. Укажите ШИРИНУ карты в клетках (мин. 10): ").strip())
-                height = int(input("2b. Укажите ВЫСОТУ карты в клетках (мин. 15): ").strip())
-                if width >= 10 and height >= 15:
-                    break
-                print("Ошибка: Минимальные размеры карты — 10x15.")
-            except ValueError:
-                print("Ошибка: введите целые числа.")
-
-        # 3. Количество комнат
-        while True:
-            try:
-                rooms_input = input("3. Введите количество комнат/секторов (2-30) [по умолчанию 3]: ").strip()
-                num_rooms = int(rooms_input) if rooms_input else 3
-                if 2 <= num_rooms <= 30:
-                    break
-                print("Ошибка: количество комнат должно быть от 2 до 30.")
-            except ValueError:
-                print("Ошибка: введите целое число.")
-
-        # 4. Выбор стиля
-        styles = ["hall", "vent", "lab", "out"]
-        while True:
-            style = input(f"4. Выберите стиль генерации {styles}: ").strip().lower()
-            if style in styles:
-                break
-            print(f"Ошибка: стиль должен быть одним из {styles}")
-
-        # 5. Сид
-        seed_input = input("5. Укажите сид (нажмите Enter для случайного): ").strip()
-        seed = seed_input if seed_input else None
-
-    else:
-        # Режим чтения флагов командной строки
-        parser = argparse.ArgumentParser(description="Генератор уровней")
-        parser.add_argument("level_num", type=int, help="Номер уровня")
-        parser.add_argument("--width", type=int, default=18, help="Ширина карты")
-        parser.add_argument("--height", type=int, default=48, help="Высота карты")
-        parser.add_argument("--rooms", type=int, default=3, help="Количество комнат (2-30)")
-        parser.add_argument("--style", type=str, choices=["hall", "vent", "lab", "out"], default="hall", help="Стиль")
-        parser.add_argument("--seed", type=str, default=None, help="Сид")
-        
-        args = parser.parse_args()
-        level_num = args.level_num
-        width = max(10, args.width)
-        height = max(15, args.height)
-        num_rooms = max(2, min(30, args.rooms))
-        style = args.style
-        seed = args.seed
-
-    # Запуск генератора с полученными параметрами
-    generator = LevelGenerator(width=width, height=height)
-    generator.generate_and_save(level_num, seed, style, num_rooms)
-
+    generator = PipelineLevelGenerator(width=100, height=100, style='out', seed=None, level_num=4)
+    generator.execute_pipeline_and_save()
