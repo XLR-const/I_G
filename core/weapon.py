@@ -204,12 +204,24 @@ class Weapon:
     def fire(self):
         """Выполняет выстрел с использованием честного луча DDA 
         и динамического разброса веера пуль строго по слотам!"""
-        if self.reloading or self.ammo <= 0:
-            if self.ammo <= 0:
-                self.sound_empty_ammo.play()
+        current_time = pygame.time.get_ticks()
+        if hasattr(self, 'reload_timer') and current_time < self.reload_timer:
             return None
 
+        # Твоя оригинальная проверка на патроны
+        if self.ammo <= 0:
+            self.sound_empty_ammo.play()
+            return None
+
+        # 🔥 АКТИВИРУЕМ ПЕРЕЗАРЯДКУ И ВЗВОДИМ ТАЙМЕР НА БУДУЩЕЕ:
         self.reloading = True
+        
+        # Читаем время задержки из твоего WEAPON_CONFIG (например, 240 мс)
+        # Если параметра вдруг нет в конфиге, ставим безопасный дефолт 300 мс
+        delay = getattr(self, 'reload_time', 300) 
+        
+        # Записываем точку времени, ДО КОТОРОЙ стрелять будет нельзя
+        self.reload_timer = current_time + delay
         self.last_shot_time = pygame.time.get_ticks()
         
         # Переключаемся на непрерывную ленту выстрела

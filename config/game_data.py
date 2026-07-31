@@ -269,6 +269,13 @@ SYMBOLS_CONFIG = {
         'sprite': 'resources/weapons/KNIFE2/icon.png',
         'description': 'PLASMA'
     },
+        'aa12': {
+            'type': 'item',
+            'item_type': 'weapon',
+            'weapon_name': 'AA12',
+            'ammo': 12,
+            'sprite': 'resources/weapons/AA12/icon.png'
+        },
 
     
  # --- СИСТЕМА ДВЕРЕЙ И СЕКРЕТОК С ТЕКСТУРАМИ ---
@@ -407,7 +414,7 @@ WEAPON_CONFIG = {
         'spread': 0.05,      # Ощутимый разброс при зажиме
         'recoil': 0.04,
         'damage': 25,
-        'reload_time': 240,              # 4 кадра анимации * 60 мс скорость = 240 мс
+        'reload_time': 200,              # 4 кадра анимации * 60 мс скорость = 240 мс
         'continuous': True,              # Автоматическая стрельба (зажим)
         'ammo_start': 30,
         'max_distance': 12,              # Автомат стреляет дальше пистолета и плазмы
@@ -462,7 +469,7 @@ WEAPON_CONFIG = {
         'name': 'Knife',
         'slot': 1,
         'damage': 40,
-        'reload_time': 1000,        # Время перезарядки строго под длину анимации!
+        'reload_time': 400,        # Время перезарядки строго под длину анимации!
         'continuous': True,       # Одиночные выстрелы
         'max_distance': 0.5,
         'folder_name': 'KNIFE',
@@ -482,6 +489,18 @@ WEAPON_CONFIG = {
         'ammo_start': 10,
         'infinite_ammo': True
     },
+        'AA12': {
+            'name': 'aa12',
+            'slot': 3,
+            'damage': 15,
+            'reload_time': 300,
+            'spread': 0.5,
+            'continuous': True,
+            'max_distance': 1.3,
+            'folder_name': 'AA12',
+            'sprite_prefix': 'AA12',
+            'ammo_start': 12
+        }
 
 
 }
