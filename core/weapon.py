@@ -202,74 +202,114 @@ class Weapon:
 
 
     def fire(self):
-        """Выполняет выстрел с использованием честного луча DDA 
-        и динамического разброса веера пуль строго по слотам!"""
         current_time = pygame.time.get_ticks()
         if hasattr(self, 'reload_timer') and current_time < self.reload_timer:
             return None
 
-        # Твоя оригинальная проверка на патроны
         if self.ammo <= 0:
             self.sound_empty_ammo.play()
             return None
 
-        # 🔥 АКТИВИРУЕМ ПЕРЕЗАРЯДКУ И ВЗВОДИМ ТАЙМЕР НА БУДУЩЕЕ:
         self.reloading = True
-        
-        # Читаем время задержки из твоего WEAPON_CONFIG (например, 240 мс)
-        # Если параметра вдруг нет в конфиге, ставим безопасный дефолт 300 мс
         delay = getattr(self, 'reload_time', 300) 
-        
-        # Записываем точку времени, ДО КОТОРОЙ стрелять будет нельзя
         self.reload_timer = current_time + delay
         self.last_shot_time = pygame.time.get_ticks()
-        
-        # Переключаемся на непрерывную ленту выстрела
+
         self.current_frames = self.fire_frames
         self.frame_index = 0
         if self.fire_frames:
-            self.sprite = self.fire_frames[0]  # Гарантированно берем ПЕРВЫЙ кадр выстрела (вспышку)
+            self.sprite = self.fire_frames[0]
 
         self.sound.play()
         if not self.is_infinite:
             self.ammo -= 1
 
         # ==================================================================
-        # 📐 ЧИТАЕМ ПАРАМЕТРЫ РАЗБРОСА ИЗ КОНФИГА ПУШКИ
+        # 📐 [ПРИНТ №1] ПРОВЕРЯЕМ ТЕКУЩИЕ ПАРАМЕТРЫ СТВОЛА В РУКАХ
         # ==================================================================
+        # self.slot - число, self.key - строка (например 'PLASMA')
+        current_slot = getattr(self, 'slot', 'НЕ НАЙДЕН')
+        current_key = getattr(self, 'key', 'БЕЗ КЛЮЧА')
+        print(f"\n📢 [ВЫСТРЕЛ] Запущен метод fire(). Текущий слот пушки: {current_slot}, Ключ self.key: '{current_key}'")
+
+        # Читаем параметры из конфига пушки по номеру слота
+        w_data = {}
         try:
             from config.game_data import WEAPON_CONFIG
-            w_data = WEAPON_CONFIG.get(self.key, {})
-        except:
+            
+            # Ищем узел в конфиге строго по номеру слота
+            for cfg_key, cfg_data in WEAPON_CONFIG.items():
+                if cfg_data.get('slot') == self.slot:
+                    w_data = cfg_data
+                    print(f"🔍 [Конфиг] Найдено совпадение в WEAPON_CONFIG по слоту {self.slot}! Ключ в словаре: '{cfg_key}'")
+                    break
+            
+            if not w_data:
+                print(f"⚠️ [Внимание] В WEAPON_CONFIG не найдено пушек со слотом {self.slot}!")
+        except Exception as e:
+            print(f"❌ [Ошибка] Ошибка при чтении WEAPON_CONFIG: {e}")
             w_data = {}
 
-        # Значения по умолчанию, если в конфиге пусто
+        # Значения по умолчанию
         spread = w_data.get('spread', 0.02)
         slot_num = w_data.get('slot', 2)
+        weapon_type = w_data.get('type', 'hitscan')
 
-        # Переменная для возврата координат попадания (для совместимости)
+        # ==================================================================
+        # 📐 [ПРИНТ №2] СМОТРИМ, КАКОЙ ТИП СТРЕЛЬБЫ ОПРЕДЕЛИЛ ПИТОН
+        # ==================================================================
+        print(f"📊 [Баланс] Параметры из конфига -> type: '{weapon_type}', spread: {spread}, slot_num: {slot_num}")
+
+        from random import uniform
         last_hit_data = None
 
-        # ==================================================================
-        # 🔥 РАСЧЕТ РАЗБРОСА ПУЛЬ ПО КАТЕГОРИЯМ СЛОТОВ
-        # ==================================================================
-        # Если оружие принадлежит к Слоту 3 (Категория Дробовиков) — стреляем веером дроби!
-        if slot_num == 3:
-            # Считываем количество дробин из конфига (или ставим 10 по умолчанию)
-            num_pellets = w_data.get('pellets', 10)
+        if weapon_type == 'projectile':
+            print("🚀 [Ветвление] Захожу в режим PROJECTILE (Создание физического снаряда)...")
+            proj_angle = self.game.player.angle + uniform(-spread, spread)
             
-            for _ in range(num_pellets):
-                # Каждая дробина получает свой случайный микро-сдвиг угла в пределах конуса spread
-                pellet_angle = self.game.player.angle + uniform(-spread, spread)
+            try:
+                from core.projectile import Projectile
                 
-                # Запускаем DDA-луч для каждой дробины отдельно!
-                last_hit_data = self._spawn_bullet_hit(pellet_angle, side_blood_logic=True)
+                new_projectile = Projectile(
+                    game=self.game,
+                    x=self.game.player.x,
+                    y=self.game.player.y,
+                    angle=proj_angle,
+                    config=w_data
+                )
+                
+                # Проверяем, куда именно мы пушим снаряд
+                if hasattr(self.game, 'projectiles'):
+                    self.game.projectiles.append(new_projectile)
+                    print(f"✅ [Успех] Снаряд {w_data.get('prefix_fly')} успешно добавлен в self.game.projectiles! Всего летит: {len(self.game.projectiles)}")
+                elif hasattr(self.game.player, 'projectiles'):
+                    self.game.player.projectiles.append(new_projectile)
+                    print(f"✅ [Успех] Снаряд добавлен в self.game.player.projectiles! Всего: {len(self.game.player.projectiles)}")
+                else:
+                    print("🚨 [КРИТ] Ни у self.game, ни у self.game.player нет массива 'projectiles'! Снаряд растворился в воздухе.")
+                
+            except Exception as e:
+                print(f"❌ [КРИТ] Спавн Projectile упал в ошибку: {e}")
+                import traceback
+                traceback.print_exc()
+
+            last_hit_data = (self.game.player.x, self.game.player.y, 0, 0)
+            
         else:
-            # Для точечного оружия (Кольт, Автомат) летит одна пуля с микро-разбросом
-            bullet_angle = self.game.player.angle + uniform(-spread, spread)
-            last_hit_data = self._spawn_bullet_hit(bullet_angle, side_blood_logic=False)
+            print("🎯 [Ветвление] Захожу в режим HITSCAN (Мгновенные лучи DDA)...")
+            if slot_num == 3:
+                num_pellets = w_data.get('pellets', 10)
+                print(f"🍇 [Дробовик] Запуск веера из {num_pellets} дробин...")
+                for _ in range(num_pellets):
+                    pellet_angle = self.game.player.angle + uniform(-spread, spread)
+                    last_hit_data = self._spawn_bullet_hit(pellet_angle, side_blood_logic=True)
+            else:
+                bullet_angle = self.game.player.angle + uniform(-spread, spread)
+                last_hit_data = self._spawn_bullet_hit(bullet_angle, side_blood_logic=False)
 
         return last_hit_data
+
+
 
     def _spawn_bullet_hit(self, shot_angle, side_blood_logic=False):
         """Вспомогательный метод: просчитывает DDA-луч под кастомным углом 

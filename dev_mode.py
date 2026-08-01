@@ -77,6 +77,7 @@ class DevGame:
         self.total_kills = 0
         self.current_level = 1
         self.level_start_time = 0
+        self.projectiles = []
 
         # Катсцена — всегда выключена
         self.intro_player = None
@@ -164,6 +165,11 @@ class DevGame:
         # Оружие
         if self.weapon:
             self.weapon.update_animation()
+            
+        # Снаряды
+        for proj in self.projectiles:
+            proj.update()
+        self.projectiles = [p for p in self.projectiles if p.alive]
         
 
         # Стрельба
@@ -194,6 +200,7 @@ class DevGame:
         render_queue.extend(self.npcs)
         render_queue.extend(self.items)
         render_queue.extend(self.particles)
+        render_queue.extend([p for p in self.projectiles if p.alive])
 
         # Сортировка по дистанции
         render_queue.sort(

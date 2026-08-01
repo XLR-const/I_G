@@ -1,0 +1,221 @@
+import pygame
+import math
+import os
+from setting import *
+
+class Projectile:
+    def __init__(self, game, x, y, angle, config):
+        """Инициализирует физический снаряд, состыкованный с WEAPON_CONFIG"""
+        self.game = game
+        self.x = x
+        self.y = y
+        self.angle = angle
+        
+        # Читаем параметры строго по паспорту твоего WEAPON_CONFIG
+        self.damage = config.get('damage', 75)
+        self.speed = config.get('projectile_speed', 0.3)
+        self.folder = config.get('folder_name', 'PLASMA')
+        self.prefix_fly = config.get('prefix_fly', 'RGTR')
+        self.prefix_exp = config.get('prefix_exp', 'RGTX')
+        
+        self.alive = True
+        self.is_exploding = False 
+        
+        self.frame_index = 0
+        self.last_anim_time = pygame.time.get_ticks()
+        
+        # Загружаем спрайты по буквам DOOM (A0, B0, C0...)
+        self.fly_images = self._load_sprites(self.prefix_fly)
+        self.exp_images = self._load_sprites(self.prefix_exp)
+        
+        self.current_images = self.fly_images
+        self.texture = self.current_images[0] if self.current_images else None
+
+    def _load_sprites(self, prefix):
+        """Загружает кадры в стиле DOOM, перебирая буквенные фазы A0, B0, C0..."""
+        images = []
+        path = f"resources/weapons/{self.folder}/"
+        alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+        
+        for letter in alphabet:
+            file_name = f"{path}{prefix}{letter}0.png"
+            if os.path.exists(file_name):
+                try:
+                    img = pygame.image.load(file_name).convert_alpha()
+                    images.append(img)
+                except Exception as e:
+                    print(f"❌ [Снаряд] Ошибка чтения {file_name}: {e}")
+            else:
+                break
+
+        # Резервная заглушка, чтобы игра никогда не лагала из-за None
+        if not images:
+            dummy = pygame.Surface((16, 16), pygame.SRCALPHA)
+            pygame.draw.circle(dummy, (0, 240, 255), (8, 8), 6)
+            images.append(dummy)
+        return images
+
+    def update(self):
+        """Обновление логики, микрофизики sub-stepping и коллизий снаряда"""
+        if not self.alive: 
+            return
+            
+        current_time = pygame.time.get_ticks()
+        
+        # 1. АНИМАЦИЯ КАДРОВ
+        anim_delay = 40 if self.is_exploding else 70
+        if current_time - self.last_anim_time > anim_delay:
+            if self.current_images:
+                if self.is_exploding:
+                    if self.frame_index < len(self.current_images) - 1:
+                        self.frame_index += 1
+                    else:
+                        self.alive = False # Конец взрыва — удаляем объект из ОЗУ
+                else:
+                    self.frame_index = (self.frame_index + 1) % len(self.current_images)
+                self.last_anim_time = current_time
+
+        if self.current_images and self.frame_index < len(self.current_images):
+            self.texture = self.current_images[self.frame_index]
+
+        # Если снаряд уже детерминирован и взрывается — физику и коллизии отключаем
+        if self.is_exploding: 
+            return
+
+        # 2. МИКРОШАГИ ДЛЯ ИСКЛЮЧЕНИЯ ПРОЛЕТОВ СКВОЗЬ СТЕНЫ И NPC
+        sub_steps = 4
+        step_speed = self.speed / sub_steps
+        
+        for _ in range(sub_steps):
+            self.prev_x = self.x
+            self.prev_y = self.y
+            
+            next_x = self.x + step_speed * math.cos(self.angle)
+            next_y = self.y + step_speed * math.sin(self.angle)
+
+            # --- ПРОВЕРКА КОЛЛИЗИИ С ПЛОТЬЮ NPC (ИСПРАВЛЕНО ПОД ТВОЙ self.game.npcs) ---
+            if hasattr(self.game, 'npcs') and self.game.npcs:
+                for npc in self.game.npcs:
+                    # Проверяем, жив ли монстр по твоему свойству npc.alive из PDF
+                    is_dead = (hasattr(npc, 'alive') and not npc.alive) or \
+                              (hasattr(npc, 'state') and npc.state == "DEAD") or \
+                              (hasattr(npc, 'hp') and npc.hp <= 0)
+                              
+                    if is_dead: 
+                        continue
+
+                    # Вычисляем расстояние от микрошага до центра NPC
+                    dist_to_npc = math.hypot(npc.x - next_x, npc.y - next_y)
+                    if dist_to_npc < 0.55:
+                        print(f"💥 [Попадание] Плазма пробила плоть {npc.name}! Наношу: {self.damage} урона.")
+                        
+                        # Вызываем твой честный метод get_damage(damage) из страницы 8 PDF
+                        if hasattr(npc, 'get_damage'):
+                            npc.get_damage(self.damage)
+                            
+                        self.trigger_explosion()
+                        return
+
+            # --- ПРОВЕРКА КОЛЛИЗИИ СО СТЕНАМИ В NUMERIC_GRID ---
+            tile_x = int(next_x)
+            tile_y = int(next_y)
+            
+            grid_h = len(self.game.map.numeric_grid)
+            grid_w = len(self.game.map.numeric_grid) if grid_h > 0 else 0
+
+            if 0 <= tile_x < grid_w and 0 <= tile_y < grid_h:
+                cell_value = self.game.map.numeric_grid[tile_y][tile_x]
+                door_id = getattr(self.game.raycasting, 'door_id', -1)
+                
+                if cell_value > 0:
+                    if cell_value == door_id:
+                        door_offset = self.game.map.door_states[tile_y][tile_x]
+                        if door_offset < 0.5: # Врезаемся, если дверь закрыта
+                            self.trigger_explosion()
+                            return
+                    else:
+                        self.trigger_explosion()
+                        return
+
+            # Сдвигаем снаряд на безопасный шаг
+            self.x = next_x
+            self.y = next_y
+
+    def trigger_explosion(self):
+        """Переключает снаряд в режим взрыва и выталкивает его наружу из стен"""
+        if self.is_exploding: 
+            return
+        self.is_exploding = True
+        self.frame_index = 0
+        self.current_images = self.exp_images
+        self.texture = self.current_images[0] if self.current_images else None
+        
+        # Выталкиваем координаты взрыва на чистый пол, чтобы анимация не уходила под кирпичи
+        if hasattr(self, 'prev_x'):
+            self.x = self.prev_x
+            self.y = self.prev_y
+
+    def draw(self):
+        """Рендерит снаряд строго пополосно с динамической защитой пропорций кадра"""
+        if not self.alive or not self.texture:
+            return
+
+        # 1. Вычисляем относительные координаты до игрока
+        dx = self.x - self.game.player.x
+        dy = self.y - self.game.player.y
+        dist = math.hypot(dx, dy)
+
+        if dist < 0.1: 
+            return
+
+        # 2. Расчет и нормализация углов под тригонометрический ноль движка
+        theta = math.atan2(dy, dx)
+        delta = theta - self.game.player.angle
+        delta = (delta + math.pi) % math.tau - math.pi
+        
+        if abs(delta) > HALF_FOV + 0.5: 
+            return
+
+        dist_flat = dist * math.cos(delta)
+        if dist_flat < 0.1: 
+            return
+
+        # 3. ДИНАМИЧЕСКИЙ РАСЧЕТ ПРОПОРЦИЙ КАДРА (ФИКС РАСТЯГИВАНИЯ ВЗРЫВА)
+        # Подтягиваем SCREEN_DIST из твоего рэйкастера стен
+        wall_height = int(SCREEN_DIST / dist_flat)
+        
+        # Взрыв RGTX на диске шире, чем сфера полета, поэтому берем динамический коэффициент
+        size_factor = 0.35 if self.is_exploding else 0.25
+        proj_height = int(wall_height * size_factor)
+        if proj_height < 2: 
+            return
+
+        # Читаем честные пропорции картинки взрыва с диска, исключая сплющивание полос
+        raw_w, raw_h = self.texture.get_size()
+        current_ratio = raw_w / raw_h
+        proj_width = int(proj_height * current_ratio)
+        if proj_width < 2: 
+            proj_width = 2
+
+        center_x = (HALF_NUM_RAYS + delta / DELTA_ANGLE) * SCALE
+        start_x = int(center_x - proj_width // 2)
+        screen_y = HALF_HEIGHT - proj_height // 2
+
+        texture_step = raw_w / proj_width
+
+        # 4. ПОПОЛОСНЫЙ РЕНДЕР С ФИКСИРОВАННЫМ ПУТЕМ К ТВОЕМУ Z-БУФЕРОМ СТЕН
+        for x in range(start_x, start_x + proj_width, SCALE):
+            ray_idx = int(x // SCALE)
+            
+            if 0 <= ray_idx < NUM_RAYS:
+                # Направили проверку строго на твой self.game.raycasting.z_buffer!
+                if dist_flat < self.game.raycasting.z_buffer[ray_idx]:
+                    sub_x = int(x - start_x)
+                    
+                    if 0 <= sub_x < proj_width:
+                        tex_x = int(sub_x * texture_step)
+                        
+                        if 0 <= tex_x < raw_w:
+                            slice_surf = self.texture.subsurface(tex_x, 0, 1, raw_h)
+                            scaled_slice = pygame.transform.scale(slice_surf, (SCALE, proj_height))
+                            self.game.screen.blit(scaled_slice, (x, screen_y))

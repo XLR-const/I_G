@@ -411,6 +411,7 @@ WEAPON_CONFIG = {
         'name': 'AK-47',
         #'class_name': 'NewWeapon',       # Используем наш новый универсальный класс
         'slot': 4,
+        'type': 'hitscan',
         'spread': 0.05,      # Ощутимый разброс при зажиме
         'recoil': 0.04,
         'damage': 25,
@@ -426,6 +427,7 @@ WEAPON_CONFIG = {
         'name': 'Colt 1911',
         #'class_name': 'NewWeapon',
         'slot': 2,
+        'type': 'hitscan',
         'spread': 0.02,
         'recoil': 0.03,
         'damage': 15,
@@ -441,6 +443,7 @@ WEAPON_CONFIG = {
         'name': 'Toz',
         'class_name': 'NewWeapon',       # Используем наш универсальный класс
         'slot': 3,
+        'type': 'hitscan',
         'spread': 0.38,      # Широкий веер дроби!
         'recoil': 0.12,
         'damage': 50,                    # Огромный урон вблизи
@@ -454,6 +457,10 @@ WEAPON_CONFIG = {
         'PLASMA': {
             'name': 'Plasma Gun',
             'slot': 5,
+            'type': 'projectile',
+            'prefix_fly': 'RGTR',
+            'prefix_exp': 'RGTX',
+            'projectile_speed': 0.3, 
             'spread': 0.06,      # Ощутимый разброс при зажиме
             'recoil': 0.04,
             'damage': 75,
