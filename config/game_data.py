@@ -491,6 +491,8 @@ WEAPON_CONFIG = {
             'spread': 0.001,      # Ощутимый разброс при зажиме
             'recoil': 0.04,
             'damage': 25,
+            'splash_radius': 10.5,
+            'splash_damage': 150,
             'reload_time': 350,
             'shoot_delay': 450,
             'continuous': True,

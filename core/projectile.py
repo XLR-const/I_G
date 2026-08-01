@@ -27,6 +27,11 @@ class Projectile:
         # Загружаем спрайты по буквам DOOM (A0, B0, C0...)
         self.fly_images = self._load_sprites(self.prefix_fly)
         self.exp_images = self._load_sprites(self.prefix_exp)
+        # 🔥 ЖЕЛЕЗНЫЙ ФИКС АТРИБУТОВ (ЗАЩИТА ОТ AttributeError)
+        # Вытягиваем радиус и урон взрывной волны из переданного конфига пушки
+        self.splash_radius = config.get('splash_radius', 0)
+        self.splash_damage = config.get('splash_damage', 0)
+
         
         self.current_images = self.fly_images
         self.texture = self.current_images[0] if self.current_images else None
@@ -151,18 +156,66 @@ class Projectile:
             self.y = next_y
 
     def trigger_explosion(self):
-        """Переключает снаряд в режим взрыва и выталкивает его наружу из стен"""
+        """Переключает снаряд в режим взрыва и мгновенно бьет радиальным Splash-уроном по площади"""
         if self.is_exploding: 
             return
+            
         self.is_exploding = True
         self.frame_index = 0
         self.current_images = self.exp_images
+        self.texture = self.current_images if self.current_images else None
+        
         self.texture = self.current_images[0] if self.current_images else None
         
-        # Выталкиваем координаты взрыва на чистый пол, чтобы анимация не уходила под кирпичи
+        # Выталкиваем координаты взрыва на чистый пол, чтобы вспышка не утопала в стенах
         if hasattr(self, 'prev_x'):
             self.x = self.prev_x
             self.y = self.prev_y
+
+        # ==================================================================
+        # 🔥 РАДИАЛЬНЫЙ МАССОВЫЙ УРОН (SPLASH DAMAGE) В ТОЧКЕ ДЕТОНАЦИИ
+        # ==================================================================
+        # Если у пушки, которая выпустила этот снаряд, прописан радиус взрыва
+        if self.splash_radius > 0 and self.splash_damage > 0:
+            print(f"💥 [ДЕТОНАЦИЯ] Снаряд разорвался! Запуск волны в радиусе {self.splash_radius} кл.")
+            
+            # Берем твой системный список живых монстров из dev_mode.py
+            if hasattr(self.game, 'npcs') and self.game.npcs:
+                for npc in self.game.npcs:
+                    # Пропускаем мертвых
+                    is_dead = (hasattr(npc, 'alive') and not npc.alive) or \
+                              (hasattr(npc, 'state') and npc.state == "DEAD") or \
+                              (hasattr(npc, 'hp') and npc.hp <= 0)
+                    if is_dead: 
+                        continue
+
+                    # Считаем расстояние от точки взрыва (куда прилетел шар) до текущего NPC
+                    dist = math.hypot(npc.x - self.x, npc.y - self.y)
+
+                    # Если штурмовик оказался внутри зоны взрывной волны БФГ
+                    if dist <= self.splash_radius:
+                        # Урон падает с расстоянием: 100% в эпицентре, 0% на самом краю радиуса
+                        # Мягкое затухание: даже на самом краю взрывной волны враг получит ощутимый урон
+                        damage_dropoff = 1.0 - (dist / self.splash_radius) * 0.5  # Зажимаем падение в 2 раза
+                        #final_splash_damage = int(self.splash_damage * damage_dropoff)
+                        final_splash_damage = self.splash_damage
+
+                        if final_splash_damage > 0:
+                            print(f"  -> Взрыв задел {npc.name}! Дистанция: {dist:.2f} кл. Нанесено: {final_splash_damage} HP")
+                            
+                            # Наносим урон через твой родной метод боли из PDF!
+                            if hasattr(npc, 'get_damage'):
+                                npc.get_damage(final_splash_damage)
+
+                            # ЭФФЕКТ УДАРНОЙ ВОЛНЫ: Физически раскидываем выживших в стороны от взрыва
+                            dx_push = npc.x - self.x
+                            dy_push = npc.y - self.y
+                            dist_push = math.hypot(dx_push, dy_push)
+                            if dist_push > 0:
+                                # Сила толчка зависит от близости к эпицентру
+                                npc.x += (dx_push / dist_push) * (0.4 * damage_dropoff)
+                                npc.y += (dy_push / dist_push) * (0.4 * damage_dropoff)
+
 
     def draw(self):
         """Рендерит снаряд целиком с ручной компенсацией аппаратного растяжения экрана"""

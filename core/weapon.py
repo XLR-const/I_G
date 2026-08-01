@@ -25,6 +25,10 @@ class Weapon:
         self.ammo_start = config.get('ammo_start', 0)
         self.max_distance = config.get('max_distance', 5)
         self.is_infinite = config.get('infinite_ammo', False)
+        # Параметры массового поражения (Splash Damage)
+        self.splash_radius = config.get('splash_radius', 0)
+        self.splash_damage = config.get('splash_damage', 0)
+
 
         # Параметры для спрайт-листов
         self.folder_name = config.get('folder_name', None)
