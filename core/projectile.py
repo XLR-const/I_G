@@ -156,11 +156,10 @@ class Projectile:
             self.y = self.prev_y
 
     def draw(self):
-        """Рендерит снаряд строго пополосно с динамической защитой пропорций кадра"""
+        """Рендерит снаряд целиком с ручной компенсацией аппаратного растяжения экрана"""
         if not self.alive or not self.texture:
             return
 
-        # 1. Вычисляем относительные координаты до игрока
         dx = self.x - self.game.player.x
         dy = self.y - self.game.player.y
         dist = math.hypot(dx, dy)
@@ -168,54 +167,63 @@ class Projectile:
         if dist < 0.1: 
             return
 
-        # 2. Расчет и нормализация углов под тригонометрический ноль движка
         theta = math.atan2(dy, dx)
         delta = theta - self.game.player.angle
-        delta = (delta + math.pi) % math.tau - math.pi
         
-        if abs(delta) > HALF_FOV + 0.5: 
+        while delta > math.pi: delta -= math.tau
+        while delta < -math.pi: delta += math.tau
+        
+        if abs(delta) > HALF_FOV + 0.4: 
             return
 
         dist_flat = dist * math.cos(delta)
         if dist_flat < 0.1: 
             return
 
-        # 3. ДИНАМИЧЕСКИЙ РАСЧЕТ ПРОПОРЦИЙ КАДРА (ФИКС РАСТЯГИВАНИЯ ВЗРЫВА)
-        # Подтягиваем SCREEN_DIST из твоего рэйкастера стен
-        wall_height = int(SCREEN_DIST / dist_flat)
-        
-        # Взрыв RGTX на диске шире, чем сфера полета, поэтому берем динамический коэффициент
+        # 🔥 КОРРЕКЦИЯ SCREEN_DIST: Пересчитываем константу строго под твою ширину WIDTH = 1536
+        # Это страхует от рассинхрона углов в setting.py
+        local_screen_dist = (WIDTH // 2) / math.tan(HALF_FOV)
+
+        # Находим экранный центр снаряда
+        screen_x = int(WIDTH // 2 + math.tan(delta) * local_screen_dist)
+
+        # Вертикальный расчет высоты
+        wall_height = int(local_screen_dist / dist_flat)
         size_factor = 0.35 if self.is_exploding else 0.25
         proj_height = int(wall_height * size_factor)
         if proj_height < 2: 
             return
 
-        # Читаем честные пропорции картинки взрыва с диска, исключая сплющивание полос
         raw_w, raw_h = self.texture.get_size()
         current_ratio = raw_w / raw_h
-        proj_width = int(proj_height * current_ratio)
+        
+        # Базовая теоретическая ширина
+        base_width = int(proj_height * current_ratio)
+        
+        # ==================================================================
+        # 🔥 ГЛАВНЫЙ ФИКС: АНТИ-РАСТЯЖЕНИЕ (КОМПЕНСАТОР ПРОПОРЦИЙ МОНИТОРА)
+        # ==================================================================
+        # Так как твой движок или флаг SCALED принудительно растягивает картинку вширь,
+        # мы умышленно СЖИМАЕМ ширину снаряда на множитель 0.75 (минус 25% ширины).
+        # На чистом полотне он будет казаться узким, но на твоем экране он станет ИДЕАЛЬНО КРУГЛЫМ!
+        # Если покажется слишком узким — поставь 0.8, если все еще широковат — поставь 0.7.
+        proj_width = int(base_width * 0.72)
         if proj_width < 2: 
             proj_width = 2
 
-        center_x = (HALF_NUM_RAYS + delta / DELTA_ANGLE) * SCALE
-        start_x = int(center_x - proj_width // 2)
+        start_x = int(screen_x - proj_width // 2)
         screen_y = HALF_HEIGHT - proj_height // 2
 
-        texture_step = raw_w / proj_width
+        # Сверка с Z-буфером для скрытия за углами
+        center_ray = int(screen_x // SCALE)
+        if 0 <= center_ray < NUM_RAYS:
+            if dist_flat > self.game.raycasting.z_buffer[center_ray] + 0.3:
+                return
 
-        # 4. ПОПОЛОСНЫЙ РЕНДЕР С ФИКСИРОВАННЫМ ПУТЕМ К ТВОЕМУ Z-БУФЕРОМ СТЕН
-        for x in range(start_x, start_x + proj_width, SCALE):
-            ray_idx = int(x // SCALE)
-            
-            if 0 <= ray_idx < NUM_RAYS:
-                # Направили проверку строго на твой self.game.raycasting.z_buffer!
-                if dist_flat < self.game.raycasting.z_buffer[ray_idx]:
-                    sub_x = int(x - start_x)
-                    
-                    if 0 <= sub_x < proj_width:
-                        tex_x = int(sub_x * texture_step)
-                        
-                        if 0 <= tex_x < raw_w:
-                            slice_surf = self.texture.subsurface(tex_x, 0, 1, raw_h)
-                            scaled_slice = pygame.transform.scale(slice_surf, (SCALE, proj_height))
-                            self.game.screen.blit(scaled_slice, (x, screen_y))
+        try:
+            # Масштабируем сжатый по горизонтали спрайт
+            scaled_projectile = pygame.transform.scale(self.texture, (proj_width, proj_height))
+            # Выводим на экран
+            self.game.screen.blit(scaled_projectile, (start_x, screen_y))
+        except Exception as e:
+            print(f"❌ [Рендер] Ошибка blit снаряда: {e}")

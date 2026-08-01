@@ -461,15 +461,15 @@ WEAPON_CONFIG = {
             'prefix_fly': 'RGTR',
             'prefix_exp': 'RGTX',
             'projectile_speed': 0.3, 
-            'spread': 0.06,      # Ощутимый разброс при зажиме
+            'spread': 0.01,      # Ощутимый разброс при зажиме
             'recoil': 0.04,
-            'damage': 75,
+            'damage': 25,
             'reload_time': 350,
-            'continuous': False,
+            'continuous': True,
             'max_distance': 6,
             'folder_name': 'PLASMA',
             'sprite_prefix': 'PLASMA',
-            'ammo_start': 1
+            'ammo_start': 50
             
         },
     'KNIFE': {
