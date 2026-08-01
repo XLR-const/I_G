@@ -32,13 +32,18 @@ class Projectile:
         self.texture = self.current_images[0] if self.current_images else None
 
     def _load_sprites(self, prefix):
-        """Загружает кадры в стиле DOOM, перебирая буквенные фазы A0, B0, C0..."""
+        """Универсальный и чистый загрузчик: ищет префикс любой длины + буква + 0.png"""
         images = []
         path = f"resources/weapons/{self.folder}/"
+        
+        # Строго перебираем буквы латинского алфавита для фаз анимации (A, B, C, D...)
         alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
         
         for letter in alphabet:
+            # Математически точная склейка по твоему правилу:
+            # префикс (любой длины) + буква (кадр) + 0 (угол) + расширение
             file_name = f"{path}{prefix}{letter}0.png"
+            
             if os.path.exists(file_name):
                 try:
                     img = pygame.image.load(file_name).convert_alpha()
@@ -46,14 +51,18 @@ class Projectile:
                 except Exception as e:
                     print(f"❌ [Снаряд] Ошибка чтения {file_name}: {e}")
             else:
+                # Если цепочка букв на диске прервалась — анимация полностью собрана
                 break
 
-        # Резервная заглушка, чтобы игра никогда не лагала из-за None
+        # Железная страховка от пустых папок
         if not images:
+            print(f"🚨 [КРИТ] Файлы по правилу '{prefix}[A-Z]0.png' не найдены в '{path}'!")
             dummy = pygame.Surface((16, 16), pygame.SRCALPHA)
-            pygame.draw.circle(dummy, (0, 240, 255), (8, 8), 6)
+            pygame.draw.circle(dummy, (0, 255, 0), (8, 8), 6) # Зеленый шар БФГ
             images.append(dummy)
+            
         return images
+
 
     def update(self):
         """Обновление логики, микрофизики sub-stepping и коллизий снаряда"""

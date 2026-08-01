@@ -16,6 +16,7 @@ class Weapon:
 
         # Читаем конфигурацию из game_data.py
         config = WEAPON_CONFIG.get(weapon_name, {})
+        self.config = config
         self.name = config.get('name', weapon_name)
         self.slot = config.get('slot', 4)
         self.damage = config.get('damage', 10)
@@ -202,104 +203,84 @@ class Weapon:
 
 
     def fire(self):
+        """Идеальный метод стрельбы: берет данные из свойств текущего объекта пушки"""
         current_time = pygame.time.get_ticks()
         if hasattr(self, 'reload_timer') and current_time < self.reload_timer:
             return None
-
+            
         if self.ammo <= 0:
             self.sound_empty_ammo.play()
             return None
-
+            
         self.reloading = True
-        delay = getattr(self, 'reload_time', 300) 
-        self.reload_timer = current_time + delay
-        self.last_shot_time = pygame.time.get_ticks()
-
+        self.reload_timer = current_time + self.reload_time
+        self.last_shot_time = current_time
         self.current_frames = self.fire_frames
         self.frame_index = 0
+        
         if self.fire_frames:
             self.sprite = self.fire_frames[0]
-
-        self.sound.play()
+        if hasattr(self, 'sound') and self.sound:
+            self.sound.play()
+            
         if not self.is_infinite:
             self.ammo -= 1
 
-        # ==================================================================
-        # 📐 [ПРИНТ №1] ПРОВЕРЯЕМ ТЕКУЩИЕ ПАРАМЕТРЫ СТВОЛА В РУКАХ
-        # ==================================================================
-        # self.slot - число, self.key - строка (например 'PLASMA')
-        current_slot = getattr(self, 'slot', 'НЕ НАЙДЕН')
-        current_key = getattr(self, 'key', 'БЕЗ КЛЮЧА')
-        print(f"\n📢 [ВЫСТРЕЛ] Запущен метод fire(). Текущий слот пушки: {current_slot}, Ключ self.key: '{current_key}'")
+        # Извлекаем параметры строго из свойств ЭТОГО конкретного объекта пушки!
+        # Переменные гарантированно инициализированы в __init__, NameError исключен
+        spread = getattr(self, 'spread', 0.02)
+        slot_num = getattr(self, 'slot', 4)
+        
+        # Читаем тип стрельбы из сохраненного словаря конфигурации
+        w_config = getattr(self, 'config', {})
+        weapon_type = w_config.get('type', 'hitscan')
 
-        # Читаем параметры из конфига пушки по номеру слота
-        w_data = {}
-        try:
-            from config.game_data import WEAPON_CONFIG
-            
-            # Ищем узел в конфиге строго по номеру слота
-            for cfg_key, cfg_data in WEAPON_CONFIG.items():
-                if cfg_data.get('slot') == self.slot:
-                    w_data = cfg_data
-                    print(f"🔍 [Конфиг] Найдено совпадение в WEAPON_CONFIG по слоту {self.slot}! Ключ в словаре: '{cfg_key}'")
-                    break
-            
-            if not w_data:
-                print(f"⚠️ [Внимание] В WEAPON_CONFIG не найдено пушек со слотом {self.slot}!")
-        except Exception as e:
-            print(f"❌ [Ошибка] Ошибка при чтении WEAPON_CONFIG: {e}")
-            w_data = {}
-
-        # Значения по умолчанию
-        spread = w_data.get('spread', 0.02)
-        slot_num = w_data.get('slot', 2)
-        weapon_type = w_data.get('type', 'hitscan')
-
-        # ==================================================================
-        # 📐 [ПРИНТ №2] СМОТРИМ, КАКОЙ ТИП СТРЕЛЬБЫ ОПРЕДЕЛИЛ ПИТОН
-        # ==================================================================
-        print(f"📊 [Баланс] Параметры из конфига -> type: '{weapon_type}', spread: {spread}, slot_num: {slot_num}")
+        # Информативный лог-принт: смотрим, какая пушка РЕАЛЬНО сейчас стреляет
+        print(f"\n📢 [ВЫСТРЕЛ] Пушка: '{getattr(self, 'key', 'БЕЗ КЛЮЧА')}' | Тип: '{weapon_type}' | Папка: '{self.folder_name}'")
 
         from random import uniform
         last_hit_data = None
-
+        
+        # ==================================================================
+        # 🚀 РЕЖИМ PROJECTILE (ФИЗИЧЕСКИЙ СНАРЯД ДЛЯ PLASMA / BFG)
+        # ==================================================================
         if weapon_type == 'projectile':
-            print("🚀 [Ветвление] Захожу в режим PROJECTILE (Создание физического снаряда)...")
             proj_angle = self.game.player.angle + uniform(-spread, spread)
             
             try:
                 from core.projectile import Projectile
                 
+                # Передаем в снаряд честный config текущей пушки, сохраненный в __init__
                 new_projectile = Projectile(
                     game=self.game,
                     x=self.game.player.x,
                     y=self.game.player.y,
                     angle=proj_angle,
-                    config=w_data
+                    config=w_config
                 )
                 
-                # Проверяем, куда именно мы пушим снаряд
+                # Пушим снаряд в системный массив движка
                 if hasattr(self.game, 'projectiles'):
                     self.game.projectiles.append(new_projectile)
-                    print(f"✅ [Успех] Снаряд {w_data.get('prefix_fly')} успешно добавлен в self.game.projectiles! Всего летит: {len(self.game.projectiles)}")
+                    print(f"✅ [Успех] Снаряд '{w_config.get('prefix_fly')}' добавлен! Всего летит: {len(self.game.projectiles)}")
                 elif hasattr(self.game.player, 'projectiles'):
                     self.game.player.projectiles.append(new_projectile)
-                    print(f"✅ [Успех] Снаряд добавлен в self.game.player.projectiles! Всего: {len(self.game.player.projectiles)}")
                 else:
-                    print("🚨 [КРИТ] Ни у self.game, ни у self.game.player нет массива 'projectiles'! Снаряд растворился в воздухе.")
+                    print("🚨 [КРИТ] Ни у self.game, ни у self.game.player нет массива 'projectiles'!")
                 
             except Exception as e:
                 print(f"❌ [КРИТ] Спавн Projectile упал в ошибку: {e}")
                 import traceback
                 traceback.print_exc()
-
+                
             last_hit_data = (self.game.player.x, self.game.player.y, 0, 0)
             
+        # ==================================================================
+        # 🎯 РЕЖИМ HITSCAN (МГНОВЕННЫЕ ЛУЧИ DDA ДЛЯ АВТОМАТОВ)
+        # ==================================================================
         else:
-            print("🎯 [Ветвление] Захожу в режим HITSCAN (Мгновенные лучи DDA)...")
-            if slot_num == 3:
-                num_pellets = w_data.get('pellets', 10)
-                print(f"🍇 [Дробовик] Запуск веера из {num_pellets} дробин...")
+            if slot_num == 3: # Дробовик
+                num_pellets = w_config.get('pellets', 10)
                 for _ in range(num_pellets):
                     pellet_angle = self.game.player.angle + uniform(-spread, spread)
                     last_hit_data = self._spawn_bullet_hit(pellet_angle, side_blood_logic=True)
@@ -308,6 +289,8 @@ class Weapon:
                 last_hit_data = self._spawn_bullet_hit(bullet_angle, side_blood_logic=False)
 
         return last_hit_data
+
+
 
 
 

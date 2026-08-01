@@ -257,10 +257,18 @@ SYMBOLS_CONFIG = {
         'type': 'item',
         'item_type': 'weapon',
         'weapon_name': 'PLASMA',
-        'ammo': 1,
+        'ammo': 25,
         'sprite': 'resources/weapons/PLASMA/icon.png',
         'description': 'PLASMA'
     },
+    'bfg': {
+            'type': 'item',
+            'item_type': 'weapon',
+            'weapon_name': 'BFG',
+            'ammo': 1,
+            'sprite': 'resources/weapons/BFG/icon.png',
+            'description': 'BFG'
+        },
         'knife2': {
         'type': 'item',
         'item_type': 'weapon',
@@ -446,7 +454,8 @@ WEAPON_CONFIG = {
         'type': 'hitscan',
         'spread': 0.38,      # Широкий веер дроби!
         'recoil': 0.12,
-        'damage': 50,                    # Огромный урон вблизи
+        'damage': 5,                    # Огромный урон вблизи
+        'pellets': 10,
         'reload_time': 350,              # 5 кадров анимации * 70 мс скорость = 350 мс
         'continuous': False,             # Одиночные выстрелы
         'max_distance': 2,               # Эффективна только на ближней дистанции
@@ -469,6 +478,24 @@ WEAPON_CONFIG = {
             'max_distance': 6,
             'folder_name': 'PLASMA',
             'sprite_prefix': 'PLASMA',
+            'ammo_start': 50
+            
+        },
+        'BFG': {
+            'name': 'Big F Gun',
+            'slot': 5,
+            'type': 'projectile',
+            'prefix_fly': 'BBGB',
+            'prefix_exp': 'BBGX',
+            'projectile_speed': 0.3, 
+            'spread': 0.001,      # Ощутимый разброс при зажиме
+            'recoil': 0.04,
+            'damage': 25,
+            'reload_time': 350,
+            'continuous': True,
+            'max_distance': 6,
+            'folder_name': 'BFG',
+            'sprite_prefix': 'BG2G',
             'ammo_start': 50
             
         },
@@ -499,7 +526,8 @@ WEAPON_CONFIG = {
         'AA12': {
             'name': 'aa12',
             'slot': 3,
-            'damage': 15,
+            'damage': 3,
+            'pellets': 5,
             'reload_time': 300,
             'spread': 0.5,
             'continuous': True,
