@@ -48,6 +48,13 @@ class Weapon:
         self.fire_frames = []
         self.current_frames = []
         
+        # Состояния для отложенного выстрела (например, для БФГ)
+        self.pending_projectile = False
+        self.projectile_spawn_time = 0
+        self.pending_w_data = {}
+        self.pending_spread = 0.0
+
+        
         # Текущий отображаемый спрайт для HUD интерфейса
         self.sprite = None
 
@@ -167,6 +174,34 @@ class Weapon:
     def update_animation(self):
         """Обновляет кадры анимации по таймеру (поддерживает циклическую анимацию покоя)"""
         now = pygame.time.get_ticks()
+        
+        # 🔥 ТРИГГЕР ОТЛОЖЕННОГО ВЫСТРЕЛA БФГ (БЕЗ КОСТЫЛЕЙ И ДОПОЛНИТЕЛЬНЫХ МЕТОДOВ)
+        # Если флаг взведен и время зарядки вышло — выпускаем снаряд
+        if getattr(self, 'pending_projectile', False):
+            if now >= getattr(self, 'projectile_spawn_time', 0):
+                self.pending_projectile = False
+                
+                from random import uniform
+                p_spread = getattr(self, 'pending_spread', 0.0)
+                proj_angle = self.game.player.angle + uniform(-p_spread, p_spread)
+                
+                try:
+                    from core.projectile import Projectile
+                    print(f"🟢 [БФГ-Аннигиляция] Энергия накоплена! Физический шар БФГ выпущен в мир.")
+                    
+                    new_projectile = Projectile(
+                        game=self.game,
+                        x=self.game.player.x,
+                        y=self.game.player.y,
+                        angle=proj_angle,
+                        config=getattr(self, 'pending_w_data', {})
+                    )
+                    
+                    if hasattr(self.game, 'projectiles'):
+                        self.game.projectiles.append(new_projectile)
+                except Exception as e:
+                    print(f"❌ [КРИТ] Ошибка отложенного спавна БФГ: {e}")
+
 
         if self.reloading:
             # Анимация выстрела (останавливается, когда доходит до конца списка)
@@ -203,7 +238,7 @@ class Weapon:
 
 
     def fire(self):
-        """Идеальный метод стрельбы: берет данные из свойств текущего объекта пушки"""
+        """Запускает выстрел, прокручивает анимацию зарядки и откладывает спавн снаряда при наличии shoot_delay"""
         current_time = pygame.time.get_ticks()
         if hasattr(self, 'reload_timer') and current_time < self.reload_timer:
             return None
@@ -226,60 +261,49 @@ class Weapon:
         if not self.is_infinite:
             self.ammo -= 1
 
-        # Извлекаем параметры строго из свойств ЭТОГО конкретного объекта пушки!
-        # Переменные гарантированно инициализированы в __init__, NameError исключен
+        # Читаем параметры из свойств объекта пушки
         spread = getattr(self, 'spread', 0.02)
         slot_num = getattr(self, 'slot', 4)
         
-        # Читаем тип стрельбы из сохраненного словаря конфигурации
         w_config = getattr(self, 'config', {})
         weapon_type = w_config.get('type', 'hitscan')
+        
+        # 🔥 ЧИТАЕМ ЗАДЕРЖКУ ИЗ КОНФИГА БФГ
+        shoot_delay = w_config.get('shoot_delay', 0)
 
-        # Информативный лог-принт: смотрим, какая пушка РЕАЛЬНО сейчас стреляет
-        print(f"\n📢 [ВЫСТРЕЛ] Пушка: '{getattr(self, 'key', 'БЕЗ КЛЮЧА')}' | Тип: '{weapon_type}' | Папка: '{self.folder_name}'")
+        print(f"\n📢 [ВЫСТРЕЛ] Пушка: '{getattr(self, 'key', 'БЕЗ КЛЮЧА')}' | Тип: '{weapon_type}' | Задержка: {shoot_delay}мс")
 
         from random import uniform
-        last_hit_data = None
+        last_hit_data = (self.game.player.x, self.game.player.y, 0, 0)
         
         # ==================================================================
-        # 🚀 РЕЖИМ PROJECTILE (ФИЗИЧЕСКИЙ СНАРЯД ДЛЯ PLASMA / BFG)
+        # 🚀 ВЕТВЛЕНИЕ 1: PROJECTILE (ПЛАЗМА / БФГ)
         # ==================================================================
         if weapon_type == 'projectile':
-            proj_angle = self.game.player.angle + uniform(-spread, spread)
-            
-            try:
-                from core.projectile import Projectile
-                
-                # Передаем в снаряд честный config текущей пушки, сохраненный в __init__
-                new_projectile = Projectile(
-                    game=self.game,
-                    x=self.game.player.x,
-                    y=self.game.player.y,
-                    angle=proj_angle,
-                    config=w_config
-                )
-                
-                # Пушим снаряд в системный массив движка
-                if hasattr(self.game, 'projectiles'):
-                    self.game.projectiles.append(new_projectile)
-                    print(f"✅ [Успех] Снаряд '{w_config.get('prefix_fly')}' добавлен! Всего летит: {len(self.game.projectiles)}")
-                elif hasattr(self.game.player, 'projectiles'):
-                    self.game.player.projectiles.append(new_projectile)
-                else:
-                    print("🚨 [КРИТ] Ни у self.game, ни у self.game.player нет массива 'projectiles'!")
-                
-            except Exception as e:
-                print(f"❌ [КРИТ] Спавн Projectile упал в ошибку: {e}")
-                import traceback
-                traceback.print_exc()
-                
-            last_hit_data = (self.game.player.x, self.game.player.y, 0, 0)
+            # Если у пушки прописана задержка (БФГ)
+            if shoot_delay > 0:
+                print(f"⏳ [БФГ] Накопление энергии... Снаряд вылетит через {shoot_delay} мс!")
+                # Запоминаем, что нужно заспавнить шар чуть позже
+                self.pending_projectile = True
+                self.projectile_spawn_time = current_time + shoot_delay
+                self.pending_w_data = w_config
+                self.pending_spread = spread
+            else:
+                # Мгновенный физический спавн (для обычной плазмы)
+                proj_angle = self.game.player.angle + uniform(-spread, spread)
+                try:
+                    from core.projectile import Projectile
+                    new_projectile = Projectile(self.game, self.game.player.x, self.game.player.y, proj_angle, w_config)
+                    if hasattr(self.game, 'projectiles'):
+                        self.game.projectiles.append(new_projectile)
+                except Exception as e:
+                    print(f"❌ [КРИТ] Ошибка мгновенного спавна снаряда: {e}")
             
         # ==================================================================
-        # 🎯 РЕЖИМ HITSCAN (МГНОВЕННЫЕ ЛУЧИ DDA ДЛЯ АВТОМАТОВ)
+        # 🎯 ВЕТВЛЕНИЕ 2: HITSCAN (ЛУЧИ DDA ДЛЯ АВТОМАТОВ И ДРОБОВИКОВ)
         # ==================================================================
         else:
-            if slot_num == 3: # Дробовик
+            if slot_num == 3 or 'SHOTGUN' in getattr(self, 'key', '') or 'COCH' in getattr(self, 'key', ''):
                 num_pellets = w_config.get('pellets', 10)
                 for _ in range(num_pellets):
                     pellet_angle = self.game.player.angle + uniform(-spread, spread)

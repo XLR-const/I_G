@@ -492,6 +492,7 @@ WEAPON_CONFIG = {
             'recoil': 0.04,
             'damage': 25,
             'reload_time': 350,
+            'shoot_delay': 450,
             'continuous': True,
             'max_distance': 6,
             'folder_name': 'BFG',
