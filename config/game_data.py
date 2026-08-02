@@ -285,6 +285,13 @@ SYMBOLS_CONFIG = {
             'sprite': 'resources/weapons/AA12/icon.png'
         },
 
+        'bazooka': {
+            'type': 'item',
+            'item_type': 'weapon',
+            'weapon_name': 'BAZOOKA',
+            'ammo': 3,
+            'sprite': 'resources/weapons/BAZOOKA/icon.png'
+        },
     
  # --- СИСТЕМА ДВЕРЕЙ И СЕКРЕТОК С ТЕКСТУРАМИ ---
     'door_normal': {
@@ -495,11 +502,33 @@ WEAPON_CONFIG = {
             'splash_damage': 150,
             'reload_time': 350,
             'shoot_delay': 450,
-            'continuous': True,
+            'continuous': False,
             'max_distance': 6,
             'folder_name': 'BFG',
             'sprite_prefix': 'BG2G',
             'ammo_start': 50
+            
+        },
+        'BAZOOKA': {
+            'name': 'Bazooka',
+            'slot': 6,
+            'type': 'projectile',
+            'prefix_fly': 'QROK',
+            'prefix_exp': 'EXP2',
+            'projectile_speed': 0.3, 
+            'spread': 0.001,
+            'recoil': 0.04,
+            'damage': 50,
+            'splash_radius': 10.5,
+            'splash_damage': 40,
+            'reload_time': 350,
+            #'shoot_delay': 450,
+            'continuous': False,
+            'max_distance': 6,
+            'folder_name': 'BAZOOKA',
+            'sprite_prefix': 'RPGA',
+            'ammo_start': 3,
+            'explosive': 'resources/weapons/BAZOOKA/explosive.wav'
             
         },
     'KNIFE': {

@@ -24,6 +24,19 @@ class Projectile:
         self.frame_index = 0
         self.last_anim_time = pygame.time.get_ticks()
         
+        self.explosion_sound = None
+        if config.get("explosive"):
+            sound_path = f"resources/weapons/{self.folder}/explosive.wav"
+            
+            if os.path.exists(sound_path):
+                try:
+                    self.explosion_sound = pygame.mixer.Sound(sound_path)
+                    self.explosion_sound.set_volume(0.1)
+                    # Можно сразу выставить кастомную громкость, если бабах слишком громкий:
+                    # self.explosion_sound.set_volume(0.8)
+                except Exception as e:
+                    print(f"⚠️ [Аудио] Не удалось загрузить звук взрыва {sound_path}: {e}")
+        
         # Загружаем спрайты по буквам DOOM (A0, B0, C0...)
         self.fly_images = self._load_sprites(self.prefix_fly)
         self.exp_images = self._load_sprites(self.prefix_exp)
@@ -166,6 +179,13 @@ class Projectile:
         self.texture = self.current_images if self.current_images else None
         
         self.texture = self.current_images[0] if self.current_images else None
+        
+        if self.explosion_sound is not None:
+            try:
+                self.explosion_sound.play()
+            except Exception as e:
+                print(f"❌ [Аудио] Ошибка при воспроизведении звука взрыва: {e}")
+        
         
         # Выталкиваем координаты взрыва на чистый пол, чтобы вспышка не утопала в стенах
         if hasattr(self, 'prev_x'):
