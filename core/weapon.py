@@ -275,7 +275,7 @@ class Weapon:
         # 🔥 ЧИТАЕМ ЗАДЕРЖКУ ИЗ КОНФИГА БФГ
         shoot_delay = w_config.get('shoot_delay', 0)
 
-        print(f"\n📢 [ВЫСТРЕЛ] Пушка: '{getattr(self, 'key', 'БЕЗ КЛЮЧА')}' | Тип: '{weapon_type}' | Задержка: {shoot_delay}мс")
+        print(f"\n📢 [ВЫСТРЕЛ] Пушка: '{getattr(self, 'weapon_name', 'БЕЗ КЛЮЧА')}' | Тип: '{weapon_type}' | Задержка: {shoot_delay}мс")
 
         from random import uniform
         last_hit_data = (self.game.player.x, self.game.player.y, 0, 0)
@@ -286,7 +286,6 @@ class Weapon:
         if weapon_type == 'projectile':
             # Если у пушки прописана задержка (БФГ)
             if shoot_delay > 0:
-                print(f"⏳ [БФГ] Накопление энергии... Снаряд вылетит через {shoot_delay} мс!")
                 # Запоминаем, что нужно заспавнить шар чуть позже
                 self.pending_projectile = True
                 self.projectile_spawn_time = current_time + shoot_delay

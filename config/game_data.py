@@ -292,6 +292,13 @@ SYMBOLS_CONFIG = {
             'ammo': 3,
             'sprite': 'resources/weapons/BAZOOKA/icon.png'
         },
+    'napalm': {
+        'type': 'item',
+        'item_type': 'weapon',
+        'weapon_name': 'NAPALM',
+        'ammo': 50,
+        'sprite': 'resources/weapons/NAPALM/icon.png'
+        },
     
  # --- СИСТЕМА ДВЕРЕЙ И СЕКРЕТОК С ТЕКСТУРАМИ ---
     'door_normal': {
@@ -528,6 +535,28 @@ WEAPON_CONFIG = {
             'folder_name': 'BAZOOKA',
             'sprite_prefix': 'RPGA',
             'ammo_start': 3,
+            'explosive': 'resources/weapons/BAZOOKA/explosive.wav'
+            
+        },
+        'NAPALM': {
+            'name': 'Vietnams Hy',
+            'slot': 6,
+            'type': 'projectile',
+            'prefix_fly': 'FIRE',
+            'prefix_exp': 'EXP2',
+            'projectile_speed': 0.8, 
+            'spread': 0.001,
+            'recoil': 0.04,
+            'damage': 50,
+            'splash_radius': 10.5,
+            'splash_damage': 40,
+            'reload_time': 30,
+            #'shoot_delay': 450,
+            'continuous': True,
+            'max_distance': 6,
+            'folder_name': 'NAPALM',
+            'sprite_prefix': 'NLAN',
+            'ammo_start': 50,
             'explosive': 'resources/weapons/BAZOOKA/explosive.wav'
             
         },
