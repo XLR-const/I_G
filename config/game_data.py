@@ -300,6 +300,14 @@ SYMBOLS_CONFIG = {
         'sprite': 'resources/weapons/NAPALM/icon.png'
         },
     
+    'grenade': {
+        'type': 'item',
+        'item_type': 'weapon',
+        'weapon_name': 'GRENADE',
+        'ammo': 3,
+        'sprite': 'resources/weapons/GRENADE/icon.png'
+    },
+    
  # --- СИСТЕМА ДВЕРЕЙ И СЕКРЕТОК С ТЕКСТУРАМИ ---
     'door_normal': {
         'type': 'door', 
@@ -558,6 +566,29 @@ WEAPON_CONFIG = {
             'sprite_prefix': 'NLAN',
             'ammo_start': 50,
             'explosive': 'resources/weapons/BAZOOKA/explosive.wav'
+            
+        },
+        
+        'GRENADE': {
+            'name': 'Grenade',
+            'slot': 6,
+            'type': 'projectile',
+            'prefix_fly': 'HGN1',
+            'prefix_exp': 'EXP3',
+            'projectile_speed': 0.3, 
+            'spread': 0.001,
+            'recoil': 0.04,
+            'damage': 50,
+            'splash_radius': 10.5,
+            'splash_damage': 40,
+            'reload_time': 350,
+            'shoot_delay': 450,
+            'continuous': False,
+            'max_distance': 6,
+            'folder_name': 'GRENADE',
+            'sprite_prefix': 'HGRN',
+            'ammo_start': 3,
+            'explosive': 'resources/weapons/GRENADE/explosive.wav'
             
         },
     'KNIFE': {
