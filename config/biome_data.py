@@ -1,87 +1,53 @@
-# ==================================================================
-# 🌐 УЛЬТИМАТИВНАЯ DATA-DRIVEN БАЗА ДАННЫХ ДЛЯ КОНТРОЛЯ БАЛАНСА БИОМОВ
-# Полная поддержка геометрических куч, радиусов исключения и жестких лимитов!
-# ==================================================================
-
+# Пример структуры для BIOME_DATABASE под новый генератор
 BIOME_DATABASE = {
     'out': {
         'name': '🪖 Улица и Военные Блокпосты',
-        
-        # 🧱 СЛОЙ 1: ДОМИНАЦИЯ СТЕН
-        'walls': {
-            'primary': { 'char': 'rocks', 'weight': 85 },             # Основополагающая стена каньона (80%)
-            'secondary': { 'char': 'metal_crunch_wall', 'weight': 15 } # Дополняющая броня блокпостов (20%)
+        'geometry': {
+            'perimeter_wall': 'rocks',       # Жесткая рамка уровня (защита от краша)
+            'bsp_min_room_size': 6,          # Ограничения для BSP-алгоритма
+            'bsp_max_room_size': 12,
         },
-        
-        # 🚪 СЛОЙ 2: ДВЕРИ
+        'walls': {
+            'primary': { 'char': 'rocks', 'weight': 85 },
+            'secondary': { 'char': 'metal_crunch_wall', 'weight': 15 }
+        },
         'doors': {
             'normal': 'door_normal',
-            'locked': 'door_blue_key'
+            'locked': 'door_blue_key',
+            'required_key': 'key_blue'       # Перенос логики связки ключа/двери в конфиг
         },
-        
-        # 🧟 СЛОЙ 3: МОНСТРЫ И NPC
         'npc_settings': {
-            'density': 0.012,  
+            'density': 0.012, 
             'pool': {
                 'AGG': { 
-                    'weight': 100, 'max_count': 25, 'min_dist': 5, 
-                    'cluster_type': 'circle', 'cluster_chance': 0.15, 'cluster_size': 2 
-                }, # Патрульные: спавнятся кучками по 2 человека с шансом 15%
+                    'weight': 100, 'max_count': 25, 'min_dist': 4, 'min_progress': 0.0,
+                    'cluster': { 'type': 'circle', 'chance': 0.15, 'size': 2 }
+                },
                 'CM': { 
-                    'weight': 20, 'max_count': 3, 'min_dist': 12, 
-                    'cluster_type': 'single', 'cluster_chance': 0.0, 'cluster_size': 1 
-                }  # Чайнганнер (Мини-босс)
+                    'weight': 20, 'max_count': 3, 'min_dist': 10, 'min_progress': 0.5, # Вместо хардкода в коде
+                    'cluster': { 'type': 'single', 'chance': 0.0, 'size': 1 }
+                }
             }
         },
-        
-        # 📦 СЛОЙ 4: ДЕКОРАЦИИ И ПРОПСЫ
         'decor_settings': {
-            'density': 0.04,  
+            'density': 0.04, 
             'pool': {
-                'prop_sandbag_wall': { 'weight': 120, 'max_count': 25, 'min_dist': 3, 'cluster_type': 'line', 'cluster_chance': 0.60, 'cluster_size': 3 }, 
-                'prop_military_crate': { 'weight': 50, 'max_count': 12, 'min_dist': 4, 'cluster_type': 'single', 'cluster_chance': 0.0, 'cluster_size': 1 }, 
-                'prop_searchlight': { 'weight': 15, 'max_count': 4, 'min_dist': 10, 'cluster_type': 'single', 'cluster_chance': 0.0, 'cluster_size': 1 }  
+                'prop_sandbag_wall': { 
+                    'weight': 120, 'max_count': 25, 'min_dist': 2, 
+                    'cluster': { 'type': 'line', 'chance': 0.60, 'size': 3 } # Мешки строятся линиями-баррикадами
+                },
+                'prop_military_crate': { 
+                    'weight': 50, 'max_count': 12, 'min_dist': 3, 
+                    'cluster': { 'type': 'single', 'chance': 0.0, 'size': 1 }
+                }
             }
         },
-        
-        # 🔫 СЛОЙ 5: ПРЕДМЕТЫ И АРСЕНАЛ (ЛУТ)
         'loot_settings': {
-            'density': 0.025,  
+            'density': 0.025, 
             'pool': {
-                'health': { 'weight': 100, 'max_count': 12, 'min_dist': 4, 'cluster_type': 'single', 'cluster_chance': 0.0, 'cluster_size': 1 }, 
-                'armor':  { 'weight': 80,  'max_count': 10, 'min_dist': 5, 'cluster_type': 'single', 'cluster_chance': 0.0, 'cluster_size': 1 }, 
-                'colt':   { 'weight': 40,  'max_count': 4,  'min_dist': 10, 'cluster_type': 'single', 'cluster_chance': 0.0, 'cluster_size': 1 }, 
-                'ak47':   { 'weight': 25,  'max_count': 3,  'min_dist': 15, 'cluster_type': 'single', 'cluster_chance': 0.0, 'cluster_size': 1 }, 
-                'shotgun':{ 'weight': 12,  'max_count': 2,  'min_dist': 25, 'cluster_type': 'single', 'cluster_chance': 0.0, 'cluster_size': 1 }  
+                'health':  { 'weight': 100, 'max_count': 12, 'min_dist': 3, 'min_progress': 0.0 },
+                'shotgun': { 'weight': 12,  'max_count': 2,  'min_dist': 12, 'min_progress': 0.6 }
             }
-        }
-    },
-    
-    'lab': {
-        'name': '🔬 Стерильная Лаборатория',
-        'walls': { 
-            'primary': { 'char': 'L', 'weight': 80 }, 
-            'secondary': { 'char': 'G', 'weight': 20 } 
-        },
-        'doors': { 'normal': 'door_normal', 'locked': 'door_red_key' },
-        'npc_settings': { 
-            'density': 0.02, 
-            'pool': {
-                'Z': { 'weight': 100, 'max_count': 30, 'min_dist': 2, 'cluster_type': 'circle', 'cluster_chance': 0.2, 'cluster_size': 2 }
-            } 
-        },
-        'decor_settings': {
-            'density': 0.04,
-            'pool': {
-                'prop_chemical_barrel': { 'weight': 80, 'max_count': 20, 'min_dist': 2, 'cluster_type': 'single', 'cluster_chance': 0.0, 'cluster_size': 1 },
-                'prop_lab_capsule':     { 'weight': 20, 'max_count': 12, 'min_dist': 3, 'cluster_type': 'line',   'cluster_chance': 0.85, 'cluster_size': 4 }
-            }
-        },
-        'loot_settings': { 
-            'density': 0.02, 
-            'pool': {
-                'colt': { 'weight': 100, 'max_count': 5, 'min_dist': 5, 'cluster_type': 'single', 'cluster_chance': 0.0, 'cluster_size': 1 }
-            } 
         }
     }
 }
