@@ -80,6 +80,7 @@ class Game:
         self.weapon_selector = WeaponSelector(self)
         self.items = []
         self.weapon = None
+        self.projectiles = []
         self.particles = []
         self.exit_pos = None
         self.total_kills = 0
@@ -112,6 +113,7 @@ class Game:
         self.level_start_time = self.level_manager.level_start_time
         self.items = self.level_manager.items
 
+
     def update(self):
         """Обновляет состояние игры"""
         self.weapon_selector.update()
@@ -136,6 +138,11 @@ class Game:
             item.update(self.player)
         # Удаляем собранные предметы
         self.items = [item for item in self.items if item.alive]
+        
+        # Снаряды
+        for proj in self.projectiles:
+            proj.update()
+        self.projectiles = [p for p in self.projectiles if p.alive]
 
         self.weapon.update_animation()
 
@@ -160,6 +167,7 @@ class Game:
         render_queue.extend(self.npcs)
         render_queue.extend(self.items)
         render_queue.extend(self.particles)
+        render_queue.extend([p for p in self.projectiles if p.alive])
 
         # 2. Сортируем ВСЮ очередь один раз: от самых дальних объектов к самым близким
         render_queue.sort(
