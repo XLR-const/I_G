@@ -42,12 +42,28 @@ BIOME_DATABASE = {
                 }
             }
         },
-        'loot_settings': {
-            'density': 0.025, 
+                'loot_settings': {
+            'density': 0.02, # Процент покрытия карты предметами
             'pool': {
-                'health':  { 'weight': 100, 'max_count': 12, 'min_dist': 3, 'min_progress': 0.0 },
-                'shotgun': { 'weight': 12,  'max_count': 2,  'min_dist': 12, 'min_progress': 0.6 }
+                'health': { 
+                    'weight': 70, 'max_count': 15, 'min_dist': 6, 'min_progress': 0.0,
+                    'cluster': { 'type': 'single', 'chance': 0.0, 'size': 1 }
+                },
+                'colt': { 
+                    'weight': 100, 'max_count': 25, 'min_dist': 4, 'min_progress': 0.0,
+                    'cluster': { 'type': 'circle', 'chance': 0.40, 'size': 3 } # Патроны спавнятся пачками по 3 штуки
+                },
+                'shotgun': { 
+                    'weight': 10, 'max_count': 2, 'min_dist': 20, 'min_progress': 0.5, # Только во второй половине карты
+                    'cluster': { 'type': 'single', 'chance': 0.0, 'size': 1 }
+                },
+                'armor': { 
+                    'weight': 15, 'max_count': 4, 'min_dist': 15, 'min_progress': 0.3,
+                    'secret_only': True, # Спавнится СТРОГО в секретных пещерах за фальш-стенами!
+                    'cluster': { 'type': 'single', 'chance': 0.0, 'size': 1 }
+                }
             }
         }
+
     }
 }

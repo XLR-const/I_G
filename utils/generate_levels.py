@@ -159,16 +159,19 @@ class PipelineLevelGenerator:
                     else:
                         self.grid[r][c] = "_"
 
-        # 2. ИСПРАВЛЕНО: Широкие извилистые дороги (Drunkard's Walk с радиусом)
-        for n1_id, n2_id, _ in self.edges:
+        # 2. ИСПРАВЛЕНО: Широкие извилистые дороги с разделением по типам (Drunkard's Walk)
+        for n1_id, n2_id, edge_type in self.edges:  # СТРОГО ИСПРАВЛЕНО: явно извлекаем edge_type!
             n1, n2 = self.nodes[n1_id], self.nodes[n2_id]
             cx, cy = n1['x'] + n1['w'] // 2, n1['y'] + n1['h'] // 2
             tx, ty = n2['x'] + n2['w'] // 2, n2['y'] + n2['h'] // 2
             
             while (cx, cy) != (tx, ty):
-                # Копаем широкую дорогу (радиус 2), чтобы клеточный автомат ее не завалил
-                for dr in [-2, -1, 0, 1, 2]:
-                    for dc in [-2, -1, 0, 1, 2]:
+                # Если это путь к секрету — делаем узкую тропу (радиус 1), иначе — полноценный каньон (радиус 2)
+                is_secret_edge = (edge_type == 'secret_wall')
+                road_radius = 1 if is_secret_edge else 2
+                
+                for dr in range(-road_radius, road_radius + 1):
+                    for dc in range(-road_radius, road_radius + 1):
                         if 2 <= cy + dr < self.height - 2 and 2 <= cx + dc < self.width - 2:
                             self.grid[cy + dr][cx + dc] = "_"
                 
@@ -188,6 +191,7 @@ class PipelineLevelGenerator:
                     
                 cx = max(2, min(self.width - 3, cx))
                 cy = max(2, min(self.height - 3, cy))
+
 
         # 3. Клеточный автомат сбалансированной эрозии каньона
         for _ in range(3):
@@ -254,13 +258,55 @@ class PipelineLevelGenerator:
                 self._place_door_on_edge(n1_id, n2_id, 'secret_wall')
 
     def _place_door_on_edge(self, n1_id, n2_id, door_char):
-        """Размещает дверь на середине ребра графа"""
+        """
+        Искусственно возводит стену-шлюз поперек широкого коридора/каньона
+        и врезает туда гермодверь, гарантируя изоляцию зон для рейкастера.
+        """
         n1, n2 = self.nodes[n1_id], self.nodes[n2_id]
         mid_x = (n1['x'] + n1['w'] // 2 + n2['x'] + n2['w'] // 2) // 2
         mid_y = (n1['y'] + n1['h'] // 2 + n2['y'] + n2['h'] // 2) // 2
-        if 1 <= mid_y < self.height - 1 and 1 <= mid_x < self.width - 1:
-            if self.grid[mid_y][mid_x] in ['_', '1']:
-                self.grid[mid_y][mid_x] = door_char
+        
+        if not (2 <= mid_y < self.height - 2 and 2 <= mid_x < self.width - 2):
+            return
+
+        # Определяем направление коридора (вертикальный или горизонтальный)
+        # Сравниваем координаты центров комнат
+        dx = abs(n1['x'] - n2['x'])
+        dy = abs(n1['y'] - n2['y'])
+        
+        # Выбираем материал для шлюза блокпоста. 
+        # Отлично подойдет металлическая стена, показывающая искусственную постройку в горах
+        gate_wall = self.secondary_wall # 'metal_crunch_wall'
+        
+        if dx > dy:
+            # Коридор преимущественно ГОРИЗОНТАЛЬНЫЙ. Строим ВЕРТИКАЛЬНУЮ стену-шлюз
+            # Перегораживаем проход сверху и снизу от центральной точки двери
+            for r_offset in [-3, -2, -1, 1, 2, 3]:
+                curr_r = mid_y + r_offset
+                if 1 <= curr_r < self.height - 1:
+                    # Ставим стену только там, где сейчас пустота или техническая скала
+                    if self.grid[curr_r][mid_x] in ["_", "1"] or self.grid[curr_r][mid_x] in self.valid_walls:
+                        self.grid[curr_r][mid_x] = gate_wall
+            
+            # Врезаем саму дверь строго по центру шлюза
+            self.grid[mid_y][mid_x] = door_char
+            # Гарантируем, что перед дверью и за ней чисто (игрок пройдет)
+            self.grid[mid_y][mid_x - 1] = "_"
+            self.grid[mid_y][mid_x + 1] = "_"
+            
+        else:
+            # Коридор преимущественно ВЕРТИКАЛЬНЫЙ. Строим ГОРИЗОНТАЛЬНУЮ стену-шлюз
+            for c_offset in [-3, -2, -1, 1, 2, 3]:
+                curr_c = mid_x + c_offset
+                if 1 <= curr_c < self.width - 1:
+                    if self.grid[mid_y][curr_c] in ["_", "1"] or self.grid[mid_y][curr_c] in self.valid_walls:
+                        self.grid[mid_y][curr_c] = gate_wall
+            
+            # Врезаем дверь
+            self.grid[mid_y][mid_x] = door_char
+            self.grid[mid_y - 1][mid_x] = "_"
+            self.grid[mid_y + 1][mid_x] = "_"
+
 
     def _spawn_hidden_key(self, key_char):
         """Ищет гарантированно доступную свободную ячейку на стартовом пути"""
@@ -348,48 +394,414 @@ class PipelineLevelGenerator:
     # 🛑 ВРЕМЕННЫЕ ЗАГЛУШКИ ДЛЯ НАПОЛНЕНИЯ ФАЗЫ 2
     # ==================================================================
     def pass_decorations(self):
-        """ЗАГЛУШКА: Будущий Flood-Fill спавнер укрытий и ящиков группами"""
-        pass
+        """
+        ФАЗА 2 (ПРОХОД 4): Модернизированный попроцессный спавн декораций.
+        Использует Flood-Fill кластеризацию для постройки линий баррикад и групп ящиков
+        вдоль стен, строго считывая параметры из Data-Driven конфига биома.
+        """
+        d_cfg = self.biome.get('decor_settings', {})
+        pool = d_cfg.get('pool', {})
+        if not pool:
+            return
+
+        # Собираем свободные клетки, прилегающие к скалам/стенам для тактического спавна
+        empty_cells = [
+            (r, c) for r in range(self.height) for c in range(self.width) 
+            if self.grid[r][c] == "_" and self._is_adjacent_to_wall(r, c)
+        ]
+        if not empty_cells:
+            return
+
+        # Рассчитываем лимит на основе плотности из конфига
+        max_decor = int(len(empty_cells) * d_cfg.get('density', 0.04))
+        decor_count = 0
+        
+        items = list(pool.keys())
+        weights = [cfg['weight'] for cfg in pool.values()]
+        
+        # Перемешиваем стартовые точки
+        random.shuffle(empty_cells)
+
+        while decor_count < max_decor and empty_cells:
+            r, c = empty_cells.pop()
+            if self.grid[r][c] != "_":
+                continue
+
+            # 1. Выбираем базовый проп по весам из конфига биома
+            decor_key = random.choices(items, weights=weights)[0]
+            cfg = pool[decor_key]
+            cluster_cfg = cfg.get('cluster', {'type': 'single', 'chance': 0.0, 'size': 1})
+
+            # Проверяем глобальный лимит на этот объект
+            if self.spawned_counters.get(decor_key, 0) >= cfg.get('max_count', 99):
+                continue
+                
+            # Проверяем минимальную дистанцию спавна до аналогов
+            if not self._check_min_distance(r, c, decor_key, cfg.get('min_dist', 0)):
+                continue
+
+            # 2. Логика КЛАСТЕРИЗАЦИИ
+            # Если шанс выпал и тип отличный от single — запускаем умную группировку
+            if random.random() < cluster_cfg.get('chance', 0.0) and cluster_cfg.get('type') != 'single':
+                c_type = cluster_cfg.get('type', 'circle')
+                c_size = cluster_cfg.get('size', 2)
+                
+                # --- ТИП ЛИНИЯ (Идеально для мешков с песком prop_sandbag_wall) ---
+                if c_type == 'line':
+                    # Выбираем случайное направление линии: горизонтальное или вертикальное
+                    dr, dc = random.choice([(0, 1), (1, 0)])
+                    for step in range(c_size):
+                        nr, nc = r + (dr * step), c + (dc * step)
+                        if 1 <= nr < self.height - 1 and 1 <= nc < self.width - 1:
+                            if self.grid[nr][nc] == "_" and self._check_min_distance(nr, nc, decor_key, cfg.get('min_dist', 0)):
+                                if self.spawned_counters.get(decor_key, 0) < cfg.get('max_count', 99):
+                                    self.grid[nr][nc] = decor_key
+                                    self.spawned_counters[decor_key] = self.spawned_counters.get(decor_key, 0) + 1
+                                    decor_count += 1
+
+                # --- ТИП КРУГ/КУЧА (Идеально для армейских ящиков prop_military_crate) ---
+                elif c_type == 'circle':
+                    # Заполняем локальную область вокруг стартовой точки в радиусе размера
+                    for dr in range(-1, 2):
+                        for dc in range(-1, 2):
+                            nr, nc = r + dr, c + dc
+                            if 1 <= nr < self.height - 1 and 1 <= nc < self.width - 1:
+                                if random.random() < 0.65 and self.grid[nr][nc] == "_":
+                                    if self.spawned_counters.get(decor_key, 0) < cfg.get('max_count', 99):
+                                        self.grid[nr][nc] = decor_key
+                                        self.spawned_counters[decor_key] = self.spawned_counters.get(decor_key, 0) + 1
+                                        decor_count += 1
+            
+            # --- ОДИНОЧНЫЙ СПАВН (Если кластер не прокнул) ---
+            else:
+                self.grid[r][c] = decor_key
+                self.spawned_counters[decor_key] = self.spawned_counters.get(decor_key, 0) + 1
+                decor_count += 1
+
 
     def pass_entities(self, layer_type='npc'):
-        """ЗАГЛУШКА: Будущий универсальный DD-спавнер ИИ и лута по весам биома"""
-        pass
+        """
+        ФАЗА 2 (ПРОХОДЫ 5 и 6): Модернизированный DD-спавнер сущностей.
+        Исключает скучивание врагов и забивание проходов с помощью
+        динамического выжигания локального пула ячеек.
+        """
+        cfg_layer = self.biome.get('npc_settings', {}) if layer_type == 'npc' else self.biome.get('loot_settings', {})
+        pool = cfg_layer.get('pool', {})
+        if not pool:
+            return
+
+        # Собираем доступные ячейки (не трогаем Спавн и Зону безопасности вокруг игрока)
+        empty_cells = []
+        spawn_pos = None
+        for r in range(self.height):
+            for c in range(self.width):
+                if self.grid[r][c] == "Spawn":
+                    spawn_pos = (r, c)
+                elif self.grid[r][c] == "_":
+                    empty_cells.append((r, c))
+
+        # Защита: убираем ячейки в радиусе 4 блоков от игрока, чтобы не умереть на старте
+        if spawn_pos:
+            empty_cells = [
+                (r, c) for (r, c) in empty_cells 
+                if math.hypot(r - spawn_pos[0], c - spawn_pos[1]) > 4
+            ]
+
+        max_spawn = int(len(empty_cells) * cfg_layer.get('density', 0.015))
+        spawn_count = 0
+        
+        items = list(pool.keys())
+        weights = [cfg['weight'] for cfg in pool.values()]
+        
+        random.shuffle(empty_cells)
+
+        while spawn_count < max_spawn and empty_cells:
+            # Берем случайную точку
+            r, c = empty_cells.pop()
+            if self.grid[r][c] != "_":
+                continue
+
+            ent_key = random.choices(items, weights=weights)[0]
+            cfg = pool[ent_key]
+            
+            # 1. Фильтр прогрессии уровня
+            progress = r / self.height
+            if progress < cfg.get('min_progress', 0.0):
+                continue
+
+            # 2. Проверка глобального лимита
+            if self.spawned_counters.get(ent_key, 0) >= cfg.get('max_count', 99):
+                continue
+
+            obj_dist = cfg.get('min_dist', 4)
+            cluster_cfg = cfg.get('cluster', {'type': 'single', 'chance': 0.0, 'size': 1})
+
+            # 3. ЛОГИКА СПАВНА СКВАДА ИЛИ ОДИНОЧКИ
+            if layer_type == 'npc' and random.random() < cluster_cfg.get('chance', 0.0) and cluster_cfg.get('type') == 'circle':
+                c_size = cluster_cfg.get('size', 2)
+                
+                # Ставим лидера отряда
+                self.grid[r][c] = ent_key
+                self.spawned_counters[ent_key] = self.spawned_counters.get(ent_key, 0) + 1
+                spawn_count += 1
+                
+                # Ищем места для его напарников в радиусе, но СТРОГО не вплотную!
+                # Перебираем ячейки на расстоянии ровно 2 клетки, чтобы они могли маневрировать
+                offsets = [(-2, 0), (2, 0), (0, -2), (0, 2), (-2, -2), (2, 2)]
+                random.shuffle(offsets)
+                
+                added_in_squad = 1
+                for dr, dc in offsets:
+                    if added_in_squad >= c_size or spawn_count >= max_spawn:
+                        break
+                    nr, nc = r + dr, c + dc
+                    if 1 <= nr < self.height - 1 and 1 <= nc < self.width - 1:
+                        if self.grid[nr][nc] == "_":
+                            if self.spawned_counters.get(ent_key, 0) < cfg.get('max_count', 99):
+                                self.grid[nr][nc] = ent_key
+                                self.spawned_counters[ent_key] = self.spawned_counters.get(ent_key, 0) + 1
+                                spawn_count += 1
+                                added_in_squad += 1
+
+            else:
+                # Одиночный спавн (лут или патрульный)
+                self.grid[r][c] = ent_key
+                self.spawned_counters[ent_key] = self.spawned_counters.get(ent_key, 0) + 1
+                spawn_count += 1
+
+            # 4. КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: Выжигаем зону вокруг всего сквада/одиночки из пула!
+            # Это гарантирует, что следующий сквад не упадет им на голову.
+            empty_cells = [
+                (ec_r, ec_c) for (ec_r, ec_c) in empty_cells
+                if math.hypot(ec_r - r, ec_c - c) > obj_dist
+            ]
+
+    def pass_entities(self, layer_type='npc'):
+        """
+        ФАЗА 2 (ПРОХОДЫ 5 и 6): Универсальный DD-спавнер сущностей и предметов.
+        Использует прогрессию, динамическое выжигание локального пула ячеек 
+        и кластеризацию объектов снабжения.
+        """
+        # Динамически переключаем пул настроек в зависимости от слоя (npc или loot)
+        cfg_layer = self.biome.get('npc_settings', {}) if layer_type == 'npc' else self.biome.get('loot_settings', {})
+        pool = cfg_layer.get('pool', {})
+        if not pool:
+            return
+
+        # Собираем доступные ячейки, исключая точку Spawn игрока
+        empty_cells = []
+        spawn_pos = None
+        for r in range(self.height):
+            for c in range(self.width):
+                if self.grid[r][c] == "Spawn":
+                    spawn_pos = (r, c)
+                elif self.grid[r][c] == "_":
+                    empty_cells.append((r, c))
+
+        # Защитная зона вокруг игрока (для предметов радиус меньше, например 2 клетки, чтобы лут мог лежать рядом)
+        if spawn_pos:
+            safe_radius = 4 if layer_type == 'npc' else 2
+            empty_cells = [
+                (r, c) for (r, c) in empty_cells 
+                if math.hypot(r - spawn_pos[0], c - spawn_pos[1]) > safe_radius
+            ]
+
+        # Вычисляем лимит спавна на основе плотности слоя из конфига биома
+        max_spawn = int(len(empty_cells) * cfg_layer.get('density', 0.02))
+        spawn_count = 0
+        
+        items = list(pool.keys())
+        weights = [cfg['weight'] for cfg in pool.values()]
+        
+        random.shuffle(empty_cells)
+
+        while spawn_count < max_spawn and empty_cells:
+            r, c = empty_cells.pop()
+            if self.grid[r][c] != "_":
+                continue
+
+            ent_key = random.choices(items, weights=weights)[0]
+            cfg = pool[ent_key]
+            
+            # 1. Фильтр прогрессии (оружие и мощный лут смещаются к выходу)
+            progress = r / self.height
+            if progress < cfg.get('min_progress', 0.0):
+                continue
+
+            # 2. Проверка глобального лимита на карту
+            if self.spawned_counters.get(ent_key, 0) >= cfg.get('max_count', 99):
+                continue
+
+            # 3. Проверка секретности (элитный лут прячется в секретных пещерах графа)
+            if cfg.get('secret_only', False):
+                # Проверяем, находится ли клетка в секретной зоне графа
+                is_in_secret = False
+                for node in self.nodes.values():
+                    if node['type'] == 'secret_cave':
+                        if node['x'] <= c < node['x'] + node['w'] and node['y'] <= r < node['y'] + node['h']:
+                            is_in_secret = True
+                            break
+                if not is_in_secret:
+                    continue # Пропускаем спавн, если это обычный каньон
+
+            obj_dist = cfg.get('min_dist', 3)
+            cluster_cfg = cfg.get('cluster', {'type': 'single', 'chance': 0.0, 'size': 1})
+
+            # 4. ЛОГИКА СПАВНА ДЛЯ NPC И КЛАТЕРИЗАЦИИ ЛУТА (ПАЧКИ ПАТРОНОВ)
+            if random.random() < cluster_cfg.get('chance', 0.0) and cluster_cfg.get('type') == 'circle':
+                c_size = cluster_cfg.get('size', 2)
+                
+                # Спавним базовый предмет
+                self.grid[r][c] = ent_key
+                self.spawned_counters[ent_key] = self.spawned_counters.get(ent_key, 0) + 1
+                spawn_count += 1
+                
+                # Кладем припасы пачкой в смежные ячейки (радиус 1), имитируя ящик снабжения
+                offsets = [(-1, 0), (1, 0), (0, -1), (0, 1), (-1, -1), (1, 1)]
+                random.shuffle(offsets)
+                
+                added_in_cluster = 1
+                for dr, dc in offsets:
+                    if added_in_cluster >= c_size or spawn_count >= max_spawn:
+                        break
+                    nr, nc = r + dr, c + dc
+                    if 1 <= nr < self.height - 1 and 1 <= nc < self.width - 1:
+                        if self.grid[nr][nc] == "_":
+                            if self.spawned_counters.get(ent_key, 0) < cfg.get('max_count', 99):
+                                self.grid[nr][nc] = ent_key
+                                self.spawned_counters[ent_key] = self.spawned_counters.get(ent_key, 0) + 1
+                                spawn_count += 1
+                                added_in_cluster += 1
+            else:
+                # Одиночный спавн предмета (аптечка, броня, пушка)
+                self.grid[r][c] = ent_key
+                self.spawned_counters[ent_key] = self.spawned_counters.get(ent_key, 0) + 1
+                spawn_count += 1
+
+            # 5. ЖЕСТКОЕ ВЫЖИГАНИЕ ХИТМАПА: убираем соседние ячейки, предотвращая кашу лута
+            empty_cells = [
+                (ec_r, ec_c) for (ec_r, ec_c) in empty_cells
+                if math.hypot(ec_r - r, ec_c - c) > obj_dist
+            ]
+
+
+    def validate_entities(self):
+        """
+        ФАЗА 2.4: Валидация геймплейного баланса сущностей.
+        Проверяет зону безопасности игрока, плотность ИИ и экономику лута.
+        """
+        # Находим координаты игрока
+        spawn_pos = None
+        for r in range(self.height):
+            for c in range(self.width):
+                if self.grid[r][c] == "Spawn":
+                    spawn_pos = (r, c)
+                    break
+            if spawn_pos: break
+            
+        if not spawn_pos:
+            return False
+
+        # 1. КРИТЕРИЙ: Проверка зоны безопасности вокруг игрока
+        # В радиусе 5 клеток не должно быть ни одного NPC (AGG, CM)
+        npc_keys = ['AGG', 'CM'] # Сюда можно добавить любые новые ключи ИИ из твоей БД
+        for dr in range(-5, 6):
+            for dc in range(-5, 6):
+                nr, nc = spawn_pos[0] + dr, spawn_pos[1] + dc
+                if 0 <= nr < self.height and 0 <= nc < self.width:
+                    if self.grid[nr][nc] in npc_keys:
+                        return False # Враг слишком близко к старту!
+
+        # 2. КРИТЕРИЙ: Проверка на перенасыщение (Локальные кучи мяса)
+        # Сканируем карту скользящим окном 10x10 ячеек
+        window_size = 10
+        for r in range(0, self.height - window_size, 4): # Шаг сканирования 4 клетки
+            for c in range(0, self.width - window_size, 4):
+                local_npc_count = 0
+                for wr in range(window_size):
+                    for wc in range(window_size):
+                        if self.grid[r + wr][c + wc] in npc_keys:
+                            local_npc_count += 1
+                # Если в зоне 10х10 скопилось больше 5 врагов — это непроходимый затор
+                if local_npc_count > 5:
+                    return False
+
+        # 3. КРИТЕРИЙ: Экономический баланс (Аптечки против Врагов)
+        total_enemies = sum(self.grid[r].count(k) for r in range(self.height) for k in npc_keys)
+        total_health = sum(self.grid[r].count("health") for r in range(self.height))
+        
+        if total_enemies > 0:
+            health_to_enemy_ratio = total_health / total_enemies
+            # Если аптечек на уровне меньше, чем 1 штука на 4 врагов — хардкор неиграбелен
+            if health_to_enemy_ratio < 0.25:
+                return False
+
+        return True
+
+
 
     # ==================================================================
     # 💾 ИСПРАВЛЕННЫЙ СУПЕР-КОНВЕЙЕР: СТРОГОЕ СОХРАНЕНИЕ В JSON
     # ==================================================================
     def execute_pipeline_and_save(self):
-        """Запускает последовательный конвейер проходов с гео-предохранителем"""
+        """Запускает последовательный конвейер проходов с двухуровневой валидацией"""
+        # ФАЗА 1: Утверждение геометрии скал и дверей
         geometry_approved = False
         attempts_geo = 0
+        
         while not geometry_approved and attempts_geo < 100:
             attempts_geo += 1
             self._clear_grid()
+            
             self.build_macro_graph()
             self.pass_geometry()
             self.pass_textures()
             self.pass_points_of_interest()
+            
             geometry_approved = self.validate_geometry()
             if not geometry_approved:
                 self.seed = str(int(self.seed) + 1)
                 random.seed(self.seed)
-        
+                
         if not geometry_approved:
             raise RuntimeError("Ошибка: Граф геометрии не сошелся за 100 попыток.")
+
+        # ФАЗА 2: Утверждение расстановки NPC и лута (с независимым откатом)
+        entities_approved = False
+        attempts_ent = 0
         
-        # Фаза 2: Наполнение (пока на заглушках)
-        self.pass_decorations()
-        self.pass_entities(layer_type='npc')
-        self.pass_entities(layer_type='loot')
-        
-        # Сборка форматированных строк карты в JSON
+        while not entities_approved and attempts_ent < 50:
+            attempts_ent += 1
+            
+            # Очищаем ТОЛЬКО сущности, лут и декор, сохраняя готовую геометрию стен!
+            for r in range(self.height):
+                for c in range(self.width):
+                    if self.grid[r][c] not in self.valid_walls and self.grid[r][c] not in ['Spawn', 'Exit', 'key_blue', 'door_normal', 'door_blue_key', 'secret_wall']:
+                        self.grid[r][c] = "_"
+            
+            self.spawned_counters = {} # Сброс счетчиков
+            
+            # Повторный спавн наполнения
+            self.pass_decorations()
+            self.pass_entities(layer_type='npc')
+            self.pass_entities(layer_type='loot')
+            
+            # Проверка наполнения новым валидатором
+            entities_approved = self.validate_entities()
+            if not entities_approved:
+                # Сдвигаем рандом для сущностей, чтобы они легли иначе
+                random.seed(self.seed + f"_ent_try_{attempts_ent}")
+                
+        if not entities_approved:
+            print("⚠️ Предупреждение: Наполнение не идеально, но пропущено по мягким критериям.")
+
+        # СБОРКА И ЗАПИСЬ JSON (Твой оригинальный алгоритм пакета)
         formatted_map_lines = []
         for row in self.grid:
             json_row = json.dumps(row, ensure_ascii=False)
             formatted_map_lines.append(f"    {json_row}")
         map_json_string = "[\n" + ",\n".join(formatted_map_lines) + "\n  ]"
-        
-        # Метаданные уровня
+
         meta_data = {
             "inventory": ["KNIFE", "COLT"],
             "starting_ammo": {"KNIFE": 1, "COLT": 60},
@@ -402,8 +814,8 @@ class PipelineLevelGenerator:
             "generator_style": self.style,
             "generator_seed": self.seed
         }
-        meta_json_string = json.dumps(meta_data, indent=2, ensure_ascii=False)
         
+        meta_json_string = json.dumps(meta_data, indent=2, ensure_ascii=False)
         final_json_content = "{\n" + f'  "map": {map_json_string},\n' + meta_json_string[2:]
         
         output_dir = os.path.join("resources", "levels")
@@ -412,10 +824,9 @@ class PipelineLevelGenerator:
         
         with open(filename, "w", encoding="utf-8") as f:
             f.write(final_json_content)
-        
+            
         print(f"\n🏁 [Пайплайн-Успех] Карта уровня {self.level_num} успешно создана всеми 6-ю проходами!")
-        print(f"-> Файл: {filename}")
-        print(f"-> Биом: {self.style.upper()} | Параметры: {self.width}x{self.height}, Секторов: {self.min_rooms}")
+        print(f"-> Гео-попыток: {attempts_geo} | Энтити-попыток: {attempts_ent}")
         print(f"-> Заспавненные объекты: {self.spawned_counters}\n")
 
 # ==================================================================
