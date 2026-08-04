@@ -210,7 +210,7 @@
     "COLT": 60
   },
   "background": {
-    "ceiling_texture": "resources/textures/rocks.png",
+    "ceiling_texture": "resources/textures/red_sky.png",
     "floor_texture": null,
     "ceiling_color": null,
     "floor_color": [
