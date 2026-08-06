@@ -48,7 +48,7 @@ def get_tests():
 def print_header():
     """Печатает заголовок"""
     print("\n" + "=" * 60)
-    print("  🗺️  MAP TOOLS — Управление уровнями")
+    print("  🗺️   DEV TOOLS - ИНСТРУМЕНТ ДЛЯ РАЗРАБОТКИ")
     print("=" * 60)
 
 
@@ -59,6 +59,7 @@ def print_menu():
     print("  [3] Список уровней")
     print("  [4] Запустить игру (DEV MODE)")
     print("  [5] Запустить тесты")
+    print("  [6] Запустить форматирование имен нпс спрайтов")
     print("  [0] Выход")
     print("-" * 60)
 
@@ -177,6 +178,41 @@ def run_dev_mode():
     subprocess.run([sys.executable, DEV_MODE_PATH])
 
     input("\nНажмите Enter для возврата в меню...")
+    
+def run_rename():
+    """Запускает утилиту автоматической конвертации спрайтов из папки utils"""
+    print("\n" + "=" * 60)
+    print("  ⚙️  ЗАПУСК АВТОМАТИЧЕСКОГO КОНВЕРТЕРА REALM667")
+    print("=" * 60)
+    print("\n  Запускается скрипт utils/converter.py")
+    print("  Утилита автоматически переименует DOOM-префиксы,")
+    print("  отзеркалит правые ракурсы ног для 2.5D ходьбы,")
+    print("  выделит боевые кадры и застрахует X-Die при смерти.")
+    
+    # Задаем точный относительный путь к файлу конвертера в проекте
+    CONVERTER_PATH = os.path.join("utils", "name_converter.py")
+
+    # Страховка: проверяем, что разработчик не забыл создать этот файл
+    if not os.path.exists(CONVERTER_PATH):
+        print(f"\n  🚨 [КРИТ] Файл утилиты не найден по пути: '{CONVERTER_PATH}'!")
+        print("  Убедитесь, что скрипт converter.py лежит внутри папки utils/.")
+        input("\nНажмите Enter для возврата в меню...")
+        return
+
+    input("\nНажмите Enter для продолжения...")
+
+    try:
+        # Запускаем скрипт в том же интерпретаторе Python
+        # Консольный ввод/вывод (input папки NPC) автоматически пробросится в текущее окно!
+        subprocess.run([sys.executable, CONVERTER_PATH])
+    except Exception as e:
+        print(f"\n  ❌ Ошибка при выполнении скрипта конвертера: {e}")
+
+    print("\n" + "-" * 60)
+    print("  ✅ Возврат в главное меню проекта.")
+    print("-" * 60)
+    input("Нажмите Enter для продолжения...")
+
 
 
 def run_tests():
@@ -248,6 +284,8 @@ def main():
             run_dev_mode()
         elif choice == '5':
             run_tests()
+        elif choice == '6':
+            run_rename()
         elif choice == '0':
             print("\n  👋 До свидания!")
             sys.exit(0)

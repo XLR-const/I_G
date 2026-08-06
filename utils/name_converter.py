@@ -89,9 +89,10 @@ def convert_all_doom_sprites():
                     except Exception as e: print(f"❌ Ошибка зеркала: {e}")
 
         # ----------------==================================
-        # БЛОК Б: БOЕВЫЕ КАДРЫ (Перехват ракурсов 1 и 0)
+        # БЛОК Б: БOЕВЫЕ КАДРЫ (Строгий и точный перехват фаз)
         # ----------------==================================
-        elif phase in attack_letters and not has_attack_frame and view1 in ['0', '1']:
+        # Жестко ловим букву E под кадр прицеливания и стойки
+        elif phase == 'E' and not has_attack_frame and view1 in ['0', '1']:
             dst = os.path.join(base_path, f"{npc_name}_attack_front_0.png")
             try:
                 with Image.open(src_path) as img: img.save(dst)
@@ -100,7 +101,8 @@ def convert_all_doom_sprites():
                 print(f"⚔️ Записан кадр прицеливания (Буква {phase}{view1}): {npc_name}_attack_front_0.png")
             except: pass
 
-        elif phase in shoot_letters and not has_shoot_frame and view1 in ['0', '1']:
+        # Жестко ловим букву F (или резервную G/H, если F не было) под вспышку выстрела
+        elif (phase == 'F' or (phase in ['G', 'H'] and not has_shoot_frame)) and not has_shoot_frame and view1 in ['0', '1']:
             dst = os.path.join(base_path, f"{npc_name}_shoot_front_0.png")
             try:
                 with Image.open(src_path) as img: img.save(dst)
@@ -108,6 +110,7 @@ def convert_all_doom_sprites():
                 converted_count += 1
                 print(f"🔥 Записан кадр выстрела (Буква {phase}{view1}): {npc_name}_shoot_front_0.png")
             except: pass
+
 
         # ----------------==================================
         # БЛОК В: ОБЫЧНАЯ СМЕРТЬ (Перехват ракурсов 1 и 0 для H...N)
