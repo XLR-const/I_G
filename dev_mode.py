@@ -155,7 +155,10 @@ class DevGame:
 
         # NPC
         for npc in self.npcs:
-            npc.update()
+            try:
+                npc.update()
+            except:
+                self.load_level(self.current_level)
 
         # Предметы
         for item in self.items[:]:
