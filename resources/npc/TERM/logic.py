@@ -151,71 +151,58 @@ class TermPlasmaBall:
 # 🤖 ПОЛНОСТЬЮ ПЕРЕХВАЧЕННЫЙ КОРНЕВOЙ ЦИКЛ ОБНОВЛЕНИЯ БОССA TERM
 # ==================================================================
 def boss_term_isolated_update(self):
-    """Кастомный корневой апдейт: заменяет метод NPC.update() со страницы 10 PDF, 
-    полностью решая баги смерти и зависания красной маски боли"""
+    """Исправленный ИИ-цикл: передает 100% управления кадрами SHOOT в кастомный аниматор"""
     now = pygame.time.get_ticks()
     dt = self.game.delta_time
-    if dt > 0.033: 
-        dt = 0.033
+    if dt > 0.033: dt = 0.033
 
-    # 🔥 ФИКС БАГА СМЕРТИ №1: Локальные снаряды STAR продолжают лететь и 
-    # анимироваться, даже если сам Терминатор уже убит и лежит на полу коридора!
+    # 🔥 УЛЬТИМАТИВНЫЙ ИММУНИТЕТ К СТАНУ БОЛИ (ФИКС СБРОСА АТАК):
+    # Если босс ведет огонь (пулемет или плазма), мы ХАРДКОДНО стираем системный стейт "HURT"
+    # и принудительно переключаем его обратно в боевой "ATTACK" / "SHOOT"!
+    # Это полностью заблокирует попытки ядра со страницы 8 PDF остановить стрельбу киборга.
+    if self.boss_internal_state in ["ATTACK_MG", "ATTACK_PLASMA"] and self.state == "HURT":
+        self.state = "SHOOT"
+
+    # Обновляем локальные снаряды плазмы STAR
     self.boss_projectiles = [p for p in self.boss_projectiles if p.alive]
     for proj in self.boss_projectiles:
         proj.update()
 
-    # 🔥 ФИКС БАГА СМЕРТИ №2: Если здоровье обнулилось — принудительно гасим 
-    # маску боли (hurt_flash = 0) и даем оригинальному аниматору прокрутить 
-    # кадры падения трупа на пол из страниц 4-5 твоей доки!
+    # Обработка смерти
     if self.state == "DEAD" or self.hp <= 0:
         self.state = "DEAD"
         self.hurt_flash = 0
         self.shoot_flash = 0
-        
-        # Синхронизируем состояние с оригинальным 8-ракурсным аниматором ядра
         self.animator.update()
         self.image = self.animator.current_image
         return
 
-    # --- СНИЖЕНИЕ ТАЙМЕРOВ ЭФФЕКТOВ (КОПИЯ СТРАНИЦЫ 10 ТВОЕГО PDF) ---
-    # Принудительно уменьшаем счетчик вспышки боли на каждом кадре игры, 
-    # гарантируя, что красный цвет СМOЕТСЯ вовремя, несмотря на очереди атак!
-    if self.hurt_flash > 0: 
-        self.hurt_flash -= 1
-    if self.shoot_flash > 0: 
-        self.shoot_flash -= 1
+    if self.hurt_flash > 0: self.hurt_flash -= 1
+    if self.shoot_flash > 0: self.shoot_flash -= 1
 
     dist_to_player = math.hypot(self.game.player.x - self.x, self.game.player.y - self.y)
-    
-    # Флаг ведения огня
     attack_in_progress = False
 
-    # --- СТEЙТ-МАШИНА БОЕВЫХ РЕЖИМOВ КИБОРГА ---
-    # АТАКА №1: Очередь пулемета (4 быстрых хитскан выстрела)
+    # --- СТEЙТ-МАШИНА БОЕВЫХ РЕЖИМOВ ---
+    # АТАКА №1: СКОРОСТРЕЛНЫЙ ПУЛЕМЕТ
     if self.boss_internal_state == "ATTACK_MG":
         attack_in_progress = True
-        self.state = "SHOOT" # Переключаем стейт для аниматора твоего ядра
+        self.state = "SHOOT"
         self.shoot_flash = 4
 
         if now >= self.mg_next_shot_time:
             self.mg_shots_left -= 1
-            
-            # Чередуем кадры дульного пламени пулемета (1 и 2)
-            self.boss_attack_frame = 2 if self.boss_attack_frame == 1 else 1
 
-            # Честная проверка видимости через DDA-лучи твоего движка стен
             is_visible = getattr(self, 'can_see', True)
-            if hasattr(self, 'ray_cast'): 
-                is_visible = self.ray_cast()
-            elif hasattr(self, 'check_visibility'): 
-                is_visible = self.check_visibility()
+            if hasattr(self, 'ray_cast'): is_visible = self.ray_cast()
+            elif hasattr(self, 'check_visibility'): is_visible = self.check_visibility()
 
             if is_visible:
                 if hasattr(self, 'sound_mg_fire') and self.sound_mg_fire:
                     self.sound_mg_fire.play()
                 if hasattr(self.game.player, 'take_damage'):
-                    self.game.player.take_damage(8) # Умеренный урон пули
-                print(f"💥 [TERM-Пулемет] Выстрел очереди! Пуль осталось: {self.mg_shots_left}")
+                    self.game.player.take_damage(8)
+                print(f"💥 [TERM-Пулемет] Выстрел очереди! Осталось пуль: {self.mg_shots_left}")
 
             if self.mg_shots_left > 0:
                 self.mg_next_shot_time = now + 140
@@ -225,105 +212,141 @@ def boss_term_isolated_update(self):
                 self.last_shot = now
                 attack_in_progress = False
 
-    # АТАКА №2: Залп тяжелой красной плазмой (Снаряд STAR)
+    # АТАКА №2: ТЯЖЕЛАЯ КРАСНАЯ ПЛАЗМА
     elif self.boss_internal_state == "ATTACK_PLASMA":
         attack_in_progress = True
         self.state = "SHOOT"
         self.shoot_flash = 4
 
         if now >= self.plasma_charge_end_time:
-            if hasattr(self, 'sound_plasma_fire') and self.sound_plasma_fire:
-                self.sound_plasma_fire.play()
+            # Если снаряд еще не был выпущен (флаг-заглушка)
+            if self.boss_attack_frame == 0:
+                if hasattr(self, 'sound_plasma_fire') and self.sound_plasma_fire:
+                    self.sound_plasma_fire.play()
+                    
+                print("🔴 [TERM-Плазма] Накопление 100%! Вылет сферы STAR.")
                 
-            print("🔴 [TERM-Плазма] Накопление завершено! Вылет снаряда STAR.")
-            self.boss_attack_frame = 1 
-            
-            strike_angle = math.atan2(self.game.player.y - self.y, self.game.player.x - self.x)
-            ball = TermPlasmaBall(
-                game=self.game, 
-                boss=self, 
-                x=self.x, 
-                y=self.y, 
-                angle=strike_angle,
-                speed=0.12, 
-                fly_frames=self.boss_star_fly, 
-                explosion_frames=self.boss_star_exp, 
-                damage=35
-            )
-            self.boss_projectiles.append(ball)
-            
-            self.boss_internal_state = "CHASE"
-            self.state = "CHASE"
-            self.last_shot = now
-            attack_in_progress = False
+                # Переключаем кадр на 1 (сигнал аниматору включить вспышку выхлопа)
+                self.boss_attack_frame = 1 
+                
+                # Продлеваем таймер стейта еще на 150 мс строго для проигрывания кадра вспышки!
+                self.plasma_charge_end_time = now + 150
+                
+                strike_angle = math.atan2(self.game.player.y - self.y, self.game.player.x - self.x)
+                ball = TermPlasmaBall(
+                    game=self.game, boss=self, x=self.x, y=self.y, angle=strike_angle,
+                    speed=0.12, fly_frames=self.boss_star_fly, explosion_frames=self.boss_star_exp, damage=35
+                )
+                self.boss_projectiles.append(ball)
+            else:
+                # 150 мс удержания кадра вспышки прошли — вот теперь полностью выходим из атаки!
+                self.boss_internal_state = "CHASE"
+                self.state = "CHASE"
+                self.last_shot = now
+                self.boss_attack_frame = 0 # Сбрасываем фазу
+                attack_in_progress = False
 
-    # --- НАВИГАЦИЯ, ПРЕСЛЕДOВАНИЕ И КУБИК МАРКОВА ---
+
+    # --- НАВИГАЦИЯ И КУБИК МАРКОВА ---
     if not attack_in_progress:
-        # Если босс находится в ступоре от боли HURT со страницы 12 PDF, ждем таймер
+        # 🔥 МИКРОФИКС: Босс реагирует на стан от боли HURT ТОЛЬКО если он просто бежит (CHASE)!
+        # Если в этот момент он стреляет из пулемета или плазмы, этот блок полностью игнорируется,
+        # и босс продолжает поливать игрока огнем без остановок и прерываний.
         if self.state == "HURT":
-            if now > self.state_timer:
+            if now > self.state_timer: 
                 self.state = "CHASE"
             return
 
+
         if dist_to_player <= self.shoot_range and (now - self.last_shot >= self.shoot_delay):
             if random.random() < 0.50:
-                print("🤖 [Марков ИИ] Выброшено 50% -> Пулеметный шквал!")
+                print("🤖 [Марков ИИ] Пулеметная очередь!")
                 self.boss_internal_state = "ATTACK_MG"
                 self.state = "ATTACK"
                 if hasattr(self, 'sound_mg_start') and self.sound_mg_start:
                     self.sound_mg_start.play()
                 self.mg_shots_left = 4
                 self.mg_next_shot_time = now + 400
-                self.boss_attack_frame = 0
             else:
-                print("🤖 [Марков ИИ] Выброшено 50% -> Энергозаряд плазмотрона!")
+                print("🤖 [Марков ИИ] Зарядка плазмотрона!")
                 self.boss_internal_state = "ATTACK_PLASMA"
                 self.state = "ATTACK"
                 if hasattr(self, 'sound_plasma_start') and self.sound_plasma_start:
                     self.sound_plasma_start.play()
                 self.plasma_charge_end_time = now + 600
-                self.boss_attack_frame = 0
         else:
-            # Преследование и бег за игроком (Вызываем оригинальный update_state из страницы 12 PDF)
             self.boss_internal_state = "CHASE"
+            self.state = "CHASE"
             if hasattr(self, 'update_state'):
                 self.update_state(dt)
-        
-        # Синхронизируем состояние с оригинальным 8-ракурсным аниматором твоего ядра
-        self.animator.update()
-        
-        # Записываем готовый кадр в системное свойство отображения движка
-        self.image = self.animator.current_image
-        if self.image:
-            self.sprite_width, self.sprite_height = self.image.get_size()
-            self.sprite_ratio = self.sprite_width / self.sprite_height
+
+    self.animator.update()
+    self.image = self.animator.current_image
+    if self.image:
+        self.sprite_width, self.sprite_height = self.image.get_size()
+        self.sprite_ratio = self.sprite_width / self.sprite_height
+
 
 
 # ==================================================================
 # 🎨 ИСПРАВЛЕННЫЙ ИНКАПСУЛИРОВАННЫЙ АНИМАТОР БOЕВЫХ КАДРOВ
 # ==================================================================
 def boss_term_personal_animator_update(self_animator):
+    """Кастомный аниматор Терминатора: честно крутит кадры SHOOT по независимым таймерам для пулемета и плазмы"""
     npc = self_animator.npc
+    now = pygame.time.get_ticks()
+    
     if npc.state == "DEAD":
         self_animator.base_animator_update_func()
         return
 
-    # Если Терминатор ведет огонь, подменяем стандартную ходьбу на кадры вспышек
+    # 🔥 1. ПУЛЕМЕТНЫЙ ШКВАЛ (Анимация SHOOT из трех кадров 1, 2, 3)
     if npc.boss_internal_state == "ATTACK_MG":
-        key = f"shoot_front_mg_{npc.boss_attack_frame}"
-        if npc.boss_attack_frame == 0:
+        # Если это только вскидка до первого выстрела очереди
+        if now < npc.mg_next_shot_time - 140:
             key = "attack_front_mg_0"
-        if key in self_animator.sprites:
-            self_animator.current_image = self_animator.sprites[key]
-            return
+            if key in self_animator.sprites:
+                self_animator.current_image = self_animator.sprites[key]
+                return
+        else:
+            # Очередь пошла! Инициализируем локальный таймер вспышек
+            if not hasattr(self_animator, 'term_mg_frame'):
+                self_animator.term_mg_frame = 1
+                self_animator.term_mg_timer = now
+                
+            # Быстро сменяем три твоих кадра 1->2->3 каждые 55 мс
+            if now - getattr(self_animator, 'term_mg_timer', 0) > 55:
+                self_animator.term_mg_timer = now
+                self_animator.term_mg_frame = (self_animator.term_mg_frame % 3) + 1
+                
+            key = f"shoot_front_mg_{self_animator.term_mg_frame}"
+            if key in self_animator.sprites:
+                self_animator.current_image = self_animator.sprites[key]
+                return
+
+    # 🔥 2. ЗАЛП ПЛАЗМОТРОНА (Анимация SHOOT: удержание вспышки выхлопа)
     elif npc.boss_internal_state == "ATTACK_PLASMA":
-        key = "shoot_front_plasma_0" if npc.boss_attack_frame == 1 else "attack_front_plasma_0"
+        if hasattr(self_animator, 'term_mg_frame'): delattr(self_animator, 'term_mg_frame')
+
+        # Если ИИ-цикл переключил флаг в 1 — жестко лочим на экране кадр выхлопа!
+        if getattr(npc, 'boss_attack_frame', 0) == 1:
+            key = "shoot_front_plasma_0"
+        else:
+            # Всё остальное время накопления энергии босс стоит в фазе зарядки
+            key = "attack_front_plasma_0"
+            
         if key in self_animator.sprites:
             self_animator.current_image = self_animator.sprites[key]
             return
 
-    # В режиме бега пускай работает оригинальный 8-ракурсный Doom-поворот твоего ядра!
+
+    # Если босс просто бежит за нами — сбрасываем боевые таймеры и возвращаем Doom-поворот 8-ракурсных спрайтов
+    if hasattr(self_animator, 'term_mg_frame'):
+        delattr(self_animator, 'term_mg_frame')
+        
     self_animator.base_animator_update_func()
+
+
 
 
 def boss_term_custom_draw(self):
