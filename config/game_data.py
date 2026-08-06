@@ -367,7 +367,7 @@ SYMBOLS_CONFIG.update(DECOR_CONFIG)
 # КОНФИГУРАЦИЯ NPC
 # ============================================================
 NPC_CONFIG = {
-        'AGG': {
+    'AGG': {
         'name': 'AutoGunGuy',
         'speed': 0.28,
         'hp': 100,
@@ -379,7 +379,7 @@ NPC_CONFIG = {
         'shoot_delay': 1400,
         'sound_volume': 0.25,
     },
-        'BS': {
+    'BS': {
         'name': 'BeamSolder',
         'speed': 0.28,
         'hp': 100,
@@ -391,7 +391,7 @@ NPC_CONFIG = {
         'shoot_delay': 2000,
         'sound_volume': 0.25,
     },
-        'CM': {
+    'CM': {
         'name': 'ChaingunMajor',        # Должно строго совпадать с именем папки!
         'speed': 0.18,                 # Медлительный из-за тяжелого пулемета
         'hp': 150,                     # Живучий мини-босс
@@ -426,7 +426,7 @@ NPC_CONFIG = {
         'shoot_delay': 1800,            # Кулдаун в миллисекундах МЕЖДУ его супер-атаками
         'sound_volume': 0.45,           # Слышно на весь уровень!
         },
-        'SB': {
+    'SB': {
         'name': 'SuicideBomber',
         'speed': 0.48,        # Быстрый как пуля!
         'hp': 80,             # Мало здоровья, чтобы игрок успевал сбрить его на подлете
@@ -436,6 +436,17 @@ NPC_CONFIG = {
         'shoot_range': 0.6,   # Дистанция взрыва в упор
         'shoot_delay': 0,
         'sound_volume': 0.5,
+    },
+    'SOS': {
+        'name': 'SpecOpsShotgun',
+        'speed': 0.48, 
+        'hp': 120,      
+        'damage': 9,  
+        'activation_distance': 35,     # Оптимизация (ИИ спит, если игрок дальше 25 клеток)
+        'view_distance': 12,           # Зоркость (Бот заметит игрока и побежит, только если тот ближе 12 клеток)
+        'shoot_range': 7.0,            # Стрельба (Остановится и откроет огонь на расстоянии 7 клеток)
+        'shoot_delay': 1400,
+        'sound_volume': 0.25,
     },
 
 
