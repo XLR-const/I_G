@@ -246,6 +246,8 @@ class Game:
                     if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                         if not self.weapon.reloading and not self.weapon.is_continuous:
                             self.weapon.fire()
+                            
+
 
                 if event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_1:
@@ -261,6 +263,19 @@ class Game:
 
                     if self.level_manager.current_weapon_index < len(self.inventory):
                         self.weapon = self.inventory[self.level_manager.current_weapon_index]
+                        
+                    if event.key == pygame.K_g:
+                        prev = self.weapon
+                        for w in self.inventory:
+                            if w.name == 'Grenade':
+                                self.weapon = w
+                                self.weapon.fire()
+                                if self.weapon.reloading:
+                                    self.weapon.update_animation()
+                                else:
+                                    self.weapon = prev
+                                break    
+                    
                         
                     # Интерактивное нажатие на секретку
                     if event.type == pygame.KEYDOWN:

@@ -326,6 +326,18 @@ class DevGame:
                 if event.key == pygame.K_F5:
                     print("🔄 Перезагрузка уровня...")
                     self.load_level(self.current_level)
+                    
+                if event.key == pygame.K_g:
+                    prev = self.weapon
+                    for w in self.inventory:
+                        if w.name == 'Grenade':
+                            self.weapon = w
+                            self.weapon.fire()
+                            if self.weapon.reloading:
+                                self.weapon.update_animation()
+                            else:
+                                self.weapon = prev
+                            break
 
             # Стрельба и колесо мыши
             if event.type == pygame.MOUSEBUTTONDOWN:
