@@ -794,3 +794,10 @@ MUSIC_CONFIG = {
     'death': 'resources/music/deaths/death.wav',
     'level_end': 'resources/music/levelends/levelend.wav',
 }
+
+ACTS_CONFIG = {
+    'act_test': 'resources/levels/act_test',
+    'act_build': 'resources/levels/act_build',
+    'act_invasion': 'resources/levels/act_invasion'
+}
+ACTS_SEQUENCE = ['act_invasion', 'act_ventilation', 'act_hall', 'act_labrotory', 'act_hangurd']

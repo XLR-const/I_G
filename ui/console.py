@@ -96,12 +96,45 @@ class DevConsole:
 
         elif command.startswith("level "):
             try:
-                level = int(command[6:])
-                self.game.current_level = level
-                self.game.load_level(level)
-                self.lines.append(f"Загружен уровень {level}")
-            except Exception:
-                self.lines.append("Ошибка: level <число>")
+                # Отрезаем "level " и разбиваем аргументы по пробелу
+                args = command[6:].strip().split()
+                
+                if len(args) == 2:
+                    # Формат: level <индекс_акта> <номер_уровня> (например: level 1 2)
+                    act_idx = int(args[0])
+                    level = int(args[1])
+                    
+                    self.game.level_manager.current_act_index = act_idx
+                    self.game.level_manager.current_level = level
+                    
+                    # 🔥 Вызываем ГЛАВНЫЙ метод игры для полной перезаписи ссылок и стен!
+                    self.game.load_level(level)
+                    
+                    act_name = self.game.level_manager.get_current_act_name()
+                    self.lines.append(f"Загружен Акт {act_idx} ({act_name}), Уровень {level}")
+                        
+                elif len(args) == 1:
+                    # Формат: level <номер_уровня> (внутри текущего акта) или через точку level 1.2
+                    if '.' in args[0]:
+                        act_part, lvl_part = args[0].split('.')
+                        self.game.level_manager.current_act_index = int(act_part)
+                        level = int(lvl_part)
+                    else:
+                        level = int(args[0])
+                        
+                    self.game.level_manager.current_level = level
+                    
+                    # 🔥 Вызываем ГЛАВНЫЙ метод игры
+                    self.game.load_level(level)
+                    
+                    act_name = self.game.level_manager.get_current_act_name()
+                    self.lines.append(f"В акте '{act_name}' загружен уровень {level}")
+                else:
+                    self.lines.append("Ошибка: Неверное количество аргументов")
+                    
+            except Exception as e:
+                self.lines.append("Использование: level <число> или level <акт> <уровень>")
+
 
         elif command.startswith("hp "):
             try:

@@ -216,6 +216,20 @@ class Game:
                 self.intro_player.update()
                 return
             
+                        # Консоль
+            if self.console and self.console.active:
+                self.console.handle_event(event)
+                if event.type == pygame.KEYDOWN and event.key == pygame.K_BACKQUOTE:
+                    self.console.toggle()
+                continue
+
+            # Открытие консоли
+            if event.type == pygame.KEYDOWN and event.key == pygame.K_BACKQUOTE:
+                if self.console:
+                    self.console.toggle()
+                    if self.console.active:
+                        continue
+            
             handled = self.ui_manager.handle_event(event)
 
             if not handled and self.ui_manager.current_state == self.ui_manager.states['PLAYING']:
@@ -299,13 +313,9 @@ class Game:
                             self.level_manager.current_weapon_index - 1
                         ) % len(self.inventory)
                     self.weapon = self.inventory[self.level_manager.current_weapon_index]
+                
 
-                if self.console.active:
-                    self.console.handle_event(event)
-                    return
 
-                if event.type == pygame.KEYDOWN and event.key == pygame.K_BACKQUOTE:
-                    self.console.toggle()
 
     def run(self):
         """Главный игровой цикл"""

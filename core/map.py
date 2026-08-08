@@ -106,7 +106,6 @@ class Map:
 
                 elif char in WEAPON_CONFIG:
                     self.weapon_positions.append((i, j, char))
-
     def is_wall(self, x, y):
         """Проверяет, является ли клетка стеной
 
