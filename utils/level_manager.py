@@ -206,48 +206,84 @@ class LevelManager:
         print(f"Уровень {level_num} акта '{act_name}' загружен: {len(self.npcs)} NPC")
         return True
 
-    def next_level(self):
-        """Умный переход на следующий уровень или следующий акт"""
-        self.level_time = (pygame.time.get_ticks() - self.level_start_time) // 1000
+    def next_level(self): 
+        """Переход на следующий уровень или акт с гарантированной защитой от циклов""" 
+        self.level_time = (pygame.time.get_ticks() - self.level_start_time) // 1000 
         
-        # Получаем имя текущего акта перед расчетами
+        # 🔥 КРИТИЧЕСКИЙ ФИКС 1: Мгновенно аннулируем точку выхода, 
+        # чтобы триггер не мог сработать повторно на следующем кадре, если файл не найдут!
+        self.exit_pos = None
+        
+        next_lvl_num = self.current_level + 1
         act_name = self.get_current_act_name()
         
-        # Проверяем, существует ли СЛЕДУЮЩИЙ уровень внутри текущего акта
-        next_lvl_num = self.current_level + 1
-        next_level_path = f"{self.levels_folder}/{act_name}/level_{next_lvl_num}.json"
+        # Проверяем, есть ли следующий уровень в ТЕКУЩЕМ акте
+        next_level_path = f"{self.levels_folder}/{act_name}/level_{next_lvl_num}.json" 
         
-        if os.path.exists(next_level_path):
-            # Если файл есть, просто шагаем на следующий уровень в этом же акте
+        if os.path.exists(next_level_path): 
+            # Шаг внутри текущего акта
             self.current_level = next_lvl_num
-            # Сохраняем прогресс (передаем сквозной ID уровня для сейв-системы, например 100 * акт + уровень)
-            self.game.save_system.save(self.current_level, self.total_kills, self.level_time)
-            self.game.ui_manager.current_state = self.game.ui_manager.states['LEVEL_END']
-        else:
-            # Иначе — текущий акт полностью пройден! Пытаемся переключиться на следующий акт
+            self.game.save_system.save(self, self.total_kills, self.level_time) 
+            self.game.ui_manager.current_state = self.game.ui_manager.states['LEVEL_END'] 
+        else: 
+            # Уровни в текущем акте кончились! Вычисляем следующий акт
             next_act_idx = self.current_act_index + 1
             
             if next_act_idx < len(ACTS_SEQUENCE):
-                # Если в списке еще есть акты, переключаемся на начало нового акта
+                # Если следующий акт прописан в ACTS_SEQUENCE — переключаемся на него
                 self.current_act_index = next_act_idx
                 self.current_level = 1
                 
-                self.game.save_system.save(self.current_level, self.total_kills, self.level_time)
-                self.game.ui_manager.current_state = self.game.ui_manager.states['LEVEL_END']
-                print(f"[УРОВЕНЬ] Переход на АКТ: '{ACTS_SEQUENCE[self.current_act_index]}'")
+                # Сохраняем прогресс нового акта
+                self.game.save_system.save(self, self.total_kills, self.level_time) 
+                
+                # 🔥 КРИТИЧЕСКИЙ ФИКС 2: Проверяем, существует ли физически ФАЙЛ первого уровня нового акта!
+                new_act_name = ACTS_SEQUENCE[next_act_idx]
+                new_act_first_level_path = f"{self.levels_folder}/{new_act_name}/level_1.json"
+                
+                if os.path.exists(new_act_first_level_path):
+                    # Если файл нового акта есть — спокойно включаем брифинг
+                    self.game.ui_manager.current_state = self.game.ui_manager.states['LEVEL_END']
+                else:
+                    # Если папки или файла уровня на диске нет (как в случае с act_hall) —
+                    # не ломаем игру брифингами, а аварийно и безопасно выходим в главное меню!
+                    print(f"⚠️ [ПРЕДУПРЕЖДЕНИЕ] Файл {new_act_first_level_path} отсутствует на диске. Экстренный выход в меню.")
+                    self.game.ui_manager.current_state = self.game.ui_manager.states['MENU']
             else:
-                # Если акты закончились — игра полностью пройдена! Выходим в главное меню
+                # ЕСЛИ ВООБЩЕ ВСЕ АКТЫ ИЗ КОНФИГА ЗАКОНЧИЛИСЬ — ИГРА ПОЛНОСТЬЮ ПРОЙДЕНА
                 print("[ИГРА] Поздравляем! Все акты из ACTS_SEQUENCE успешно пройдены!")
+                self.game.save_system.delete()
+                
+                # Сбрасываем индексы в дефолт для будущей новой игры
+                self.current_act_index = 0
+                self.current_level = 1
+                self.total_kills = 0
+                self.level_time = 0
+                
                 self.game.ui_manager.current_state = self.game.ui_manager.states['MENU']
 
+
+
     def check_exit(self):
-        if self.exit_pos is None or self.player is None:
+        """Проверяет, достиг ли игрок выхода, с жесткой защитой от пустых объектов"""
+        # Если игрока нет, или мы находимся в меню/интро/брифинге — блокируем проверку!
+        if self.player is None or self.exit_pos is None:
             return
-        player_cell = (int(self.player.x), int(self.player.y))
-        exit_cell = (int(self.exit_pos[0]), int(self.exit_pos[1]))
-        
-        if player_cell == exit_cell:
-            self.next_level()
+            
+        if hasattr(self.game, 'ui_manager') and self.game.ui_manager.current_state != self.game.ui_manager.states['PLAYING']:
+            return
+
+        try:
+            player_cell = (int(self.player.x), int(self.player.y))
+            exit_cell = (int(self.exit_pos[0]), int(self.exit_pos[1]))
+            
+            if player_cell == exit_cell:
+                # Сбрасываем позицию выхода, чтобы триггер не вызвался дважды за два кадра
+                self.exit_pos = None 
+                self.next_level()
+        except Exception as e:
+            print(f"[ОШИБКА КОЛЛИЗИИ ВЫХОДА] {e}")
+
 
     def reset_game(self):
         """Полный сброс игры на самый первый уровень самого первого акта"""
