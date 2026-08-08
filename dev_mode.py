@@ -63,7 +63,24 @@ class DevGame:
         self.music_manager = MusicManager() if config.get('music_manager', False) else None
         
         # Level Manager
+        # utils/level_manager.py
         self.level_manager = LevelManager(self) if config.get('level_manager', True) else None
+
+        # 🔥 ЖЕСТКАЯ НАСТРОЙКА ДЛЯ DEV_MODE:
+        # Принудительно выставляем менеджеру уровней индексы для act_test,
+        # чтобы при вызове load_level путь склеился в resources/levels/act_test/level_1.json
+        if self.level_manager:
+            # Находим в листе ACTS_SEQUENCE индекс нашего тестового акта.
+            # Если его там нет, мы принудительно инжектим имя act_test в логику
+            from config.game_data import ACTS_SEQUENCE
+            if "act_test" in ACTS_SEQUENCE:
+                self.level_manager.current_act_index = ACTS_SEQUENCE.index("act_test")
+            else:
+                # Если в боевом листе его нет, временно подменяем метод возврата имени акта
+                self.level_manager.get_current_act_name = lambda: "act_test"
+            
+            # Устанавливаем стартовый уровень дев-режима в 1
+            self.level_manager.current_level = 1
 
         # Игровые объекты
         self.player = None
@@ -75,6 +92,8 @@ class DevGame:
         self.particles = []
         self.exit_pos = None
         self.total_kills = 0
+        
+        # Синхронизируем текущий уровень с менеджером
         self.current_level = 1
         self.level_start_time = 0
         self.projectiles = []
@@ -84,10 +103,11 @@ class DevGame:
 
         # Загружаем уровень
         if self.level_manager:
+            # Вызов подхватит измененные выше индексы и загрузит act_test/level_1.json
             self.load_level(self.current_level)
+            
         self.flashlight = FlashlightMask(self)
         self.flashlight.active = True
-
         self._print_status()
 
     def _print_status(self):

@@ -269,9 +269,9 @@ class LevelManager:
         # Если игрока нет, или мы находимся в меню/интро/брифинге — блокируем проверку!
         if self.player is None or self.exit_pos is None:
             return
-            
-        if hasattr(self.game, 'ui_manager') and self.game.ui_manager.current_state != self.game.ui_manager.states['PLAYING']:
-            return
+        if self.game.ui_manager != None:    
+            if hasattr(self.game, 'ui_manager') and self.game.ui_manager.current_state != self.game.ui_manager.states['PLAYING']:
+                return
 
         try:
             player_cell = (int(self.player.x), int(self.player.y))
