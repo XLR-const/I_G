@@ -136,8 +136,8 @@ BIOME_DATABASE = {
         'name': '💨 Вентиляционные Шахты и Техподполье',
         'geometry': { 'perimeter_wall': 'metal_crunch_wall', 'bsp_min_room_size': 4, 'bsp_max_room_size': 6, 'min_density': 0.12, 'max_density': 0.35 },
         'walls': {
-            'primary': { 'char': 'metal_crunch_wall', 'weight': 95 },
-            'secondary': { 'char': '1', 'weight': 5 }
+            'primary': { 'char': 'M', 'weight': 95 },
+            'secondary': { 'char': 'L', 'weight': 5 }
         },
         'doors': {
             'normal': 'door_normal',

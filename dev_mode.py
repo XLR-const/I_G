@@ -70,17 +70,16 @@ class DevGame:
         # Принудительно выставляем менеджеру уровней индексы для act_test,
         # чтобы при вызове load_level путь склеился в resources/levels/act_test/level_1.json
         if self.level_manager:
-            # Находим в листе ACTS_SEQUENCE индекс нашего тестового акта.
-            # Если его там нет, мы принудительно инжектим имя act_test в логику
-            from config.game_data import ACTS_SEQUENCE
-            if "act_test" in ACTS_SEQUENCE:
-                self.level_manager.current_act_index = ACTS_SEQUENCE.index("act_test")
-            else:
-                # Если в боевом листе его нет, временно подменяем метод возврата имени акта
-                self.level_manager.get_current_act_name = lambda: "act_test"
-            
-            # Устанавливаем стартовый уровень дев-режима в 1
-            self.level_manager.current_level = 1
+                    from config.game_data import ACTS_SEQUENCE
+                    
+                    # Если 'act_test' ещё нет в списке актов (чтобы не дублировать при перезапусках)
+                    if "act_test" not in ACTS_SEQUENCE:
+                        # Вставляем 'act_test' в САМОЕ НАЧАЛО списка актов, на нулевой индекс!
+                        ACTS_SEQUENCE.insert(0, "act_test")
+                    
+                    # Сбрасываем менеджер на нулевой индекс (теперь это 'act_test') и 1 уровень
+                    self.level_manager.current_act_index = 0
+                    self.level_manager.current_level = 1
 
         # Игровые объекты
         self.player = None
