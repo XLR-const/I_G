@@ -254,8 +254,10 @@ class MapEditor:
                 continue
 
             # ПАНЕЛЬ ИНСТРУМЕНТОВ
-            if event.type == pygame.MOUSEBUTTONDOWN:
+            elif event.type == pygame.MOUSEBUTTONDOWN:
                 mx, my = event.pos
+                
+                # Проверяем клик по панели инструментов (сверху)
                 if self.tools_panel.handle_click(mx, my):
                     self.current_tool = self.tools_panel.get_selected_tool()
                     if self.current_tool != 'select':
@@ -264,6 +266,23 @@ class MapEditor:
                         self.selection.end_x = None
                         self.selection.end_y = None
                     continue
+                
+                # Проверяем клик по панели объектов (справа)
+                if self.toolbar.rect.collidepoint(mx, my):
+                    if event.button == 4:
+                        self.toolbar.scroll(-30)
+                        continue
+                    elif event.button == 5:
+                        self.toolbar.scroll(30)
+                        continue
+                    elif event.button == 1:  # Левая кнопка
+                        if self.toolbar.handle_click(mx, my):
+                            symbol = self.toolbar.get_selected_symbol()
+                            self.selected_symbol = symbol
+                            # Если есть выделение - заполняем
+                            if self.current_tool == 'select' and self.selection.get_selection():
+                                self.selection.fill(symbol)
+                            continue
 
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
