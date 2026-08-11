@@ -37,21 +37,33 @@ class MapEditor:
         if level_file:
             self.load_level(level_file)
 
+
     def _setup_ui(self):
         # ПАНЕЛЬ ИНСТРУМЕНТОВ (сверху) - ВЫСОТА 50px
         tools_rect = pygame.Rect(0, 0, WINDOW_WIDTH - 250, 50)
         self.tools_panel = ToolsPanel(tools_rect)
-
+        
         # КАНВАС (под панелью инструментов)
         canvas_rect = pygame.Rect(0, 50, WINDOW_WIDTH - 250, WINDOW_HEIGHT - 50 - 60)
         self.canvas = Canvas(canvas_rect)
-
+        
         # ИНФОРМАЦИЯ (внизу)
         info_rect = pygame.Rect(0, WINDOW_HEIGHT - 60, WINDOW_WIDTH - 250, 60)
         self.info_panel = InfoPanel(info_rect)
-
-        # ЛЕГЕНДА (справа)
+        
+        # ЛЕГЕНДА (справа) - теперь динамическая!
         toolbar_rect = pygame.Rect(WINDOW_WIDTH - 250, 0, 250, WINDOW_HEIGHT)
+        self.toolbar = Toolbar(toolbar_rect)
+
+    def resize(self, new_width, new_height):
+        """Обработка изменения размера окна"""
+        # Обновляем размеры панелей
+        self.tools_panel.rect = pygame.Rect(0, 0, new_width - 250, 50)
+        self.canvas.rect = pygame.Rect(0, 50, new_width - 250, new_height - 50 - 60)
+        self.info_panel.rect = pygame.Rect(0, new_height - 60, new_width - 250, 60)
+        
+        # Пересоздаём toolbar с новым размером
+        toolbar_rect = pygame.Rect(new_width - 250, 0, 250, new_height)
         self.toolbar = Toolbar(toolbar_rect)
 
     def _setup_tools(self):
@@ -283,6 +295,37 @@ class MapEditor:
                             if self.current_tool == 'select' and self.selection.get_selection():
                                 self.selection.fill(symbol)
                             continue
+                        
+            # map_editor/editor.py - добавляем в _handle_events
+
+            elif event.type == pygame.MOUSEMOTION:
+                mx, my = event.pos
+                
+                # Обновляем канвас
+                self.canvas.update_drag(mx, my)
+                
+                # Обновляем hover на панели объектов
+                self.toolbar.update_hover(mx, my)
+                
+                # Обновляем ячейку под курсором
+                cell = self.canvas.get_cell_at(mx, my)
+                if pygame.mouse.get_pressed()[0] and cell:
+                    x, y = cell
+                    if self.current_tool == 'brush':
+                        self.brush.apply(x, y)
+                    elif self.current_tool == 'eraser':
+                        self.eraser.apply(x, y)
+                    elif self.current_tool == 'select':
+                        self.selection.update(x, y)
+                
+                if pygame.mouse.get_pressed()[2] and cell:
+                    # Правая кнопка - пипетка (опционально)
+                    x, y = cell
+                    if 0 <= y < len(self.grid) and 0 <= x < len(self.grid[0]):
+                        symbol = self.grid[y][x]
+                        if symbol != '_':
+                            self.selected_symbol = symbol
+                            print(f"[Пипетка] Выбран символ: '{symbol}'")
 
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
