@@ -31,11 +31,23 @@ class MapEditor:
         self.has_changes = False
         self._saving = False
 
+        # Инициализируем переменные метаданных по умолчанию до загрузки файла уровня
+        self.inventory = ["KNIFE"]
+        self.starting_ammo = {"KNIFE": 1}
+        self.background_data = {
+            "ceiling_texture": None,
+            "floor_texture": None,
+            "ceiling_color": [40, 40, 40],
+            "floor_color": [40, 40, 40]
+        }
+        self.generator_style = "out"
+        self.generator_seed = "0"
+
         self._setup_ui()
         self._setup_tools()
-
         if level_file:
             self.load_level(level_file)
+
 
 
     def _setup_ui(self):
@@ -137,11 +149,22 @@ class MapEditor:
 
             map_data = data.get('map', [])
             
-            # Если map_data — список строк, превращаем в список списков
+            # Твоя оригинальная проверка типа данных карты
             if map_data and isinstance(map_data[0], str):
                 self.grid = [list(row) for row in map_data]
             else:
                 self.grid = map_data
+
+            # --- БЕЗОПАСНО ЧИТАЕМ ПАРАМЕТРЫ КАРТЫ ДЛЯ ОКНА СВОЙСТВ ---
+            self.inventory = data.get('inventory', ["KNIFE"])
+            self.starting_ammo = data.get('starting_ammo', {"KNIFE": 1})
+            self.background_data = data.get('background', {
+                "ceiling_texture": None, "floor_texture": None,
+                "ceiling_color": [40, 40, 40], "floor_color": [40, 40, 40]
+            })
+            self.generator_style = data.get('generator_style', "out")
+            self.generator_seed = data.get('generator_seed', "0")
+            # --------------------------------------------------------
 
             self.current_file = file_path
             self.has_changes = False
@@ -155,10 +178,10 @@ class MapEditor:
             print(f"  Размер: {len(self.grid[0])}x{len(self.grid)}")
 
             return True
-
         except Exception as e:
             print(f"[Ошибка] Не удалось загрузить уровень: {e}")
             return False
+
 
     def save_level(self, file_path=None):
         if file_path is None:
@@ -176,6 +199,12 @@ class MapEditor:
 
             # Обновляем карту
             data['map'] = self.grid
+            # --- ОБНОВЛЯЕМ ДАННЫЕ ИЗ ОКНА СВОЙСТВ ДО ФОРМАТИРОВАНИЯ ---
+            data['inventory'] = self.inventory
+            data['starting_ammo'] = self.starting_ammo
+            data['background'] = self.background_data
+            data['generator_style'] = self.generator_style
+            data['generator_seed'] = self.generator_seed
 
             # ============================================================
             # РУЧНОЕ ФОРМАТИРОВАНИЕ
@@ -270,7 +299,14 @@ class MapEditor:
                 mx, my = event.pos
                 
                 # Проверяем клик по панели инструментов (сверху)
-                if self.tools_panel.handle_click(mx, my):
+                click_result = self.tools_panel.handle_click(mx, my)
+                
+                if click_result == "open_properties":
+                    from .ui.properties import LevelPropertiesWindow
+                    props_window = LevelPropertiesWindow(self)
+                    props_window.run()  # Уходим в изолированный цикл модального окна свойств
+                    continue
+                elif click_result:  # Если вернулся True (кликунли по обычному инструменту)
                     self.current_tool = self.tools_panel.get_selected_tool()
                     if self.current_tool != 'select':
                         self.selection.start_x = None
@@ -295,6 +331,7 @@ class MapEditor:
                             if self.current_tool == 'select' and self.selection.get_selection():
                                 self.selection.fill(symbol)
                             continue
+
                         
             # map_editor/editor.py - добавляем в _handle_events
 
