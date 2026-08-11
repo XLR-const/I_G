@@ -50,6 +50,51 @@ class Toolbar:
             'label': max(9, int(self.rect.height * 0.015)),
             'category': max(10, int(self.rect.height * 0.016)),
         }
+    
+    def _scale_image(self, surface, target_size):
+        """
+        Масштабирует изображение с сохранением пропорций
+        """
+        if surface is None:
+            return None
+        
+        target_width, target_height = target_size
+        orig_width, orig_height = surface.get_size()
+        
+        # Если размеры совпадают
+        if orig_width == target_width and orig_height == target_height:
+            return surface.copy()
+        
+        # Проверяем, что размеры валидны
+        if orig_width == 0 or orig_height == 0:
+            return surface
+        
+        # Вычисляем коэффициент масштабирования
+        # Используем min, чтобы вписать в контейнер
+        scale_x = target_width / orig_width
+        scale_y = target_height / orig_height
+        scale = min(scale_x, scale_y) * 0.85  # 85% от размера контейнера
+        
+        new_width = max(4, int(orig_width * scale))
+        new_height = max(4, int(orig_height * scale))
+        
+        # Создаем поверхность с прозрачным фоном
+        result = pygame.Surface((target_width, target_height), pygame.SRCALPHA)
+        result.fill((0, 0, 0, 0))  # Прозрачный фон
+        
+        try:
+            # Используем smoothscale для лучшего качества
+            scaled = pygame.transform.smoothscale(surface, (new_width, new_height))
+            # Центрируем
+            x = (target_width - new_width) // 2
+            y = (target_height - new_height) // 2
+            result.blit(scaled, (x, y))
+        except:
+            # Fallback
+            result.blit(surface, (target_width // 2 - orig_width // 2,
+                                target_height // 2 - orig_height // 2))
+        
+        return result
         
     def _get_font(self, size_key, bold=False, emoji=False):
         """Возвращает шрифт через менеджер"""
@@ -441,7 +486,6 @@ class Toolbar:
         return "\n".join(info_lines) if info_lines else "NPC"
     
     def _load_texture_or_color(self, symbol, size):
-        """Загружает текстуру или создаёт цветной квадрат"""
         config = SYMBOLS_CONFIG.get(symbol, {})
         texture_path = config.get('texture') or config.get('sprite')
 
@@ -450,7 +494,7 @@ class Toolbar:
             if os.path.exists(full_path):
                 try:
                     surf = pygame.image.load(full_path).convert_alpha()
-                    return pygame.transform.scale(surf, (size, size))
+                    return self._scale_image(surf, (size, size))
                 except:
                     pass
 
@@ -458,17 +502,16 @@ class Toolbar:
         return self._create_surface(symbol, color, size)
 
     def _load_npc_sprite(self, name, size):
-        """Загружает спрайт NPC"""
         try:
             path = os.path.join(NPC_DIR, name, f"{name}_move_front_1.png")
             if os.path.exists(path):
                 surf = pygame.image.load(path).convert_alpha()
-                return pygame.transform.scale(surf, (size, size))
+                return self._scale_image(surf, (size, size))
 
             path_old = os.path.join(NPC_DIR, name, f"{name}_idle_front.png")
             if os.path.exists(path_old):
                 surf = pygame.image.load(path_old).convert_alpha()
-                return pygame.transform.scale(surf, (size, size))
+                return self._scale_image(surf, (size, size))
         except:
             pass
         return None
