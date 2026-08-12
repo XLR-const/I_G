@@ -212,6 +212,10 @@ SYMBOLS_CONFIG = {
         'type': 'wall',
         'texture': 'resources/textures/metal_crunch_wall.png'
     },
+    'toxic_wall': {
+      'type': 'wall',
+      'texture': 'resources/textures/toxic_wall.png'  
+    },
     
     # Предметы
     'health': {

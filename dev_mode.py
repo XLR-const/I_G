@@ -201,8 +201,8 @@ class DevGame:
                 self.weapon.fire()
 
         # Регенерация
-        if self.player:
-            self.player.update_regen()
+        '''if self.player:
+            self.player.update_regen()'''
 
         self.delta_time = self.clock.tick(FPS)
 

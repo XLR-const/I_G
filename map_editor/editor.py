@@ -356,13 +356,12 @@ class MapEditor:
                         self.selection.update(x, y)
                 
                 if pygame.mouse.get_pressed()[2] and cell:
-                    # Правая кнопка - пипетка (опционально)
+                    # Правая кнопка - жестко активирует Ластик для стирания в пустоту "_"
                     x, y = cell
                     if 0 <= y < len(self.grid) and 0 <= x < len(self.grid[0]):
-                        symbol = self.grid[y][x]
-                        if symbol != '_':
-                            self.selected_symbol = symbol
-                            print(f"[Пипетка] Выбран символ: '{symbol}'")
+                        if self.grid[y][x] != '_':
+                            self.grid[y][x] = '_'  # стираем в пустоту
+                            self._on_change()  # сообщаем о изменениях на карте
 
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
