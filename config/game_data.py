@@ -237,7 +237,7 @@ SYMBOLS_CONFIG = {
         'type': 'item',
         'item_type': 'weapon',
         'weapon_name': 'AK-47',
-        'ammo': 30,
+        'ammo': 15,
         'sprite': 'resources/weapons/AK47/icon.png',  # Используем готовую иконку из папки пушки!
         'description': 'Автомат АК-47 (+30 патронов)'
     },
@@ -261,7 +261,7 @@ SYMBOLS_CONFIG = {
         'type': 'item',
         'item_type': 'weapon',
         'weapon_name': 'PLASMA',
-        'ammo': 25,
+        'ammo': 10,
         'sprite': 'resources/weapons/PLASMA/icon.png',
         'description': 'PLASMA'
     },
@@ -285,7 +285,7 @@ SYMBOLS_CONFIG = {
             'type': 'item',
             'item_type': 'weapon',
             'weapon_name': 'AA12',
-            'ammo': 12,
+            'ammo': 5,
             'sprite': 'resources/weapons/AA12/icon.png'
         },
 
@@ -308,7 +308,7 @@ SYMBOLS_CONFIG = {
         'type': 'item',
         'item_type': 'weapon',
         'weapon_name': 'GRENADE',
-        'ammo': 3,
+        'ammo': 1,
         'sprite': 'resources/weapons/GRENADE/icon.png'
     },
     
@@ -770,7 +770,7 @@ WEAPON_CONFIG = {
         'AA12': {
             'name': 'aa12',
             'slot': 3,
-            'damage': 3,
+            'damage': 6,
             'pellets': 5,
             'reload_time': 300,
             'spread': 0.5,
