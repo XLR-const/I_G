@@ -216,6 +216,18 @@ SYMBOLS_CONFIG = {
       'type': 'wall',
       'texture': 'resources/textures/toxic_wall.png'  
     },
+    'hall_main': {
+        'type': 'wall',
+        'texture': 'resources/textures/hall_main.png'
+        },
+    'hall_second': {
+        'type': 'wall',
+        'texture': 'resources/textures/hall_second.png'
+    },
+    'hall_ceil': {
+      'type': 'wall',
+      'texture': 'resources/textures/hall_ceil.png'  
+    },
     
     # Предметы
     'health': {
@@ -457,7 +469,7 @@ NPC_CONFIG = {
         'name': 'SpecOpsMachinegun',        # Должно строго совпадать с именем папки!
         'speed': 0.18,                 # Медлительный из-за тяжелого пулемета
         'hp': 170,                     # Живучий мини-босс
-        'damage': 8,                   # Урон за одну пулю (небольшой, но их летит очень много!)
+        'damage': 4,                   # Урон за одну пулю (небольшой, но их летит очень много!)
         # --- Дистанции ---
         'activation_distance': 45,     # Активируется издалека
         'view_distance': 15,           # Замечает игрока с 15 клеток
@@ -646,7 +658,7 @@ WEAPON_CONFIG = {
             'projectile_speed': 0.3, 
             'spread': 0.01,      # Ощутимый разброс при зажиме
             'recoil': 0.04,
-            'damage': 25,
+            'damage': 35,
             'reload_time': 350,
             'continuous': True,
             'max_distance': 6,

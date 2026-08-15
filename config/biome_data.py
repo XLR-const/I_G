@@ -53,8 +53,8 @@ BIOME_DATABASE = {
             'max_density': 0.75   # Но плотнее огромных открытых ангаров hang
         },
         'walls': {
-            'primary': { 'char': 'metal_crunch_wall', 'weight': 90 },
-            'secondary': { 'char': '1', 'weight': 10 } # Использование вашей базовой белой стены
+            'primary': { 'char': 'hall_main', 'weight': 90 },
+            'secondary': { 'char': 'hall_second', 'weight': 10 } # Использование вашей базовой белой стены
         },
         'doors': {
             'normal': 'door_normal',
@@ -63,8 +63,9 @@ BIOME_DATABASE = {
         'npc_settings': {
             'density': 0.012,
             'pool': {
-                'AGG': { 'weight': 80, 'max_count': 20, 'min_dist': 5, 'min_progress': 0.0, 'cluster': { 'type': 'circle', 'chance': 0.20, 'size': 2 } },
-                'CM':  { 'weight': 30, 'max_count': 4,  'min_dist': 10, 'min_progress': 0.4, 'cluster': { 'type': 'single', 'chance': 0.0, 'size': 1 } }
+                'SOS': { 'weight': 80, 'max_count': 20, 'min_dist': 5, 'min_progress': 0.0, 'cluster': { 'type': 'circle', 'chance': 0.20, 'size': 2 } },
+                'SOM':  { 'weight': 30, 'max_count': 4,  'min_dist': 10, 'min_progress': 0.4, 'cluster': { 'type': 'single', 'chance': 0.0, 'size': 1 } },
+                'SOR': { 'weight': 80, 'max_count': 20, 'min_dist': 5, 'min_progress': 0.0, 'cluster': { 'type': 'circle', 'chance': 0.20, 'size': 2 } },
             }
         },
         'decor_settings': {

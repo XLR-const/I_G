@@ -450,7 +450,7 @@ class Renderer:
         """Sci-Fi HUD: Синусоидальный пульс здоровья и вращающийся циклотрон брони.
         Полная автономность, нулевая привязка к полигонам, идеальный визуал!"""
         if hasattr(self.game, 'flashlight'):
-            if self.game.current_level in (55, 65):
+            if self.game.level_manager.current_act_index == 9 and self.game.current_level in (1, 2):
                 self.game.flashlight.draw()
         
         hp = max(0, min(100, self.game.player.hp))
