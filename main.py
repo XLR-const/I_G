@@ -7,6 +7,8 @@ import pygame
 import sys
 import math
 from setting import *
+import config.user_settings as us
+binds = us.USER_SETTINGS["KEYBINDS"]
 from rendering.raycasting import RayCasting
 from rendering.renderer import Renderer
 from utils.pathfinding import PathFinder
@@ -246,7 +248,7 @@ class Game:
                                 self.weapon.fire()
 
                 if event.type == pygame.KEYDOWN:
-                    if event.key == pygame.K_SPACE:
+                    if event.key == binds["FIRE"]['key']:
                         self.weapon.fire()
                         
                 # 🔥 ХАК ПЕРЕХВАТА КНОПОК 1-4:
