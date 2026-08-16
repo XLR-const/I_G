@@ -228,6 +228,23 @@ SYMBOLS_CONFIG = {
       'type': 'wall',
       'texture': 'resources/textures/hall_ceil.png'  
     },
+    'lab_ceil': {
+        'type': 'wall',
+        'texture': 'resources/textures/lab_ceil.png'  
+    },
+    'lab_wall_1': {
+        'type': 'wall',
+        'texture': 'resources/textures/lab_wall_1.png'  
+    },
+    'lab_wall_2': {
+        'type': 'wall',
+        'texture': 'resources/textures/lab_wall_2.png'  
+    },
+    'lab_wall_3': {
+        'type': 'wall',
+        'texture': 'resources/textures/lab_wall_3.png'  
+    },
+    
     
     # Предметы
     'health': {
@@ -816,4 +833,4 @@ ACTS_CONFIG = {
     'act_build': 'resources/levels/act_build',
     'act_invasion': 'resources/levels/act_invasion'
 }
-ACTS_SEQUENCE = ['act_invasion', 'act_ventilation', 'act_hall', 'act_labrotory', 'act_hangurd']
+ACTS_SEQUENCE = ['act_invasion', 'act_ventilation', 'act_hall', 'act_laboratory', 'act_hangurd']

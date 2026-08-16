@@ -98,8 +98,8 @@ BIOME_DATABASE = {
             'max_density': 0.60   # Лаборатории компактные и блочные
         },
         'walls': {
-            'primary': { 'char': 'metal_crunch_wall', 'weight': 80 },
-            'secondary': { 'char': '1', 'weight': 20 }
+            'primary': { 'char': 'lab_wall_1', 'weight': 80 },
+            'secondary': { 'char': 'lab_wall_2', 'weight': 20 }
         },
         'doors': {
             'normal': 'door_normal',
@@ -108,7 +108,11 @@ BIOME_DATABASE = {
         'npc_settings': {
             'density': 0.018,
             'pool': {
-                'AGG': { 'weight': 100, 'max_count': 30, 'min_dist': 3, 'min_progress': 0.0, 'cluster': { 'type': 'circle', 'chance': 0.40, 'size': 3 } }
+                'ScF': { 'weight': 100, 'max_count': 30, 'min_dist': 3, 'min_progress': 0.0, 'cluster': { 'type': 'circle', 'chance': 0.40, 'size': 3 } },
+                'ScP': { 'weight': 100, 'max_count': 30, 'min_dist': 3, 'min_progress': 0.0, 'cluster': { 'type': 'circle', 'chance': 0.40, 'size': 3 } },
+                'ScPl': { 'weight': 100, 'max_count': 30, 'min_dist': 3, 'min_progress': 0.0, 'cluster': { 'type': 'circle', 'chance': 0.40, 'size': 3 } },
+                'ScU': { 'weight': 100, 'max_count': 30, 'min_dist': 3, 'min_progress': 0.0, 'cluster': { 'type': 'circle', 'chance': 0.40, 'size': 3 } },
+                'UB': { 'weight': 100, 'max_count': 30, 'min_dist': 3, 'min_progress': 0.0, 'cluster': { 'type': 'circle', 'chance': 0.40, 'size': 3 } }
             }
         },
         'decor_settings': {
