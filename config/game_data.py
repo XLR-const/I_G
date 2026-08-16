@@ -6,7 +6,7 @@
 - WEAPON_CONFIG: параметры всех типов оружия
 - MUSIC_CONFIG: пути к музыкальным трекам
 """
-
+import pygame
 
 # 🔥 РЕГИСТРАЦИЯ ВСЕХ ДЕКОРАЦИЙ ПО СТАРИНКЕ С РАЗМЕРАМИ И ОПИСАНИЕМ
 DECOR_CONFIG = {
@@ -834,3 +834,19 @@ ACTS_CONFIG = {
     'act_invasion': 'resources/levels/act_invasion'
 }
 ACTS_SEQUENCE = ['act_invasion', 'act_ventilation', 'act_hall', 'act_laboratory', 'act_hangurd']
+
+
+
+DEFAULT_USER_SETTINGS = {
+    "MOUSE_SENSITIVITY": 0.0020,
+    "MASTER_VOLUME": 0.60,
+    "KEYBINDS": {
+        "FORWARD": {"name": "ВХОД ВПЕРЕД", "key": 119, "key_name": "W"},  # pygame.K_w = 119
+        "BACKWARD": {"name": "ШАГ НАЗАД", "key": 115, "key_name": "S"}, # pygame.K_s = 115
+        "LEFT": {"name": "СТРЕЙФ ЛЕВО", "key": 97, "key_name": "A"},    # pygame.K_a = 97
+        "RIGHT": {"name": "СТРЕЙФ ПРАВО", "key": 100, "key_name": "D"},  # pygame.K_d = 100
+        "FIRE": {"name": "ОГНЬ / СТРЕЛЬБА", "key": 32, "key_name": "SPACE"} # pygame.K_SPACE = 32
+    }
+}
+
+

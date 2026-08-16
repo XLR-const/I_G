@@ -309,50 +309,130 @@ class UIManager:
         return False
 
     def _handle_options_event(self, event):
-        """Обрабатывает события меню настроек
+        """Обрабатывает события настроек с поддержкой кнопки полного сброса"""
+        import config.user_settings as us
+        import pprint
+        
+        bind_keys = list(us.USER_SETTINGS["KEYBINDS"].keys())
+        
+        # 🔥 НОВАЯ ДЛИНА МЕНЮ: 2 слайдера + N кнопок + 1 СБРОС + 1 НАЗАД
+        options_len = 2 + len(bind_keys) + 2
+        
+        reset_option_id = options_len - 2  # ID кнопки сброса
+        back_option_id = options_len - 1   # ID кнопки назад
 
-        Args:
-            event: Событие pygame
-
-        Returns:
-            bool: True если событие обработано
-        """
-        options_len = 3
+        if not hasattr(self, 'waiting_for_key'):
+            self.waiting_for_key = False
 
         if event.type == pygame.KEYDOWN:
+            # 1. РЕЖИМ ОЖИДАНИЯ КЛАВИШИ
+            if self.waiting_for_key:
+                if event.key == pygame.K_ESCAPE:
+                    self.waiting_for_key = False
+                    if self.swap_sound: self.swap_sound.play()
+                    return True
+                
+                current_bind_idx = self.selected_option - 2
+                bind_id = bind_keys[current_bind_idx]
+                k_name = pygame.key.name(event.key).upper()
+                
+                us.USER_SETTINGS["KEYBINDS"][bind_id]["key"] = event.key
+                us.USER_SETTINGS["KEYBINDS"][bind_id]["key_name"] = k_name
+                
+                user_config_path = os.path.join("config", "user_settings.py")
+                try:
+                    formatted_dict = pprint.pformat(us.USER_SETTINGS, indent=4, width=120, sort_dicts=False)
+                    with open(user_config_path, "w", encoding="utf-8") as f:
+                        f.write("# Автоматически сгенерированный файл настроек игрока\n")
+                        f.write(f"USER_SETTINGS = {formatted_dict}\n")
+                except Exception as e:
+                    print(f"❌ Ошибка сохранения кнопок: {e}")
+                
+                self.waiting_for_key = False
+                if self.enter_sound: self.enter_sound.play()
+                return True
+
+            # 2. ОБЫЧНЫЙ РЕЖИМ НАВИГАЦИИ
             if event.key == pygame.K_UP:
                 self.selected_option = (self.selected_option - 1) % options_len
-                if self.swap_sound:
-                    self.swap_sound.play()
+                if self.swap_sound: self.swap_sound.play()
                 return True
+                
             if event.key == pygame.K_DOWN:
                 self.selected_option = (self.selected_option + 1) % options_len
-                if self.swap_sound:
-                    self.swap_sound.play()
+                if self.swap_sound: self.swap_sound.play()
                 return True
+                
             if event.key == pygame.K_LEFT:
                 if self.selected_option == 0:
-                    new_val = max(0.0005, setting.MOUSE_SENSITIVITY - 0.0005)
-                    setting.MOUSE_SENSITIVITY = new_val
+                    setting.MOUSE_SENSITIVITY = max(0.0005, setting.MOUSE_SENSITIVITY - 0.0005)
+                    us.USER_SETTINGS["MOUSE_SENSITIVITY"] = setting.MOUSE_SENSITIVITY
                 elif self.selected_option == 1:
-                    new_val = max(0.0, setting.MASTER_VOLUME - 0.1)
-                    setting.MASTER_VOLUME = new_val
+                    setting.MASTER_VOLUME = max(0.0, setting.MASTER_VOLUME - 0.1)
+                    us.USER_SETTINGS["MASTER_VOLUME"] = setting.MASTER_VOLUME
+                
+                try:
+                    formatted_dict = pprint.pformat(us.USER_SETTINGS, indent=4, width=120, sort_dicts=False)
+                    with open(os.path.join("config", "user_settings.py"), "w", encoding="utf-8") as f:
+                        f.write(f"USER_SETTINGS = {formatted_dict}\n")
+                except: pass
                 return True
+                
             if event.key == pygame.K_RIGHT:
                 if self.selected_option == 0:
-                    new_val = min(0.01, setting.MOUSE_SENSITIVITY + 0.0005)
-                    setting.MOUSE_SENSITIVITY = new_val
+                    setting.MOUSE_SENSITIVITY = min(0.01, setting.MOUSE_SENSITIVITY + 0.0005)
+                    us.USER_SETTINGS["MOUSE_SENSITIVITY"] = setting.MOUSE_SENSITIVITY
                 elif self.selected_option == 1:
-                    new_val = min(1.0, setting.MASTER_VOLUME + 0.1)
-                    setting.MASTER_VOLUME = new_val
+                    setting.MASTER_VOLUME = min(1.0, setting.MASTER_VOLUME + 0.1)
+                    us.USER_SETTINGS["MASTER_VOLUME"] = setting.MASTER_VOLUME
+                
+                try:
+                    formatted_dict = pprint.pformat(us.USER_SETTINGS, indent=4, width=120, sort_dicts=False)
+                    with open(os.path.join("config", "user_settings.py"), "w", encoding="utf-8") as f:
+                        f.write(f"USER_SETTINGS = {formatted_dict}\n")
+                except: pass
                 return True
-            if event.key in (pygame.K_RETURN, pygame.K_ESCAPE):
-                if self.enter_sound:
-                    self.enter_sound.play()
-                if self.selected_option == 2:
+                
+            if event.key == pygame.K_RETURN:
+                if self.enter_sound: self.enter_sound.play()
+                
+                if 2 <= self.selected_option < reset_option_id:
+                    self.waiting_for_key = True
+                    
+                # 🔥 ОБРАБОТКА НАЖАТИЯ НА КНОПКУ "СБРОС НАСТРОЕК"
+                elif self.selected_option == reset_option_id:
+                    from config.game_data import DEFAULT_USER_SETTINGS
+                    import copy
+                    
+                    # Глубоко копируем дефолтный словарь из гейм-даты, чтобы изменения не связались ссылками
+                    us.USER_SETTINGS = copy.deepcopy(DEFAULT_USER_SETTINGS)
+                    
+                    # Мгновенно синхронизируем переменные движка в ОЗУ с дефолтными
+                    setting.MOUSE_SENSITIVITY = us.USER_SETTINGS["MOUSE_SENSITIVITY"]
+                    setting.MASTER_VOLUME = us.USER_SETTINGS["MASTER_VOLUME"]
+                    
+                    # Физически перезаписываем чистый дефолтный словарь на жесткий диск
+                    user_config_path = os.path.join("config", "user_settings.py")
+                    try:
+                        formatted_dict = pprint.pformat(us.USER_SETTINGS, indent=4, width=120, sort_dicts=False)
+                        with open(user_config_path, "w", encoding="utf-8") as f:
+                            f.write("# Автоматически сгенерированный файл настроек игрока\n")
+                            f.write(f"USER_SETTINGS = {formatted_dict}\n")
+                        print("🗑️ [КОНФИГУРАТОР] Настройки успешно сброшены к базовым заводским значениям!")
+                    except Exception as e:
+                        print(f"❌ Ошибка записи сброса на диск: {e}")
+                        
+                elif self.selected_option == back_option_id:
                     self.current_state = self.states['MENU']
                 return True
+                
+            if event.key == pygame.K_ESCAPE:
+                if self.enter_sound: self.enter_sound.play()
+                self.current_state = self.states['MENU']
+                return True
+                
         return False
+
 
     # ----------------------------------------------------------------------
     # UPDATE LOOPS
@@ -894,84 +974,191 @@ class UIManager:
     # ----------------------------------------------------------------------
 
     def _update_options(self):
-        """Обновляет меню настроек"""
-        pass
+        """Обновляет меню настроек: рассчитывает тайминги для мягких Sci-Fi эффектов"""
+        now = pygame.time.get_ticks()
+        
+        # Мягкая пульсация активного пункта (синус от 160 до 255)
+        self.menu_pulse = int(207 + 48 * math.sin(now * 0.004))
+        
+        # Эффект легкого шума терминала (микро-глитч яркости)
+        self.hud_glitch = random.choice([0, 0, 0, 0, 12, 0, -8, 0, 0])
+        
+        # Переключатель режима ожидания новой клавиши
+        if not hasattr(self, 'waiting_for_key'):
+            self.waiting_for_key = False
 
     def _draw_options(self, screen):
-        """Рисует меню настроек"""
-        screen.fill((20, 20, 40))
+        """Рисует меню настроек: добавлена кнопка безопасного сброса к дефолтам"""
+        menu_font = self.font_normal
+        title_font = self.font_tile
 
-        title = self.font_tile.render("НАСТРОЙКИ", True, (255, 200, 0))
-        title_rect = title.get_rect(center=(setting.WIDTH // 2, int(setting.CELL_H * 2)))
-        screen.blit(title, title_rect)
+        if hasattr(self, 'settings_bg') and self.settings_bg is not None:
+            screen.blit(self.settings_bg, (0, 0))
+        else:
+            screen.fill((10, 12, 16))
 
-        start_row = 4
+        dark = pygame.Surface((setting.WIDTH, setting.HEIGHT), pygame.SRCALPHA)
+        dark.fill((4, 7, 14, 150)) 
+        screen.blit(dark, (0, 0))
 
-        y_text = int(setting.CELL_H * start_row)
-        sens_text = self.font_normal.render(
-            f"ЧУВСТВИТЕЛЬНОСТЬ МЫШИ: {setting.MOUSE_SENSITIVITY:.3f}",
-            True, (200, 200, 200)
-        )
-        sens_rect = sens_text.get_rect(center=(setting.WIDTH // 2, y_text))
-        screen.blit(sens_text, sens_rect)
+        vignette = pygame.Surface((setting.WIDTH, setting.HEIGHT), pygame.SRCALPHA)
+        pygame.draw.rect(vignette, (0, 0, 0, 50), vignette.get_rect(), border_radius=20)
+        screen.blit(vignette, (0, 0))
 
-        if self.selected_option == 0:
-            bar_width = int(setting.CELL_W * 6)
-            bar_x = setting.WIDTH // 2 - bar_width // 2
-            bar_y = y_text + int(setting.CELL_H * 0.3)
-            pygame.draw.rect(screen, (80, 80, 80), (bar_x, bar_y, bar_width, 8))
-            norm = (setting.MOUSE_SENSITIVITY - 0.0005) / (0.01 - 0.0005)
-            handle_x = bar_x + int(bar_width * norm)
-            pygame.draw.rect(screen, (255, 200, 0), (handle_x - 5, bar_y - 4, 10, 16))
-            left_arr = self.font_small.render("<", True, (255, 200, 0))
-            right_arr = self.font_small.render(">", True, (255, 200, 0))
-            screen.blit(left_arr, (bar_x - 25, bar_y - 8))
-            screen.blit(right_arr, (bar_x + bar_width + 15, bar_y - 8))
+        pulse_val = getattr(self, 'menu_pulse', 255)
+        glitch_val = getattr(self, 'hud_glitch', 0)
+        
+        text_white = (240, 245, 255)
+        text_gray = (150, 160, 170)
+        cyan_dim = (0, 120, 220)
+        amber_gold = (255, 180, 0)
+        
+        g_color = max(0, min(255, pulse_val + glitch_val))
+        active_color = (0, g_color, 255)
 
-        y_text = int(setting.CELL_H * (start_row + 1.2))
-        vol_text = self.font_normal.render(
-            f"ГРОМКОСТЬ: {int(setting.MASTER_VOLUME * 100)}%",
-            True, (200, 200, 200)
-        )
-        vol_rect = vol_text.get_rect(center=(setting.WIDTH // 2, y_text))
-        screen.blit(vol_text, vol_rect)
+        # ЛОГОТИП НАСТРОЕК
+        title_text = "КОНФИГУРАТОР СИСТЕМ"
+        tx, ty = setting.WIDTH // 2, int(setting.CELL_H * 1.0)
+        title_brightness = max(0, min(255, 230 + glitch_val))
+        
+        glow_color = (0, int(title_brightness * 0.4), int(title_brightness * 0.8))
+        for ox, oy in [(-2, -2), (2, 2), (-2, 2), (2, -2)]:
+            glow_surf = title_font.render(title_text, True, glow_color)
+            screen.blit(glow_surf, glow_surf.get_rect(center=(tx + ox, ty + oy)))
+        
+        title = title_font.render(title_text, True, (255, int(title_brightness * 0.85), 0))
+        screen.blit(title, title.get_rect(center=(tx, ty)))
 
-        if self.selected_option == 1:
-            bar_width = int(setting.CELL_W * 6)
-            bar_x = setting.WIDTH // 2 - bar_width // 2
-            bar_y = y_text + int(setting.CELL_H * 0.3)
-            pygame.draw.rect(screen, (80, 80, 80), (bar_x, bar_y, bar_width, 8))
-            handle_x = bar_x + int(bar_width * setting.MASTER_VOLUME)
-            pygame.draw.rect(screen, (255, 200, 0), (handle_x - 5, bar_y - 4, 10, 16))
-            left_arr = self.font_small.render("<", True, (255, 200, 0))
-            right_arr = self.font_small.render(">", True, (255, 200, 0))
-            screen.blit(left_arr, (bar_x - 25, bar_y - 8))
-            screen.blit(right_arr, (bar_x + bar_width + 15, bar_y - 8))
+        import config.user_settings as us
+        bind_keys = list(us.USER_SETTINGS["KEYBINDS"].keys())
+        options_len = 2 + len(bind_keys) + 2
+        
+        reset_option_id = options_len - 2
+        back_option_id = options_len - 1
 
-        y_text = int(setting.CELL_H * (start_row + 2.4))
-        color = (255, 255, 255) if self.selected_option == 2 else (150, 150, 150)
-        back_text = self.font_normal.render("НАЗАД", True, color)
-        back_rect = back_text.get_rect(center=(setting.WIDTH // 2, y_text))
+        start_y = int(setting.CELL_H * 2.3)
+        row_spacing = 42  
+        bx = int(setting.WIDTH * 0.62)
+        bar_width = 160
+
+        # СЛАЙДЕР 0: МЫШЬ
+        is_sel = (self.selected_option == 0)
+        c = active_color if is_sel else text_gray
+        txt = menu_font.render(f"ЧУВСТВИТЕЛЬНОСТЬ МЫШИ: {setting.MOUSE_SENSITIVITY:.4f}", True, c)
+        screen.blit(txt, txt.get_rect(left=int(setting.WIDTH * 0.15), centery=start_y))
+        
+        pygame.draw.rect(screen, (30, 40, 50), (bx, start_y - 4, bar_width, 8))
+        norm = (setting.MOUSE_SENSITIVITY - 0.0005) / (0.01 - 0.0005)
+        norm = max(0.0, min(1.0, norm))
+        hx = bx + int(bar_width * norm)
+        pygame.draw.rect(screen, active_color if is_sel else cyan_dim, (bx, start_y - 4, hx - bx, 8))
+        pygame.draw.rect(screen, text_white, (hx - 3, start_y - 8, 6, 16))
+        
+        bracket_color = active_color if is_sel else (60, 75, 90)
+        b_l = menu_font.render("[", True, bracket_color)
+        screen.blit(b_l, b_l.get_rect(right=bx - 10, centery=start_y))
+        b_r = menu_font.render("]", True, bracket_color)
+        screen.blit(b_r, b_r.get_rect(left=bx + bar_width + 10, centery=start_y))
+        
+        # СЛАЙДЕР 1: ЗВУК
+        start_y += row_spacing
+        is_sel = (self.selected_option == 1)
+        c = active_color if is_sel else text_gray
+        txt = menu_font.render(f"ГРОМКОСТЬ ЗВУКА: {int(setting.MASTER_VOLUME * 100)}%", True, c)
+        screen.blit(txt, txt.get_rect(left=int(setting.WIDTH * 0.15), centery=start_y))
+        
+        pygame.draw.rect(screen, (30, 40, 50), (bx, start_y - 4, bar_width, 8))
+        hx = bx + int(bar_width * max(0.0, min(1.0, setting.MASTER_VOLUME)))
+        pygame.draw.rect(screen, active_color if is_sel else cyan_dim, (bx, start_y - 4, hx - bx, 8))
+        pygame.draw.rect(screen, text_white, (hx - 3, start_y - 8, 6, 16))
+        
+        bracket_color = active_color if is_sel else (60, 75, 90)
+        b_l = menu_font.render("[", True, bracket_color)
+        screen.blit(b_l, b_l.get_rect(right=bx - 10, centery=start_y))
+        b_r = menu_font.render("]", True, bracket_color)
+        screen.blit(b_r, b_r.get_rect(left=bx + bar_width + 10, centery=start_y))
+
+        # Разделительная линия
+        start_y += int(row_spacing * 0.8)
+        pygame.draw.line(screen, (30, 45, 60), (int(setting.WIDTH * 0.12), start_y), (int(setting.WIDTH * 0.88), start_y), 1)
+        
+        start_y += int(row_spacing * 0.8)
+        header_txt = self.font_small.render("КОНФИГУРАЦИЯ КЛАВИШ КОСТЮМА:", True, amber_gold)
+        screen.blit(header_txt, header_txt.get_rect(left=int(setting.WIDTH * 0.15), centery=start_y))
+        
+        # ТАБЛИЦЫ КНОПОК
+        waiting_key_flag = getattr(self, 'waiting_for_key', False)
+
+        for idx, bind_id in enumerate(bind_keys):
+            start_y += row_spacing
+            current_opt_global_id = 2 + idx 
+            is_sel = (self.selected_option == current_opt_global_id)
+            
+            action_name = us.USER_SETTINGS["KEYBINDS"][bind_id]["name"]
+            key_display_name = us.USER_SETTINGS["KEYBINDS"][bind_id]["key_name"]
+            
+            c = active_color if is_sel else text_gray
+            action_txt = menu_font.render(action_name, True, c)
+            screen.blit(action_txt, action_txt.get_rect(left=int(setting.WIDTH * 0.15), centery=start_y))
+            
+            if is_sel and waiting_key_flag:
+                flash_alpha = int(140 + 115 * math.sin(pygame.time.get_ticks() * 0.01))
+                key_c = (255, flash_alpha // 2, 0)
+                key_txt = menu_font.render("[ НАЖМИ КЛАВИШУ ]", True, key_c)
+            else:
+                key_c = active_color if is_sel else text_white
+                key_txt = menu_font.render(f"[  {key_display_name}  ]", True, key_c)
+                
+            screen.blit(key_txt, key_txt.get_rect(left=bx, centery=start_y))
+
+        # ---------------------------------------------------------------------
+        # 🔥 НОВАЯ КНОПКА: СБРОСИТЬ НАСТРОЕК (Мягкий оранжевый тон)
+        # ---------------------------------------------------------------------
+        start_y += int(row_spacing * 1.2)
+        is_sel_reset = (self.selected_option == reset_option_id)
+        
+        if is_sel_reset:
+            reset_text = menu_font.render("СБРОСИТЬ НАСТРОЕКИ ПО УМОЛЧАНИЮ", True, active_color)
+            reset_rect = reset_text.get_rect(center=(setting.WIDTH // 2, start_y))
+            
+            b_l = menu_font.render("[ ", True, active_color)
+            screen.blit(b_l, b_l.get_rect(right=reset_rect.left - 10, centery=reset_rect.centery))
+            b_r = menu_font.render(" ]", True, active_color)
+            screen.blit(b_r, b_r.get_rect(left=reset_rect.right + 10, centery=reset_rect.centery))
+        else:
+            reset_text = menu_font.render("СБРОСИТЬ НАСТРОЕКИ ПО УМОЛЧАНИЮ", True, (190, 110, 20))
+            reset_rect = reset_text.get_rect(center=(setting.WIDTH // 2, start_y))
+            
+        screen.blit(reset_text, reset_rect)
+
+        # ---------------------------------------------------------------------
+        # КНОПКА "СОХРАНИТЬ И НАЗАД"
+        # ---------------------------------------------------------------------
+        start_y += int(row_spacing * 1.1)
+        is_sel_back = (self.selected_option == back_option_id)
+        
+        if is_sel_back:
+            back_text = menu_font.render("СОХРАНИТЬ И НАЗАД", True, active_color)
+            back_rect = back_text.get_rect(center=(setting.WIDTH // 2, start_y))
+            
+            b_l = menu_font.render("[ ", True, active_color)
+            screen.blit(b_l, b_l.get_rect(right=back_rect.left - 10, centery=back_rect.centery))
+            b_r = menu_font.render(" ]", True, active_color)
+            screen.blit(b_r, b_r.get_rect(left=back_rect.right + 10, centery=back_rect.centery))
+        else:
+            back_text = menu_font.render("СОХРАНИТЬ И НАЗАД", True, text_gray)
+            back_rect = back_text.get_rect(center=(setting.WIDTH // 2, start_y))
+            
         screen.blit(back_text, back_rect)
 
-        tip = self.font_small.render(
-            "↑/↓ - ВЫБОР, ←/→ - ИЗМЕНИТЬ, ESC/ENTER - НАЗАД",
-            True, (150, 150, 150)
-        )
-        tip_rect = tip.get_rect(center=(setting.WIDTH // 2, setting.HEIGHT - int(setting.CELL_H * 2)))
+        # Подсказка
+        tip_str = "UP/DOWN - НАВИГАЦИЯ, ENTER - ПЕРЕНАЗНАЧИТЬ КЛАВИШУ / СБРОСИТЬ, ESC - ВЫХОД"
+        if waiting_key_flag:
+            tip_str = "СИСТЕМА ОЖИДАЕТ НАЖАТИЯ ЛЮБОЙ КЛАВИШИ НА КЛАВИАТУРЕ..."
+            
+        tip = self.font_small.render(tip_str, True, (110, 130, 145))
+        tip_rect = tip.get_rect(center=(setting.WIDTH // 2, setting.HEIGHT - int(setting.CELL_H * 0.6)))
         screen.blit(tip, tip_rect)
-
-        controls_start_row = 10
-        controls = [
-            "УПРАВЛЕНИЕ:", "W/A/S/D - ДВИЖЕНИЕ", "МЫШЬ - ПОВОРОТ",
-            "ЛКМ / ПРОБЕЛ - СТРЕЛЬБА", "1-4 - СМЕНА ОРУЖИЯ", "ESC - ПАУЗА/ВЫХОД"
-        ]
-        for i, line in enumerate(controls):
-            y = int(setting.CELL_H * (controls_start_row + i * 0.4))
-            color = (255, 200, 0) if i == 0 else (180, 180, 180)
-            txt = self.font_small.render(line, True, color)
-            txt_rect = txt.get_rect(center=(setting.WIDTH // 2, y))
-            screen.blit(txt, txt_rect)
 
     # ----------------------------------------------------------------------
     # HELPERS
