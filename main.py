@@ -4,6 +4,7 @@
 """
 
 import pygame
+import utils.sound_patch
 import sys
 import math
 from setting import *

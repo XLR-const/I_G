@@ -370,6 +370,7 @@ class UIManager:
                 elif self.selected_option == 1:
                     setting.MASTER_VOLUME = max(0.0, setting.MASTER_VOLUME - 0.1)
                     us.USER_SETTINGS["MASTER_VOLUME"] = setting.MASTER_VOLUME
+                    pygame.mixer.music.set_volume(setting.MASTER_VOLUME)
                 
                 try:
                     formatted_dict = pprint.pformat(us.USER_SETTINGS, indent=4, width=120, sort_dicts=False)
@@ -385,6 +386,7 @@ class UIManager:
                 elif self.selected_option == 1:
                     setting.MASTER_VOLUME = min(1.0, setting.MASTER_VOLUME + 0.1)
                     us.USER_SETTINGS["MASTER_VOLUME"] = setting.MASTER_VOLUME
+                    pygame.mixer.music.set_volume(setting.MASTER_VOLUME)
                 
                 try:
                     formatted_dict = pprint.pformat(us.USER_SETTINGS, indent=4, width=120, sort_dicts=False)
@@ -988,23 +990,28 @@ class UIManager:
             self.waiting_for_key = False
 
     def _draw_options(self, screen):
-        """Рисует меню настроек: добавлена кнопка безопасного сброса к дефолтам"""
+        """Рисует меню настроек: абсолютное позиционирование по центру высоты экрана"""
         menu_font = self.font_normal
         title_font = self.font_tile
 
+        # 1. ОТРИСОВКА ЗАДНИКА
         if hasattr(self, 'settings_bg') and self.settings_bg is not None:
             screen.blit(self.settings_bg, (0, 0))
         else:
-            screen.fill((10, 12, 16))
+            # Если картинка не найдена — заливаем красивым глубоким Sci-Fi цветом космоса
+            screen.fill((10, 16, 26))
 
+        # Накладываем полупрозрачное Sci-Fi затемнение
         dark = pygame.Surface((setting.WIDTH, setting.HEIGHT), pygame.SRCALPHA)
-        dark.fill((4, 7, 14, 150)) 
+        dark.fill((4, 7, 14, 160)) 
         screen.blit(dark, (0, 0))
 
+        # Кинематографичная виньетка по краям экрана
         vignette = pygame.Surface((setting.WIDTH, setting.HEIGHT), pygame.SRCALPHA)
         pygame.draw.rect(vignette, (0, 0, 0, 50), vignette.get_rect(), border_radius=20)
         screen.blit(vignette, (0, 0))
 
+        # Настройки анимаций и пульсации
         pulse_val = getattr(self, 'menu_pulse', 255)
         glitch_val = getattr(self, 'hud_glitch', 0)
         
@@ -1014,11 +1021,13 @@ class UIManager:
         amber_gold = (255, 180, 0)
         
         g_color = max(0, min(255, pulse_val + glitch_val))
-        active_color = (0, g_color, 255)
+        active_color = (0, g_color, 255)  # Неоновый бирюзовый
 
-        # ЛОГОТИП НАСТРОЕК
+        # 2. ГОЛОГРАФИЧЕСКИЙ ЛОГОТИП НАСТРОЕК (Мягкий янтарный Glow)
         title_text = "КОНФИГУРАТОР СИСТЕМ"
-        tx, ty = setting.WIDTH // 2, int(setting.CELL_H * 1.0)
+        tx = setting.WIDTH // 2
+        # Жестко фиксируем заголовок у верхнего края (на 8% от высоты экрана)
+        ty = int(setting.HEIGHT * 0.08)
         title_brightness = max(0, min(255, 230 + glitch_val))
         
         glow_color = (0, int(title_brightness * 0.4), int(title_brightness * 0.8))
@@ -1029,24 +1038,31 @@ class UIManager:
         title = title_font.render(title_text, True, (255, int(title_brightness * 0.85), 0))
         screen.blit(title, title.get_rect(center=(tx, ty)))
 
+        # Читаем структуру данных из нового изолированного файла настроек
         import config.user_settings as us
         bind_keys = list(us.USER_SETTINGS["KEYBINDS"].keys())
-        options_len = 2 + len(bind_keys) + 2
         
-        reset_option_id = options_len - 2
-        back_option_id = options_len - 1
+        options_len = 2 + len(bind_keys) + 2
+        reset_option_id = options_len - 2  
+        back_option_id = options_len - 1   
 
-        start_y = int(setting.CELL_H * 2.3)
-        row_spacing = 42  
+        # 🔥 ЖЕСТКИЙ ФИКС ВЕРСТКИ: Привязываем координаты К ВЫСОТЕ ЭКРАНА вместо CELL_H!
+        # Первая строчка начнется строго на 28% от верха экрана, а шаг между ними — 38 пикселей
+        start_y = int(setting.HEIGHT * 0.26)  
+        row_spacing = 38                     
+        
         bx = int(setting.WIDTH * 0.62)
         bar_width = 160
 
-        # СЛАЙДЕР 0: МЫШЬ
+        # ---------------------------------------------------------------------
+        # СЛАЙДЕР 0: ЧУВСТВИТЕЛЬНОСТЬ МЫШИ
+        # ---------------------------------------------------------------------
         is_sel = (self.selected_option == 0)
         c = active_color if is_sel else text_gray
         txt = menu_font.render(f"ЧУВСТВИТЕЛЬНОСТЬ МЫШИ: {setting.MOUSE_SENSITIVITY:.4f}", True, c)
         screen.blit(txt, txt.get_rect(left=int(setting.WIDTH * 0.15), centery=start_y))
         
+        # Шкала
         pygame.draw.rect(screen, (30, 40, 50), (bx, start_y - 4, bar_width, 8))
         norm = (setting.MOUSE_SENSITIVITY - 0.0005) / (0.01 - 0.0005)
         norm = max(0.0, min(1.0, norm))
@@ -1054,39 +1070,50 @@ class UIManager:
         pygame.draw.rect(screen, active_color if is_sel else cyan_dim, (bx, start_y - 4, hx - bx, 8))
         pygame.draw.rect(screen, text_white, (hx - 3, start_y - 8, 6, 16))
         
+        # Скобочки по бокам
         bracket_color = active_color if is_sel else (60, 75, 90)
         b_l = menu_font.render("[", True, bracket_color)
         screen.blit(b_l, b_l.get_rect(right=bx - 10, centery=start_y))
         b_r = menu_font.render("]", True, bracket_color)
         screen.blit(b_r, b_r.get_rect(left=bx + bar_width + 10, centery=start_y))
         
-        # СЛАЙДЕР 1: ЗВУК
+        # ---------------------------------------------------------------------
+        # СЛАЙДЕР 1: ГРОМКОСТЬ ЗВУКА
+        # ---------------------------------------------------------------------
         start_y += row_spacing
         is_sel = (self.selected_option == 1)
         c = active_color if is_sel else text_gray
-        txt = menu_font.render(f"ГРОМКОСТЬ ЗВУКА: {int(setting.MASTER_VOLUME * 100)}%", True, c)
+        
+        # 🔥 ФИКС БИТОГО СИМВОЛА %: Заменяем знак процента на текстовое обозначение "ЕД"
+        vol_val = int(setting.MASTER_VOLUME * 100)
+        txt = menu_font.render(f"ГРОМКОСТЬ ЗВУКА: {vol_val} ЕД", True, c)
         screen.blit(txt, txt.get_rect(left=int(setting.WIDTH * 0.15), centery=start_y))
         
+        # Шкала
         pygame.draw.rect(screen, (30, 40, 50), (bx, start_y - 4, bar_width, 8))
         hx = bx + int(bar_width * max(0.0, min(1.0, setting.MASTER_VOLUME)))
         pygame.draw.rect(screen, active_color if is_sel else cyan_dim, (bx, start_y - 4, hx - bx, 8))
         pygame.draw.rect(screen, text_white, (hx - 3, start_y - 8, 6, 16))
         
+        # Скобочки по бокам
         bracket_color = active_color if is_sel else (60, 75, 90)
         b_l = menu_font.render("[", True, bracket_color)
         screen.blit(b_l, b_l.get_rect(right=bx - 10, centery=start_y))
         b_r = menu_font.render("]", True, bracket_color)
         screen.blit(b_r, b_r.get_rect(left=bx + bar_width + 10, centery=start_y))
 
-        # Разделительная линия
+        # Разделительная тактическая линия
         start_y += int(row_spacing * 0.8)
         pygame.draw.line(screen, (30, 45, 60), (int(setting.WIDTH * 0.12), start_y), (int(setting.WIDTH * 0.88), start_y), 1)
         
+        # Заголовок блока клавиш
         start_y += int(row_spacing * 0.8)
         header_txt = self.font_small.render("КОНФИГУРАЦИЯ КЛАВИШ КОСТЮМА:", True, amber_gold)
         screen.blit(header_txt, header_txt.get_rect(left=int(setting.WIDTH * 0.15), centery=start_y))
         
-        # ТАБЛИЦЫ КНОПОК
+        # ---------------------------------------------------------------------
+        # ДИНАМИЧЕСКИЙ БЛОК ТАБЛИЦЫ КНОПОК ИЗ USER_SETTINGS
+        # ---------------------------------------------------------------------
         waiting_key_flag = getattr(self, 'waiting_for_key', False)
 
         for idx, bind_id in enumerate(bind_keys):
@@ -1112,15 +1139,14 @@ class UIManager:
             screen.blit(key_txt, key_txt.get_rect(left=bx, centery=start_y))
 
         # ---------------------------------------------------------------------
-        # 🔥 НОВАЯ КНОПКА: СБРОСИТЬ НАСТРОЕК (Мягкий оранжевый тон)
+        # КНОПКА СБРОСА: СБРОСИТЬ НАСТРОЙКИ ПО УМОЛЧАНИЮ
         # ---------------------------------------------------------------------
-        start_y += int(row_spacing * 1.2)
+        start_y += int(row_spacing * 1.5) # Даем чуть больше отступа перед финишными кнопками
         is_sel_reset = (self.selected_option == reset_option_id)
         
         if is_sel_reset:
             reset_text = menu_font.render("СБРОСИТЬ НАСТРОЕКИ ПО УМОЛЧАНИЮ", True, active_color)
             reset_rect = reset_text.get_rect(center=(setting.WIDTH // 2, start_y))
-            
             b_l = menu_font.render("[ ", True, active_color)
             screen.blit(b_l, b_l.get_rect(right=reset_rect.left - 10, centery=reset_rect.centery))
             b_r = menu_font.render(" ]", True, active_color)
@@ -1128,19 +1154,17 @@ class UIManager:
         else:
             reset_text = menu_font.render("СБРОСИТЬ НАСТРОЕКИ ПО УМОЛЧАНИЮ", True, (190, 110, 20))
             reset_rect = reset_text.get_rect(center=(setting.WIDTH // 2, start_y))
-            
         screen.blit(reset_text, reset_rect)
 
         # ---------------------------------------------------------------------
-        # КНОПКА "СОХРАНИТЬ И НАЗАД"
+        # КНОПКА ВЫХОДА ОБРАТНО "СОХРАНИТЬ И НАЗАД"
         # ---------------------------------------------------------------------
-        start_y += int(row_spacing * 1.1)
+        start_y += int(row_spacing * 1.2)
         is_sel_back = (self.selected_option == back_option_id)
         
         if is_sel_back:
             back_text = menu_font.render("СОХРАНИТЬ И НАЗАД", True, active_color)
             back_rect = back_text.get_rect(center=(setting.WIDTH // 2, start_y))
-            
             b_l = menu_font.render("[ ", True, active_color)
             screen.blit(b_l, b_l.get_rect(right=back_rect.left - 10, centery=back_rect.centery))
             b_r = menu_font.render(" ]", True, active_color)
@@ -1148,10 +1172,11 @@ class UIManager:
         else:
             back_text = menu_font.render("СОХРАНИТЬ И НАЗАД", True, text_gray)
             back_rect = back_text.get_rect(center=(setting.WIDTH // 2, start_y))
-            
         screen.blit(back_text, back_rect)
 
-        # Подсказка
+        # ---------------------------------------------------------------------
+        # НИЖНЯЯ ПОДСКАЗКА С КЛАВИШАМИ НАВИГАЦИИ
+        # ---------------------------------------------------------------------
         tip_str = "UP/DOWN - НАВИГАЦИЯ, ENTER - ПЕРЕНАЗНАЧИТЬ КЛАВИШУ / СБРОСИТЬ, ESC - ВЫХОД"
         if waiting_key_flag:
             tip_str = "СИСТЕМА ОЖИДАЕТ НАЖАТИЯ ЛЮБОЙ КЛАВИШИ НА КЛАВИАТУРЕ..."

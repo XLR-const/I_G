@@ -5,6 +5,7 @@
 
 import os
 import pygame
+from setting import *
 from config.game_data import MUSIC_CONFIG
 
 
@@ -20,7 +21,7 @@ class MusicManager:
     def __init__(self):
         """Инициализирует MusicManager"""
         self.current_track = None
-        self.volume = 0.2
+        self.volume = MASTER_VOLUME * 0.5
         self.fade_time = 500
 
         if not pygame.mixer.get_init():
