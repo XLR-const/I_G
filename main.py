@@ -153,7 +153,7 @@ class Game:
                 self.weapon.fire()
 
         self.delta_time = self.clock.tick(FPS)
-        self.player.update_regen()
+        #self.player.update_regen()
         pygame.display.set_caption(f'FPS: {self.clock.get_fps():.1f}')
 
     def draw(self):
