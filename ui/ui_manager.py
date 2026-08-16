@@ -5,6 +5,7 @@ import random
 from utils.save_system import SaveSystem
 from config.game_data import ACTS_SEQUENCE
 import os
+import math
 
 
 class UIManager:
@@ -429,33 +430,88 @@ class UIManager:
     # ----------------------------------------------------------------------
 
     def _update_menu(self):
-        """Обновляет главное меню"""
-        pass
+        """Обновляет главное меню: рассчитывает тайминги для мягких Sci-Fi эффектов"""
+        now = pygame.time.get_ticks()
+        
+        # Мягкая пульсация активного пункта (синус от 160 до 255)
+        self.menu_pulse = int(207 + 48 * math.sin(now * 0.004))
+        
+        # Эффект легкого шума терминала (микро-глитч яркости голограммы)
+        self.hud_glitch = random.choice([0, 0, 0, 0, 12, 0, -8, 0, 0])
 
     def _draw_menu(self, screen):
-        """Рисует главное меню"""
+        """Рисует главное меню: исправлен контраст цветов и фикс сложения кортежей"""
+        # 1. Отрисовка базового задника
         if self.backgrounds.get('menu'):
             screen.blit(self.backgrounds['menu'], (0, 0))
         else:
-            screen.fill((20, 40, 20))
+            screen.fill((10, 12, 16))
 
-        title = self.font_tile.render("Ilyusha Grate", True, (255, 250, 0))
-        title_rect = title.get_rect(center=(setting.WIDTH // 2, int(setting.CELL_H * 2)))
-        screen.blit(title, title_rect)
+        # 2. Мягкая виньетка по краям экрана для увеличения контраста текста
+        vignette = pygame.Surface((setting.WIDTH, setting.HEIGHT), pygame.SRCALPHA)
+        pygame.draw.rect(vignette, (0, 0, 0, 45), vignette.get_rect(), border_radius=20)
+        screen.blit(vignette, (0, 0))
 
+        # 3. ЛОГОТИП ИГРЫ (С неоновым Sci-Fi свечением плазмы)
+        title_text = "Ilyusha Grate"
+        
+        # Разделяем координаты центра логотипа на X и Y
+        tx = setting.WIDTH // 2
+        ty = int(setting.CELL_H * 1.5)
+        
+        glitch_val = getattr(self, 'hud_glitch', 0)
+        pulse_val = getattr(self, 'menu_pulse', 255)
+        logo_y_brightness = max(0, min(255, 230 + glitch_val))
+        
+        # Размытый неоновый Glow-ореол под логотипом (Фикс: попиксельный сдвиг без сложения кортежей)
+        glow_color = (0, int(logo_y_brightness * 0.4), int(logo_y_brightness * 0.8))
+        for ox, oy in [(-2, -2), (2, 2), (-2, 2), (2, -2)]:
+            glow_surf = self.font_tile.render(title_text, True, glow_color)
+            screen.blit(glow_surf, glow_surf.get_rect(center=(tx + ox, ty + oy)))
+
+        # Тень под логотипом
+        title_shadow = self.font_tile.render(title_text, True, (15, 20, 30))
+        screen.blit(title_shadow, title_shadow.get_rect(center=(tx + 2, ty + 2)))
+        
+        # Сам логотип (Твой оригинальный шрифт font_tile)
+        title = self.font_tile.render(title_text, True, (255, int(logo_y_brightness * 0.85), 0))
+        screen.blit(title, title.get_rect(center=(tx, ty)))
+
+        # 4. НАСТРОЙКА ЦЕНТРОВКИ И КОНТРАСТНЫХ ЦВЕТОВ ПУНКТОВ
+        menu_center_x = int(setting.WIDTH * 0.70) 
         options = ['НОВАЯ ИГРА', 'ЗАГРУЗИТЬ ПОСЛЕДНЮЮ ИГРУ', 'НАСТРОЙКИ', 'ВЫХОД']
+        
         for i, opt in enumerate(options):
+            # Шаг по вертикали под твой родной размер
             y = setting.HEIGHT // 2 + i * 60
-            color = (255, 255, 255) if i == self.selected_option else (255, 140, 0)
-            text = self.font_normal.render(opt, True, color)
-            text_rect = text.get_rect(center=(setting.WIDTH // 2, y))
+            
+            if i == self.selected_option:
+                # 🔷 АКТИВНЫЙ ПУНКТ: Яркий неоновый бирюзовый
+                g_color = max(0, min(255, pulse_val + glitch_val))
+                color = (0, g_color, 255)
+                
+                text = self.font_normal.render(opt, True, color)
+                text_rect = text.get_rect(center=(menu_center_x, y))
+                
+                # Квадратные скобки [ ]
+                bracket_l = self.font_normal.render("[ ", True, color)
+                bracket_l_rect = bracket_l.get_rect(right=text_rect.left - 15, centery=text_rect.centery)
+                
+                bracket_r = self.font_normal.render(" ]", True, color)
+                bracket_r_rect = bracket_r.get_rect(left=text_rect.right + 15, centery=text_rect.centery)
+                
+                screen.blit(bracket_l, bracket_l_rect)
+                screen.blit(bracket_r, bracket_r_rect)
+            else:
+                # ⚪ КОНТРАСТНЫЙ ЦВЕТ: Светло-серый тактический металл (Больше не сливается со скалами!)
+                color = (220, 225, 230)
+                
+                text = self.font_normal.render(opt, True, color)
+                text_rect = text.get_rect(center=(menu_center_x, y))
+
+            # Выводим оригинальный резкий пиксельный текст на экран
             screen.blit(text, text_rect)
 
-            if i == self.selected_option:
-                arrow_x = text_rect.left - 30
-                arrow_y = text_rect.centery
-                pygame.draw.line(screen, (255, 200, 0), (arrow_x, arrow_y - 10), (arrow_x + 15, arrow_y), 3)
-                pygame.draw.line(screen, (255, 200, 0), (arrow_x, arrow_y + 10), (arrow_x + 15, arrow_y), 3)
 
     # ----------------------------------------------------------------------
     # BRIEFING
@@ -546,27 +602,115 @@ class UIManager:
     # ----------------------------------------------------------------------
 
     def _update_pause(self):
-        """Обновляет меню паузы"""
-        pass
+        """Обновляет меню паузы: рассчитывает тайминги для мягких Sci-Fi эффектов"""
+        now = pygame.time.get_ticks()
+        
+        # Мягкая пульсация активного пункта (синус)
+        self.pause_pulse = int(207 + 48 * math.sin(now * 0.004))
+        
+        # Микро-глитч яркости голограммы
+        self.pause_glitch = random.choice([0, 0, 0, 0, 12, 0, -8, 0, 0])
 
     def _draw_pause(self, screen):
-        """Рисует меню паузы"""
-        dark = pygame.Surface((setting.WIDTH, setting.HEIGHT))
-        dark.set_alpha(180)
-        dark.fill((0, 0, 0))
+        """Рисует минималистичное меню паузы поверх яркого фона базы"""
+        menu_font = self.font_normal
+        title_font = self.font_tile
+
+        # 1. ЗАГРУЗКА И КЭШИРОВАНИЕ ФОНА НАПРЯМУЮ С ДИСКА
+        if not hasattr(self, '_pause_bg_cached'):
+            bg_path = "resources/ui/main_menu_bg.png"
+            if os.path.exists(bg_path):
+                try:
+                    img = pygame.image.load(bg_path).convert()
+                    self._pause_bg_cached = pygame.transform.scale(img, (setting.WIDTH, setting.HEIGHT))
+                except:
+                    self._pause_bg_cached = None
+            else:
+                self._pause_bg_cached = None
+
+        # Отрисовка фона
+        if self._pause_bg_cached:
+            screen.blit(self._pause_bg_cached, (0, 0))
+        else:
+            screen.fill((10, 12, 16))
+
+        # 🔥 ФИКС 1: ДЕЛАЕМ ФОН ЯРЧЕ
+        # Снижаем плотность альфа-канала с 195 до 110. 
+        # Теперь база и персонаж будут видны четко, сочно и контрастно!
+        dark = pygame.Surface((setting.WIDTH, setting.HEIGHT), pygame.SRCALPHA)
+        dark.fill((4, 7, 14, 110)) 
         screen.blit(dark, (0, 0))
 
-        title = self.font_tile.render("ПАУЗА", True, (255, 200, 0))
-        title_rect = title.get_rect(center=(setting.WIDTH // 2, int(setting.CELL_H * 3)))
-        screen.blit(title, title_rect)
+        # Кинематографичная легкая виньетка по краям
+        vignette = pygame.Surface((setting.WIDTH, setting.HEIGHT), pygame.SRCALPHA)
+        pygame.draw.rect(vignette, (0, 0, 0, 50), vignette.get_rect(), border_radius=30)
+        screen.blit(vignette, (0, 0))
 
+        # Цвет линий тактических уголков шлема
+        blue_line = (0, 140, 255)
+
+        # 🔥 ФИКС 2: ВСЕ ЛИШНИЕ ОБЪЕКТЫ (РАДАР, ЛУЧИ, СИНУСОИДЫ) ПОЛНОСТЬЮ УДАЛЕНЫ
+
+        # Оставляем только аккуратные тонкие Sci-Fi уголки по краям экрана для сохранения HUD-стилистики
+        margin, length = 25, 20
+        pygame.draw.line(screen, blue_line, (margin, margin), (margin + length, margin), 1)
+        pygame.draw.line(screen, blue_line, (margin, margin), (margin, margin + length), 1)
+        pygame.draw.line(screen, blue_line, (setting.WIDTH - margin, margin), (setting.WIDTH - margin - length, margin), 1)
+        pygame.draw.line(screen, blue_line, (setting.WIDTH - margin, margin), (setting.WIDTH - margin, margin + length), 1)
+
+        # 2. ЗАГЛУШКА-ЗАГОЛОВОК "ПАУЗА"
+        title_text = "ПАУЗА"
+        tx, ty = setting.WIDTH // 2, int(setting.CELL_H * 2.5)
+        
+        glitch_val = getattr(self, 'pause_glitch', 0)
+        pulse_val = getattr(self, 'pause_pulse', 255)
+        title_brightness = max(0, min(255, 230 + glitch_val))
+        
+        # Эффект мягкого свечения под заголовком
+        glow_color = (int(title_brightness * 0.9), int(title_brightness * 0.7), 0)
+        for ox, oy in [(-2, -2), (2, 2), (-2, 2), (2, -2)]:
+            glow_surf = title_font.render(title_text, True, glow_color)
+            screen.blit(glow_surf, glow_surf.get_rect(center=(tx + ox, ty + oy)))
+
+        title_shadow = title_font.render(title_text, True, (5, 5, 10))
+        screen.blit(title_shadow, title_shadow.get_rect(center=(tx + 3, ty + 3)))
+        
+        title = title_font.render(title_text, True, (255, int(title_brightness * 0.8), 0))
+        screen.blit(title, title.get_rect(center=(tx, ty)))
+
+        # 3. ОТРИСОВКА ПУНКТОВ МЕНЮ (Твой родной резкий пиксельный шрифт)
+        menu_center_x = setting.WIDTH // 2
         options = ['ПРОДОЛЖИТЬ', 'ПЕРЕЗАПУСТИТЬ УРОВЕНЬ', 'ГЛАВНОЕ МЕНЮ', 'ВЫХОД']
+
         for i, opt in enumerate(options):
             y = setting.HEIGHT // 2 + i * 60
-            color = (255, 255, 255) if i == self.selected_option else (150, 150, 150)
-            text = self.font_normal.render(opt, True, color)
-            text_rect = text.get_rect(center=(setting.WIDTH // 2, y))
+            
+            if i == self.selected_option:
+                # 🔷 Активный пункт: Неоновый бирюзовый с легким мерцанием
+                g_color = max(0, min(255, pulse_val + glitch_val))
+                color = (0, g_color, 255)
+                
+                text = menu_font.render(opt, True, color)
+                text_rect = text.get_rect(center=(menu_center_x, y))
+                
+                # Строгие квадратные скобки вокруг активной строки
+                bracket_l = menu_font.render("[ ", True, color)
+                bracket_l_rect = bracket_l.get_rect(right=text_rect.left - 15, centery=text_rect.centery)
+                
+                bracket_r = menu_font.render(" ]", True, color)
+                bracket_r_rect = bracket_r.get_rect(left=text_rect.right + 15, centery=text_rect.centery)
+                
+                screen.blit(bracket_l, bracket_l_rect)
+                screen.blit(bracket_r, bracket_r_rect)
+            else:
+                # ⚪ Неактивные пункты: Контрастный светло-серый стальной HUD-цвет
+                color = (190, 200, 210)
+                text = menu_font.render(opt, True, color)
+                text_rect = text.get_rect(center=(menu_center_x, y))
+
             screen.blit(text, text_rect)
+
+
 
     # ----------------------------------------------------------------------
     # LEVEL END
