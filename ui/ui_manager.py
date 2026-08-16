@@ -405,25 +405,116 @@ class UIManager:
     # ----------------------------------------------------------------------
 
     def _update_boot(self):
-        """Обновляет экран загрузки"""
+        """Обновляет экран загрузки: считает тайминги"""
         if not hasattr(self, 'boot_start'):
             self.boot_start = pygame.time.get_ticks()
-        if pygame.time.get_ticks() - self.boot_start > 2000:
+            
+        # Задаем общее время загрузки в 2500 мс (2.5 секунды), чтобы логи успели пробежать
+        self.boot_duration = 2500
+        
+        if pygame.time.get_ticks() - self.boot_start > self.boot_duration:
             self.current_state = self.states['MENU']
 
     def _draw_boot(self, screen):
-        """Рисует экран загрузки"""
-        screen.fill((0, 0, 0))
-        text = self.font_tile.render("Загрузка...", True, (255, 255, 255))
-        text_rect = text.get_rect(center=(setting.WIDTH // 2, setting.HEIGHT // 2))
-        screen.blit(text, text_rect)
+        """Рисует стилизованный Sci-Fi экран инициализации BIOS/HUD"""
+        # Гарантируем, что boot_start инициализирован во избежание ZeroDivisionError
+        if not hasattr(self, 'boot_start'):
+            self.boot_start = pygame.time.get_ticks()
+            
+        now = pygame.time.get_ticks()
+        elapsed = now - self.boot_start
+        duration = getattr(self, 'boot_duration', 2500)
+        progress = min(1.0, elapsed / duration)
+        
+        # 1. СТРОГИЙ ЧЕРНЫЙ ФОН ТЕРМИНАЛА
+        screen.fill((10, 12, 16))
+        
+        # Цветовая палитра военного HUD
+        neon_blue = (0, 140, 255)
+        neon_cyan = (0, 255, 210)
+        dark_metal = (35, 45, 55)
+        text_gray = (160, 175, 185)
 
-        progress = min(1.0, (pygame.time.get_ticks() - self.boot_start) / 2000)
-        bar_width = int(setting.WIDTH * 0.4)
-        filled = int(bar_width * progress)
-        bar_rect = pygame.Rect(setting.WIDTH // 2 - bar_width // 2, setting.HEIGHT // 2 + 50, bar_width, 20)
-        pygame.draw.rect(screen, (100, 100, 100), bar_rect)
-        pygame.draw.rect(screen, (0, 200, 0), (bar_rect.x, bar_rect.y, filled, 20))
+        # 2. ИМИТАЦИЯ СИСТЕМНЫХ ЛОГОВ (БЕГУЩИЕ СТРОКИ)
+        # Массив логов с таймингами их появления на экране (в долях прогресса)
+        boot_logs = [
+            (0.00, "INITIALIZING BOOT PROTOCOL..."),
+            (0.12, "CORE ENGINE: STABLE (VER 2.5D_ALPHA)"),
+            (0.25, "RAYCASTING MATRIX... LOADED"),
+            (0.38, "Z-BUFFER MATRIX... ALLOCATED"),
+            (0.50, "MAPPING REYKASTER GRID... OK"),
+            (0.65, "CACHING TEXTURES & SPRITES... OK"),
+            (0.78, "CONNECTING DATA-DRIVEN ACT SEQUENCER..."),
+            (0.90, "TACTICAL HUD VISOR... INITIALIZED"),
+            (0.98, "SYSTEMS ONLINE. WELCOME, OPERATOR.")
+        ]
+        
+        log_y_start = int(setting.HEIGHT * 0.15)
+        log_spacing = 30
+        
+        # Выводим на экран только те строки, до которых дошел прогресс времени
+        for log_trigger_progress, log_text in boot_logs:
+            if progress >= log_trigger_progress:
+                # Последняя появившаяся строка горит неоновым бирюзовым, остальные — серым текстом
+                is_latest = (log_trigger_progress == max(t for t, _ in boot_logs if progress >= t))
+                color = neon_cyan if is_latest else text_gray
+                
+                # Добавляем к последней строке мигающий курсор "_"
+                display_text = log_text
+                if is_latest and (now // 250) % 2 == 0 and progress < 0.98:
+                    display_text += "_"
+                    
+                log_surf = self.font_normal.render(display_text, True, color)
+                screen.blit(log_surf, (int(setting.WIDTH * 0.1), log_y_start))
+                log_y_start += log_spacing
+
+        # 3. ЦЕНТРАЛЬНЫЙ СТАТУС ЗАГРУЗКИ
+        # Пишем крупным шрифтом статус по центру экрана
+        status_str = f"LOADING SYSTEM... {int(progress * 100)}%"
+        if progress >= 1.0:
+            status_str = "SYSTEMS ONLINE"
+            
+        status_text = self.font_tile.render(status_str, True, neon_blue)
+        status_rect = status_text.get_rect(center=(setting.WIDTH // 2, setting.HEIGHT // 2 + 60))
+        screen.blit(status_text, status_rect)
+
+        # 4. 🔥 НОВЫЙ Sci-Fi ПРОГРЕСС-БАР С СЕГМЕНТАМИ
+        bar_width = int(setting.WIDTH * 0.5)
+        bar_height = 14
+        bx = setting.WIDTH // 2 - bar_width // 2
+        by = status_rect.bottom + 25
+        
+        # Задняя рамка-подложка
+        pygame.draw.rect(screen, dark_metal, (bx, by, bar_width, bar_height), 1)
+        
+        # Рисуем заполнение в виде дискретных Sci-Fi блоков (черточек), а не сплошной полосой
+        num_segments = 25  # Сколько всего блоков в полоске
+        segments_to_fill = int(num_segments * progress)
+        segment_width = (bar_width - (num_segments - 1) * 3) // num_segments
+        
+        for seg in range(num_segments):
+            seg_x = bx + seg * (segment_width + 3)
+            # Если этот сегмент должен быть заполнен по времени
+            if seg < segments_to_fill:
+                # Первые сегменты синие, финальные переходят в сочную бирюзу
+                seg_color = neon_cyan if seg > num_segments * 0.7 else neon_blue
+                pygame.draw.rect(screen, seg_color, (seg_x, by + 2, segment_width, bar_height - 4))
+            else:
+                # Неактивные сегменты еле заметны на фоне
+                pygame.draw.rect(screen, (20, 25, 35), (seg_x, by + 2, segment_width, bar_height - 4))
+                
+        # 5. Мягкие Sci-Fi уголки по краям экрана для сохранения общей стилистики HUD
+        margin, length = 20, 15
+        
+        # Левый верхний угол
+        pygame.draw.line(screen, dark_metal, (margin, margin), (margin + length, margin), 1)
+        pygame.draw.line(screen, dark_metal, (margin, margin), (margin, margin + length), 1)
+        
+        # Правый верхний угол (Фикс: теперь строго передается цвет dark_metal)
+        pygame.draw.line(screen, dark_metal, (setting.WIDTH - margin, margin), (setting.WIDTH - margin - length, margin), 1)
+        pygame.draw.line(screen, dark_metal, (setting.WIDTH - margin, margin), (setting.WIDTH - margin, margin + length), 1)
+
+
 
     # ----------------------------------------------------------------------
     # MAIN MENU
