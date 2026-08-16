@@ -3,6 +3,8 @@ import setting
 import sys
 import random
 from utils.save_system import SaveSystem
+from config.game_data import ACTS_SEQUENCE
+import os
 
 
 class UIManager:
@@ -75,15 +77,41 @@ class UIManager:
         except Exception:
             self.backgrounds['dead'] = None
 
-        for i in range(1, 7):
-            path = f"resources/briefings/level_{i}.png"
-            try:
-                img = pygame.image.load(path).convert()
-                img = pygame.transform.scale(img, (setting.WIDTH, setting.HEIGHT))
-                self.briefing_images[i] = img
-                print(f"Загружен брифинг для уровня {i}")
-            except Exception:
-                pass
+
+        # Брифинги
+        self.briefing_images = {}
+        briefings_base_path = "resources/briefings"
+        
+        # 1. Сначала обрабатываем наш дебаг-акт для dev_mode, если он используется
+        all_acts = list(ACTS_SEQUENCE)
+        if "act_test" not in all_acts:
+            all_acts.append("act_test")
+
+        # 2. Сканируем папки для каждого акта
+        for act in all_acts:
+            act_folder = os.path.join(briefings_base_path, act)
+            
+            if os.path.exists(act_folder):
+                # Ищем все файлы вида level_X.png в папке акта
+                for filename in os.listdir(act_folder):
+                    if filename.startswith("level_") and filename.endswith(".png"):
+                        try:
+                            # Вытаскиваем номер уровня из имени файла (н-р из "level_1.png" берем 1)
+                            level_num = int(filename.split("_")[1].split(".")[0])
+                            
+                            path = os.path.join(act_folder, filename)
+                            img = pygame.image.load(path).convert()
+                            img = pygame.transform.scale(img, (setting.WIDTH, setting.HEIGHT))
+                            
+                            # 🔥 КРИТИЧЕСКИЙ ФИКС: Сохраняем в словарь под составным ключом (акт, уровень)
+                            self.briefing_images[(act, level_num)] = img
+                            print(f"  --> Успешно: брифинг для {act} -> Уровень {level_num}")
+                        except Exception as e:
+                            print(f"  ❌ Ошибка парсинга файла {filename} в акте {act}: {e}")
+                            pass
+            else:
+                print(f"  ⚠️ Папка брифингов для акта '{act}' не найдена на диске")
+
 
         try:
             self.swap_sound = pygame.mixer.Sound('resources/ui_sounds/swap.wav')
@@ -447,9 +475,13 @@ class UIManager:
         """Рисует экран брифинга"""
         screen.fill((0, 0, 0))
         level_num = self.game.current_level
+        act_name = self.game.level_manager.get_current_act_name()
+        
+        briefing_key = (act_name, level_num)
 
-        if level_num in self.briefing_images:
-            screen.blit(self.briefing_images[level_num], (0, 0))
+        if briefing_key in self.briefing_images:
+            screen.blit(self.briefing_images[briefing_key], (0, 0))
+
 
             """font = pygame.font.Font(None, 36)
             text = font.render("Нажмите на любую кнопку...", True, (255, 255, 255))
