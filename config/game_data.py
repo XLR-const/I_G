@@ -244,6 +244,18 @@ SYMBOLS_CONFIG = {
         'type': 'wall',
         'texture': 'resources/textures/lab_wall_3.png'  
     },
+    'rust_list': {
+        'type': 'wall',
+        'texture': 'resources/textures/rust_list.png'  
+    },
+    'rust_grid': {
+        'type': 'wall',
+        'texture': 'resources/textures/rust_grid.png'  
+    },
+    'hang_wall': {
+        'type': 'wall',
+        'texture': 'resources/textures/hang_wall.png'  
+    },
     
     
     # Предметы

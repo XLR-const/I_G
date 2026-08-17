@@ -332,7 +332,7 @@ class Game:
                 self.clock.tick(FPS)
                 continue
 
-            self.music_manager.update(self.ui_manager.current_state, self.current_level)
+            #self.music_manager.update(self.ui_manager.current_state, self.current_level)
 
             if self.ui_manager.current_state == self.ui_manager.states['PLAYING']:
                 self.update()

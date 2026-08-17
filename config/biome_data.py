@@ -177,8 +177,8 @@ BIOME_DATABASE = {
         'name': '📦 Складские Ангары и Погрузочные Доки',
         'geometry': { 'perimeter_wall': 'metal_crunch_wall', 'bsp_min_room_size': 14, 'bsp_max_room_size': 22, 'min_density': 0.50, 'max_density': 0.85 },
         'walls': {
-            'primary': { 'char': 'metal_crunch_wall', 'weight': 90 },
-            'secondary': { 'char': '1', 'weight': 10 } # Разбавление дефолтной белой стеной
+            'primary': { 'char': 'hang_wall', 'weight': 90 },
+            'secondary': { 'char': 'rust_list', 'weight': 10 } # Разбавление дефолтной белой стеной
         },
         'doors': {
             'normal': 'door_normal',
@@ -188,8 +188,13 @@ BIOME_DATABASE = {
             'density': 0.014,
             'pool': {
                 # Враги на открытых пространствах ангара нападают большими группами до 4 человек
-                'AGG': { 'weight': 70, 'max_count': 25, 'min_dist': 5, 'min_progress': 0.0, 'cluster': { 'type': 'circle', 'chance': 0.35, 'size': 4 } },
-                'CM':  { 'weight': 40, 'max_count': 5,  'min_dist': 8,  'min_progress': 0.3, 'cluster': { 'type': 'single', 'chance': 0.0, 'size': 1 } }
+                'SOS': { 'weight': 70, 'max_count': 25, 'min_dist': 5, 'min_progress': 0.0, 'cluster': { 'type': 'circle', 'chance': 0.35, 'size': 4 } },
+                'SOM':  { 'weight': 40, 'max_count': 5,  'min_dist': 8,  'min_progress': 0.3, 'cluster': { 'type': 'single', 'chance': 0.0, 'size': 1 } },
+                'SOR':  { 'weight': 40, 'max_count': 5,  'min_dist': 8,  'min_progress': 0.3, 'cluster': { 'type': 'single', 'chance': 0.0, 'size': 1 } },
+                'UB':  { 'weight': 40, 'max_count': 5,  'min_dist': 8,  'min_progress': 0.3, 'cluster': { 'type': 'single', 'chance': 0.0, 'size': 1 } },
+                'TM':  { 'weight': 40, 'max_count': 5,  'min_dist': 8,  'min_progress': 0.3, 'cluster': { 'type': 'single', 'chance': 0.0, 'size': 1 } },
+                'TP':  { 'weight': 40, 'max_count': 5,  'min_dist': 8,  'min_progress': 0.3, 'cluster': { 'type': 'single', 'chance': 0.0, 'size': 1 } },
+                'TR':  { 'weight': 40, 'max_count': 5,  'min_dist': 8,  'min_progress': 0.3, 'cluster': { 'type': 'single', 'chance': 0.0, 'size': 1 } }
             }
         },
         'decor_settings': {
