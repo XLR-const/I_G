@@ -12,6 +12,8 @@ EDITOR_PATH = os.path.join("map_editor", "main.py")
 DEV_MODE_PATH = os.path.join("dev_mode.py")
 LEVELS_DIR = os.path.join("resources", "levels")
 TESTS_DIR = os.path.join("tests")
+MAIN_DIR = os.path.join("main.py")
+PTP_DIR = os.path.join("utils", "py_to_pdf.py")
 
 
 def clear_screen():
@@ -124,8 +126,10 @@ def print_menu():
     print("  [2] Редактор уровней")
     print("  [3] Список уровней")
     print("  [4] Запустить игру (DEV MODE)")
-    print("  [5] Запустить тесты")
-    print("  [6] Запустить форматирование имен нпс спрайтов")
+    print("  [5] Запустить игру (main.py)")
+    print("  [6] Запустить тесты")
+    print("  [7] Запустить форматирование имен нпс спрайтов")
+    print("  [8] Запустить скрипт форматирования .py -> pdf")
     print("  [0] Выход")
     print("-" * 60)
 
@@ -281,6 +285,37 @@ def run_rename():
     print("  ✅ Возврат в главное меню проекта.")
     print("-" * 60)
     input("Нажмите Enter для продолжения...")
+    
+def run_main():
+    """Запускает мейн версию проекта"""
+    try:
+        subprocess.run([sys.executable, MAIN_DIR])
+    except Exception as e:
+        print(f"\n Ошибка запуска: {e}")
+    finally:
+        print("\n" + "-" * 60)
+        print("  ✅ Возврат в главное меню проекта.")
+        print("-" * 60)
+        input("Нажмите Enter для продолжения...")
+        
+
+
+def run_pdf():
+    """Запускает скрипт конвертации папки с файлами
+    .py в pdf для ллм"""
+    print("\n" + "=" * 60)
+    print("  ⚙️  ЗАПУСК АВТОМАТИЧЕСКОГO КОНВЕРТЕРА .py -> pdf")
+    input("Нажмите Enter для запуска...")
+    
+    try:
+        subprocess.run([sys.executable, PTP_DIR])
+    except Exception as e:
+        print(f"Ошибка выполнения: {e}")
+    finally:
+        print("\n" + "-" * 60)
+        print("  ✅ Возврат в главное меню проекта.")
+        print("-" * 60)
+        input("Нажмите Enter для продолжения...")
 
 
 
@@ -352,9 +387,13 @@ def main():
         elif choice == '4':
             run_dev_mode()
         elif choice == '5':
-            run_tests()
+            run_main()
         elif choice == '6':
+            run_tests()
+        elif choice == '7':
             run_rename()
+        elif choice == '8':
+            run_pdf()
         elif choice == '0':
             print("\n  👋 До свидания!")
             sys.exit(0)
