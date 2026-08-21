@@ -110,7 +110,7 @@ vidmaker==2.3.0
 
 1. **Клонирование репозитория проекта:**
 ```bash
-git clone [https://github.com](https://github.com/XLR-const/I_G)
+git clone https://github.com/XLR-const/I_G
 cd I_G
 ```
 
