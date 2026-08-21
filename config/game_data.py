@@ -6,7 +6,7 @@
 - WEAPON_CONFIG: параметры всех типов оружия
 - MUSIC_CONFIG: пути к музыкальным трекам
 """
-
+import pygame
 
 # 🔥 РЕГИСТРАЦИЯ ВСЕХ ДЕКОРАЦИЙ ПО СТАРИНКЕ С РАЗМЕРАМИ И ОПИСАНИЕМ
 DECOR_CONFIG = {
@@ -23,7 +23,7 @@ DECOR_CONFIG = {
         'type': 'item', 
         'item_type': 'decor', 
         'sprite': 'resources/decorations/prop_sandbag_wall.png',
-        'ammo': 40,  # Высота: 40% от стены (низкий бруствер укрытия)
+        'ammo': 60,
         'desc': 'Мешки с песком'
     },
     
@@ -204,6 +204,59 @@ SYMBOLS_CONFIG = {
         'type': 'wall',
         'texture': 'resources/textures/rocks.png'
     },
+    'bruce': {
+      'type': 'wall',
+      'texture': 'resources/textures/bruce.png'  
+    },
+    'metal_crunch_wall': {
+        'type': 'wall',
+        'texture': 'resources/textures/metal_crunch_wall.png'
+    },
+    'toxic_wall': {
+      'type': 'wall',
+      'texture': 'resources/textures/toxic_wall.png'  
+    },
+    'hall_main': {
+        'type': 'wall',
+        'texture': 'resources/textures/hall_main.png'
+        },
+    'hall_second': {
+        'type': 'wall',
+        'texture': 'resources/textures/hall_second.png'
+    },
+    'hall_ceil': {
+      'type': 'wall',
+      'texture': 'resources/textures/hall_ceil.png'  
+    },
+    'lab_ceil': {
+        'type': 'wall',
+        'texture': 'resources/textures/lab_ceil.png'  
+    },
+    'lab_wall_1': {
+        'type': 'wall',
+        'texture': 'resources/textures/lab_wall_1.png'  
+    },
+    'lab_wall_2': {
+        'type': 'wall',
+        'texture': 'resources/textures/lab_wall_2.png'  
+    },
+    'lab_wall_3': {
+        'type': 'wall',
+        'texture': 'resources/textures/lab_wall_3.png'  
+    },
+    'rust_list': {
+        'type': 'wall',
+        'texture': 'resources/textures/rust_list.png'  
+    },
+    'rust_grid': {
+        'type': 'wall',
+        'texture': 'resources/textures/rust_grid.png'  
+    },
+    'hang_wall': {
+        'type': 'wall',
+        'texture': 'resources/textures/hang_wall.png'  
+    },
+    
     
     # Предметы
     'health': {
@@ -225,7 +278,7 @@ SYMBOLS_CONFIG = {
         'type': 'item',
         'item_type': 'weapon',
         'weapon_name': 'AK-47',
-        'ammo': 30,
+        'ammo': 15,
         'sprite': 'resources/weapons/AK47/icon.png',  # Используем готовую иконку из папки пушки!
         'description': 'Автомат АК-47 (+30 патронов)'
     },
@@ -233,7 +286,7 @@ SYMBOLS_CONFIG = {
         'type': 'item',
         'item_type': 'weapon',
         'weapon_name': 'COLT',
-        'ammo': 15,
+        'ammo': 5,
         'sprite': 'resources/weapons/Colt/icon.png',  # Иконка Кольта
         'description': 'Пистолет Colt 1911 (+7 патронов)'
     },
@@ -249,11 +302,56 @@ SYMBOLS_CONFIG = {
         'type': 'item',
         'item_type': 'weapon',
         'weapon_name': 'PLASMA',
-        'ammo': 1,
+        'ammo': 10,
         'sprite': 'resources/weapons/PLASMA/icon.png',
         'description': 'PLASMA'
     },
+    'bfg': {
+            'type': 'item',
+            'item_type': 'weapon',
+            'weapon_name': 'BFG',
+            'ammo': 1,
+            'sprite': 'resources/weapons/BFG/icon.png',
+            'description': 'BFG'
+        },
+        'knife2': {
+        'type': 'item',
+        'item_type': 'weapon',
+        'weapon_name': 'KNIFE2',
+        'ammo': 1,
+        'sprite': 'resources/weapons/KNIFE2/icon.png',
+        'description': 'PLASMA'
+    },
+        'aa12': {
+            'type': 'item',
+            'item_type': 'weapon',
+            'weapon_name': 'AA12',
+            'ammo': 5,
+            'sprite': 'resources/weapons/AA12/icon.png'
+        },
 
+        'bazooka': {
+            'type': 'item',
+            'item_type': 'weapon',
+            'weapon_name': 'BAZOOKA',
+            'ammo': 3,
+            'sprite': 'resources/weapons/BAZOOKA/icon.png'
+        },
+    'napalm': {
+        'type': 'item',
+        'item_type': 'weapon',
+        'weapon_name': 'NAPALM',
+        'ammo': 50,
+        'sprite': 'resources/weapons/NAPALM/icon.png'
+        },
+    
+    'grenade': {
+        'type': 'item',
+        'item_type': 'weapon',
+        'weapon_name': 'GRENADE',
+        'ammo': 1,
+        'sprite': 'resources/weapons/GRENADE/icon.png'
+    },
     
  # --- СИСТЕМА ДВЕРЕЙ И СЕКРЕТОК С ТЕКСТУРАМИ ---
     'door_normal': {
@@ -314,38 +412,38 @@ SYMBOLS_CONFIG.update(DECOR_CONFIG)
 # КОНФИГУРАЦИЯ NPC
 # ============================================================
 NPC_CONFIG = {
-        'AGG': {
+    'AGG': {
         'name': 'AutoGunGuy',
         'speed': 0.28,
         'hp': 100,
         'damage': 6,
         # --- ТРИ СТУПЕНИ ДИСТАНЦИЙ ---
-        'activation_distance': 35,     # Оптимизация (ИИ спит, если игрок дальше 25 клеток)
-        'view_distance': 12,           # Зоркость (Бот заметит игрока и побежит, только если тот ближе 12 клеток)
+        'activation_distance': 45,     # Оптимизация (ИИ спит, если игрок дальше 25 клеток)
+        'view_distance': 17,           # Зоркость (Бот заметит игрока и побежит, только если тот ближе 12 клеток)
         'shoot_range': 7.0,            # Стрельба (Остановится и откроет огонь на расстоянии 7 клеток)
         'shoot_delay': 1400,
         'sound_volume': 0.25,
     },
-        'BS': {
+    'BS': {
         'name': 'BeamSolder',
         'speed': 0.28,
         'hp': 100,
         'damage': 20,
         # --- ТРИ СТУПЕНИ ДИСТАНЦИЙ ---
-        'activation_distance': 35,     # Оптимизация (ИИ спит, если игрок дальше 25 клеток)
-        'view_distance': 12,           # Зоркость (Бот заметит игрока и побежит, только если тот ближе 12 клеток)
+        'activation_distance': 45,     # Оптимизация (ИИ спит, если игрок дальше 25 клеток)
+        'view_distance': 15,           # Зоркость (Бот заметит игрока и побежит, только если тот ближе 12 клеток)
         'shoot_range': 7.0,            # Стрельба (Остановится и откроет огонь на расстоянии 7 клеток)
         'shoot_delay': 2000,
         'sound_volume': 0.25,
     },
-        'CM': {
+    'CM': {
         'name': 'ChaingunMajor',        # Должно строго совпадать с именем папки!
         'speed': 0.18,                 # Медлительный из-за тяжелого пулемета
         'hp': 150,                     # Живучий мини-босс
         'damage': 4,                   # Урон за одну пулю (небольшой, но их летит очень много!)
         # --- Дистанции ---
-        'activation_distance': 30,     # Активируется издалека
-        'view_distance': 15,           # Замечает игрока с 15 клеток
+        'activation_distance': 45,     # Активируется издалека
+        'view_distance': 20,           # Замечает игрока с 15 клеток
         'shoot_range': 9.0,            # Лупит через длинные коридоры
         'shoot_delay': 2200,           # Задержка МЕЖДУ длинными очередями
         'sound_volume': 0.3,
@@ -356,23 +454,171 @@ NPC_CONFIG = {
         'hp': 2000,                     # Огромный запас здоровья для долгого боя
         'damage': 20,                   # Базовый урон (кастомные атаки в logic.py пересчитают его)
         # --- ТРЕХСТУПЕНЧАТАЯ СИСТЕМА ДИСТАНЦИЙ ---
-        'activation_distance': 35,      # Оптимизация (ИИ просыпается за 35 клеток)
+        'activation_distance': 55,      # Оптимизация (ИИ просыпается за 35 клеток)
         'view_distance': 25,            # Зоркость (Заметит игрока и включит боевой клич с 25 клеток)
         'shoot_range': 15.0,            # Дальний бой (Начнет спавнить вихри с 12 клеток)
         'shoot_delay': 1800,            # Кулдаун в миллисекундах МЕЖДУ его супер-атаками
         'sound_volume': 0.45,           # Слышно на весь уровень!
     },
-        'SB': {
+    'TERM': {
+        'name': 'TERM',
+        'speed': 0.3,
+        'hp': 2000,
+        'damage': 20,
+        'activation_distance': 45,      # Оптимизация (ИИ просыпается за 35 клеток)
+        'view_distance': 25,            # Зоркость (Заметит игрока и включит боевой клич с 25 клеток)
+        'shoot_range': 15.0,            # Дальний бой (Начнет спавнить вихри с 12 клеток)
+        'shoot_delay': 1800,            # Кулдаун в миллисекундах МЕЖДУ его супер-атаками
+        'sound_volume': 0.45,           # Слышно на весь уровень!
+        },
+    'SB': {
         'name': 'SuicideBomber',
         'speed': 0.48,        # Быстрый как пуля!
         'hp': 80,             # Мало здоровья, чтобы игрок успевал сбрить его на подлете
         'damage': 60,         # Больно взрывается
-        'activation_distance': 30,
+        'activation_distance': 45,
         'view_distance': 20,
         'shoot_range': 0.6,   # Дистанция взрыва в упор
         'shoot_delay': 0,
         'sound_volume': 0.5,
     },
+    # SpecOps pack
+    'SOS': {
+        'name': 'SpecOpsShotgun',
+        'speed': 0.48, 
+        'hp': 120,      
+        'damage': 9,  
+        'activation_distance': 45,     # Оптимизация (ИИ спит, если игрок дальше 25 клеток)
+        'view_distance': 12,           # Зоркость (Бот заметит игрока и побежит, только если тот ближе 12 клеток)
+        'shoot_range': 7.0,            # Стрельба (Остановится и откроет огонь на расстоянии 7 клеток)
+        'shoot_delay': 1400,
+        'sound_volume': 0.25,
+    },
+    'SOM': {
+        'name': 'SpecOpsMachinegun',        # Должно строго совпадать с именем папки!
+        'speed': 0.18,                 # Медлительный из-за тяжелого пулемета
+        'hp': 170,                     # Живучий мини-босс
+        'damage': 4,                   # Урон за одну пулю (небольшой, но их летит очень много!)
+        # --- Дистанции ---
+        'activation_distance': 45,     # Активируется издалека
+        'view_distance': 15,           # Замечает игрока с 15 клеток
+        'shoot_range': 9.0,            # Лупит через длинные коридоры
+        'shoot_delay': 2200,           # Задержка МЕЖДУ длинными очередями
+        'sound_volume': 0.3,
+    },
+    'SOR': {
+        'name': 'SpecOpsRailgun',
+        'speed': 0.28,
+        'hp': 120,
+        'damage': 35,
+        # --- ТРИ СТУПЕНИ ДИСТАНЦИЙ ---
+        'activation_distance': 45,     # Оптимизация (ИИ спит, если игрок дальше 25 клеток)
+        'view_distance': 12,           # Зоркость (Бот заметит игрока и побежит, только если тот ближе 12 клеток)
+        'shoot_range': 7.0,            # Стрельба (Остановится и откроет огонь на расстоянии 7 клеток)
+        'shoot_delay': 2000,
+        'sound_volume': 0.25,
+    },
+    
+    # Science pack
+    'ScF': {
+        'name': 'ScienceFreeze',
+        'speed': 0.28,
+        'hp': 100,
+        'damage': 35,
+        # --- ТРИ СТУПЕНИ ДИСТАНЦИЙ ---
+        'activation_distance': 35,     # Оптимизация (ИИ спит, если игрок дальше 25 клеток)
+        'view_distance': 12,           # Зоркость (Бот заметит игрока и побежит, только если тот ближе 12 клеток)
+        'shoot_range': 7.0,            # Стрельба (Остановится и откроет огонь на расстоянии 7 клеток)
+        'shoot_delay': 2000,
+        'sound_volume': 0.25,
+    },
+    'ScP': {
+        'name': 'SciencePistol',
+        'speed': 0.28,
+        'hp': 80,
+        'damage': 15,
+        # --- ТРИ СТУПЕНИ ДИСТАНЦИЙ ---
+        'activation_distance': 45,     # Оптимизация (ИИ спит, если игрок дальше 25 клеток)
+        'view_distance': 12,           # Зоркость (Бот заметит игрока и побежит, только если тот ближе 12 клеток)
+        'shoot_range': 7.0,            # Стрельба (Остановится и откроет огонь на расстоянии 7 клеток)
+        'shoot_delay': 2000,
+        'sound_volume': 0.25,
+    },
+    'ScPl': {
+        'name': 'SciencePlasma',
+        'speed': 0.28,
+        'hp': 100,
+        'damage': 35,
+        # --- ТРИ СТУПЕНИ ДИСТАНЦИЙ ---
+        'activation_distance': 45,     # Оптимизация (ИИ спит, если игрок дальше 25 клеток)
+        'view_distance': 12,           # Зоркость (Бот заметит игрока и побежит, только если тот ближе 12 клеток)
+        'shoot_range': 7.0,            # Стрельба (Остановится и откроет огонь на расстоянии 7 клеток)
+        'shoot_delay': 2000,
+        'sound_volume': 0.25,
+    },
+    'ScU': {
+        'name': 'ScienceUzi',
+        'speed': 0.28,
+        'hp': 100,
+        'damage': 8,
+        # --- ТРИ СТУПЕНИ ДИСТАНЦИЙ ---
+        'activation_distance': 45,     # Оптимизация (ИИ спит, если игрок дальше 25 клеток)
+        'view_distance': 12,           # Зоркость (Бот заметит игрока и побежит, только если тот ближе 12 клеток)
+        'shoot_range': 7.0,            # Стрельба (Остановится и откроет огонь на расстоянии 7 клеток)
+        'shoot_delay': 2000,
+        'sound_volume': 0.25,
+    },
+    'UB': {
+        'name': 'UacBot',
+        'speed': 0.28,
+        'hp': 150,
+        'damage': 5,
+        # --- ТРИ СТУПЕНИ ДИСТАНЦИЙ ---
+        'activation_distance': 45,     # Оптимизация (ИИ спит, если игрок дальше 25 клеток)
+        'view_distance': 12,           # Зоркость (Бот заметит игрока и побежит, только если тот ближе 12 клеток)
+        'shoot_range': 7.0,            # Стрельба (Остановится и откроет огонь на расстоянии 7 клеток)
+        'shoot_delay': 2000,
+        'sound_volume': 0.25,
+    },
+    
+    # Tanks pack
+    'TM': {
+        'name': 'TankMachinegun',
+        'speed': 0.28,
+        'hp': 150,
+        'damage': 10,
+        # --- ТРИ СТУПЕНИ ДИСТАНЦИЙ ---
+        'activation_distance': 45,     # Оптимизация (ИИ спит, если игрок дальше 25 клеток)
+        'view_distance': 12,           # Зоркость (Бот заметит игрока и побежит, только если тот ближе 12 клеток)
+        'shoot_range': 7.0,            # Стрельба (Остановится и откроет огонь на расстоянии 7 клеток)
+        'shoot_delay': 2000,
+        'sound_volume': 0.25,
+    },
+    'TR': {
+        'name': 'TankRocket',
+        'speed': 0.28,
+        'hp': 150,
+        'damage': 15,
+        # --- ТРИ СТУПЕНИ ДИСТАНЦИЙ ---
+        'activation_distance': 45,     # Оптимизация (ИИ спит, если игрок дальше 25 клеток)
+        'view_distance': 12,           # Зоркость (Бот заметит игрока и побежит, только если тот ближе 12 клеток)
+        'shoot_range': 7.0,            # Стрельба (Остановится и откроет огонь на расстоянии 7 клеток)
+        'shoot_delay': 2000,
+        'sound_volume': 0.25,
+    },
+    'TP': {
+        'name': 'TankPlasma',
+        'speed': 0.28,
+        'hp': 150,
+        'damage': 15,
+        # --- ТРИ СТУПЕНИ ДИСТАНЦИЙ ---
+        'activation_distance': 45,     # Оптимизация (ИИ спит, если игрок дальше 25 клеток)
+        'view_distance': 12,           # Зоркость (Бот заметит игрока и побежит, только если тот ближе 12 клеток)
+        'shoot_range': 7.0,            # Стрельба (Остановится и откроет огонь на расстоянии 7 клеток)
+        'shoot_delay': 2000,
+        'sound_volume': 0.25,
+    },
+
 
 
 
@@ -386,9 +632,13 @@ NPC_CONFIG = {
 WEAPON_CONFIG = {
         'AK-47': {
         'name': 'AK-47',
-        'class_name': 'NewWeapon',       # Используем наш новый универсальный класс
+        #'class_name': 'NewWeapon',       # Используем наш новый универсальный класс
+        'slot': 4,
+        'type': 'hitscan',
+        'spread': 0.05,      # Ощутимый разброс при зажиме
+        'recoil': 0.04,
         'damage': 25,
-        'reload_time': 240,              # 4 кадра анимации * 60 мс скорость = 240 мс
+        'reload_time': 200,              # 4 кадра анимации * 60 мс скорость = 240 мс
         'continuous': True,              # Автоматическая стрельба (зажим)
         'ammo_start': 30,
         'max_distance': 12,              # Автомат стреляет дальше пистолета и плазмы
@@ -398,7 +648,11 @@ WEAPON_CONFIG = {
     },
         'COLT': {
         'name': 'Colt 1911',
-        'class_name': 'NewWeapon',
+        #'class_name': 'NewWeapon',
+        'slot': 2,
+        'type': 'hitscan',
+        'spread': 0.02,
+        'recoil': 0.03,
         'damage': 15,
         'reload_time': 270,        # Время перезарядки строго под длину анимации!
         'continuous': False,       # Одиночные выстрелы
@@ -409,9 +663,14 @@ WEAPON_CONFIG = {
         'ammo_start': 30
     },
         'COCH': {
-        'name': 'Super Shotgun',
+        'name': 'Toz',
         'class_name': 'NewWeapon',       # Используем наш универсальный класс
-        'damage': 50,                    # Огромный урон вблизи
+        'slot': 3,
+        'type': 'hitscan',
+        'spread': 0.38,      # Широкий веер дроби!
+        'recoil': 0.12,
+        'damage': 5,                    # Огромный урон вблизи
+        'pellets': 10,
         'reload_time': 350,              # 5 кадров анимации * 70 мс скорость = 350 мс
         'continuous': False,             # Одиночные выстрелы
         'max_distance': 2,               # Эффективна только на ближней дистанции
@@ -421,14 +680,146 @@ WEAPON_CONFIG = {
     },
         'PLASMA': {
             'name': 'Plasma Gun',
-            'damage': 75,
+            'slot': 5,
+            'type': 'projectile',
+            'prefix_fly': 'RGTR',
+            'prefix_exp': 'RGTX',
+            'projectile_speed': 0.3, 
+            'spread': 0.01,      # Ощутимый разброс при зажиме
+            'recoil': 0.04,
+            'damage': 35,
             'reload_time': 350,
-            'continuous': False,
+            'continuous': True,
             'max_distance': 6,
             'folder_name': 'PLASMA',
             'sprite_prefix': 'PLASMA',
-            'ammo_start': 1
+            'ammo_start': 50
             
+        },
+        'BFG': {
+            'name': 'Big F Gun',
+            'slot': 5,
+            'type': 'projectile',
+            'prefix_fly': 'BBGB',
+            'prefix_exp': 'BBGX',
+            'projectile_speed': 0.3, 
+            'spread': 0.001,      # Ощутимый разброс при зажиме
+            'recoil': 0.04,
+            'damage': 25,
+            'splash_radius': 10.5,
+            'splash_damage': 150,
+            'reload_time': 350,
+            'shoot_delay': 450,
+            'continuous': False,
+            'max_distance': 6,
+            'folder_name': 'BFG',
+            'sprite_prefix': 'BG2G',
+            'ammo_start': 50
+            
+        },
+        'BAZOOKA': {
+            'name': 'Bazooka',
+            'slot': 6,
+            'type': 'projectile',
+            'prefix_fly': 'QROK',
+            'prefix_exp': 'EXP2',
+            'projectile_speed': 0.3, 
+            'spread': 0.001,
+            'recoil': 0.04,
+            'damage': 50,
+            'splash_radius': 10.5,
+            'splash_damage': 40,
+            'reload_time': 350,
+            #'shoot_delay': 450,
+            'continuous': False,
+            'max_distance': 6,
+            'folder_name': 'BAZOOKA',
+            'sprite_prefix': 'RPGA',
+            'ammo_start': 3,
+            'explosive': 'resources/weapons/BAZOOKA/explosive.wav'
+            
+        },
+        'NAPALM': {
+            'name': 'Vietnams Hy',
+            'slot': 6,
+            'type': 'projectile',
+            'prefix_fly': 'FIRE',
+            'prefix_exp': 'EXP2',
+            'projectile_speed': 0.8, 
+            'spread': 0.001,
+            'recoil': 0.04,
+            'damage': 50,
+            'splash_radius': 10.5,
+            'splash_damage': 40,
+            'reload_time': 30,
+            #'shoot_delay': 450,
+            'continuous': True,
+            'max_distance': 6,
+            'folder_name': 'NAPALM',
+            'sprite_prefix': 'NLAN',
+            'ammo_start': 50,
+            'explosive': 'resources/weapons/BAZOOKA/explosive.wav'
+            
+        },
+        
+        'GRENADE': {
+            'name': 'Grenade',
+            'slot': 6,
+            'type': 'projectile',
+            'prefix_fly': 'HGN1',
+            'prefix_exp': 'EXP3',
+            'projectile_speed': 0.3, 
+            'spread': 0.001,
+            'recoil': 0.04,
+            'damage': 50,
+            'splash_radius': 10.5,
+            'splash_damage': 40,
+            'reload_time': 350,
+            'shoot_delay': 450,
+            'continuous': False,
+            'max_distance': 6,
+            'folder_name': 'GRENADE',
+            'sprite_prefix': 'HGRN',
+            'ammo_start': 3,
+            'explosive': 'resources/weapons/GRENADE/explosive.wav'
+            
+        },
+    'KNIFE': {
+        'name': 'Knife',
+        'slot': 1,
+        'damage': 40,
+        'reload_time': 400,        # Время перезарядки строго под длину анимации!
+        'continuous': True,       # Одиночные выстрелы
+        'max_distance': 0.5,
+        'folder_name': 'KNIFE',
+        'sprite_prefix': 'KNFS',
+        'ammo_start': 10,
+        'infinite_ammo': True
+    },
+        'KNIFE2': {
+        'name': 'Knife2',
+        'slot': 1,
+        'damage': 40,
+        'reload_time': 1000,        # Время перезарядки строго под длину анимации!
+        'continuous': True,       # Одиночные выстрелы
+        'max_distance': 0.5,
+        'folder_name': 'KNIFE2',
+        'sprite_prefix': 'KNFG',
+        'ammo_start': 10,
+        'infinite_ammo': True
+    },
+        'AA12': {
+            'name': 'aa12',
+            'slot': 3,
+            'damage': 6,
+            'pellets': 5,
+            'reload_time': 300,
+            'spread': 0.5,
+            'continuous': True,
+            'max_distance': 1.3,
+            'folder_name': 'AA12',
+            'sprite_prefix': 'AA12',
+            'ammo_start': 12
         }
 
 
@@ -448,3 +839,26 @@ MUSIC_CONFIG = {
     'death': 'resources/music/deaths/death.wav',
     'level_end': 'resources/music/levelends/levelend.wav',
 }
+
+ACTS_CONFIG = {
+    'act_test': 'resources/levels/act_test',
+    'act_build': 'resources/levels/act_build',
+    'act_invasion': 'resources/levels/act_invasion'
+}
+ACTS_SEQUENCE = ['act_invasion', 'act_ventilation', 'act_hall', 'act_laboratory', 'act_hangurd']
+
+
+
+DEFAULT_USER_SETTINGS = {
+    "MOUSE_SENSITIVITY": 0.0020,
+    "MASTER_VOLUME": 0.60,
+    "KEYBINDS": {
+        "FORWARD": {"name": "ВХОД ВПЕРЕД", "key": 119, "key_name": "W"},  # pygame.K_w = 119
+        "BACKWARD": {"name": "ШАГ НАЗАД", "key": 115, "key_name": "S"}, # pygame.K_s = 115
+        "LEFT": {"name": "СТРЕЙФ ЛЕВО", "key": 97, "key_name": "A"},    # pygame.K_a = 97
+        "RIGHT": {"name": "СТРЕЙФ ПРАВО", "key": 100, "key_name": "D"},  # pygame.K_d = 100
+        "FIRE": {"name": "ОГНЬ / СТРЕЛЬБА", "key": 32, "key_name": "SPACE"} # pygame.K_SPACE = 32
+    }
+}
+
+

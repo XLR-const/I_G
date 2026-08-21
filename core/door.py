@@ -20,7 +20,7 @@ class Door:
         self.state = "CLOSED"
         self.open_progress = 0.0
         self.speed = 0.05
-        self.trigger_distance = 1.5
+        self.trigger_distance = 2.5
         self.close_delay = 1000
         self.close_timer = 0
         self.color = (100, 100, 100)

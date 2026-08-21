@@ -4,9 +4,12 @@
 """
 
 import pygame
+import utils.sound_patch
 import sys
 import math
 from setting import *
+import config.user_settings as us
+binds = us.USER_SETTINGS["KEYBINDS"]
 from rendering.raycasting import RayCasting
 from rendering.renderer import Renderer
 from utils.pathfinding import PathFinder
@@ -16,6 +19,8 @@ from ui.ui_manager import UIManager
 from utils.save_system import SaveSystem
 from ui.console import DevConsole
 from utils.intro_player import IntroPlayer
+from core.weapon_selector import WeaponSelector
+from rendering.flashlight import FlashlightMask
 
 
 class Game:
@@ -64,6 +69,8 @@ class Game:
         pygame.mixer.init(frequency=22050, size=-16, channels=2, buffer=512)
         self.ui_manager = UIManager(self)
         self.console = DevConsole(self)
+        self.flashlight = FlashlightMask(self)
+        self.flashlight.active = True
 
         self.music_manager = MusicManager()
 
@@ -73,8 +80,10 @@ class Game:
         self.map = None
         self.npcs = []
         self.inventory = []
+        self.weapon_selector = WeaponSelector(self)
         self.items = []
         self.weapon = None
+        self.projectiles = []
         self.particles = []
         self.exit_pos = None
         self.total_kills = 0
@@ -107,8 +116,13 @@ class Game:
         self.level_start_time = self.level_manager.level_start_time
         self.items = self.level_manager.items
 
+
     def update(self):
         """Обновляет состояние игры"""
+        self.weapon_selector.update()
+        if self.weapon_selector.active:
+            return 
+        
         self.player.update()
         self.level_manager.check_exit()
 
@@ -127,8 +141,14 @@ class Game:
             item.update(self.player)
         # Удаляем собранные предметы
         self.items = [item for item in self.items if item.alive]
+        
+        # Снаряды
+        for proj in self.projectiles:
+            proj.update()
+        self.projectiles = [p for p in self.projectiles if p.alive]
 
         self.weapon.update_animation()
+
 
         mouse_buttons = pygame.mouse.get_pressed()
         if mouse_buttons[0]:
@@ -136,12 +156,12 @@ class Game:
                 self.weapon.fire()
 
         self.delta_time = self.clock.tick(FPS)
-        self.player.update_regen()
+        #self.player.update_regen()
         pygame.display.set_caption(f'FPS: {self.clock.get_fps():.1f}')
 
     def draw(self):
         """Отрисовывает игру"""
-        self.renderer.draw_background()
+        self.renderer.draw_background_panoram()
         self.raycasting.ray_cast()
         self.renderer.draw_fps()
 
@@ -150,6 +170,7 @@ class Game:
         render_queue.extend(self.npcs)
         render_queue.extend(self.items)
         render_queue.extend(self.particles)
+        render_queue.extend([p for p in self.projectiles if p.alive])
 
         # 2. Сортируем ВСЮ очередь один раз: от самых дальних объектов к самым близким
         render_queue.sort(
@@ -174,6 +195,7 @@ class Game:
 
         # Отрисовка оружия и UI
         self.weapon.draw()
+        self.weapon_selector.draw()
         self.renderer.draw_interface()
         self.renderer.draw_crosshair()
         self.console.draw(self.screen)
@@ -197,6 +219,20 @@ class Game:
                 self.intro_player.update()
                 return
             
+                        # Консоль
+            if self.console and self.console.active:
+                self.console.handle_event(event)
+                if event.type == pygame.KEYDOWN and event.key == pygame.K_BACKQUOTE:
+                    self.console.toggle()
+                continue
+
+            # Открытие консоли
+            if event.type == pygame.KEYDOWN and event.key == pygame.K_BACKQUOTE:
+                if self.console:
+                    self.console.toggle()
+                    if self.console.active:
+                        continue
+            
             handled = self.ui_manager.handle_event(event)
 
             if not handled and self.ui_manager.current_state == self.ui_manager.states['PLAYING']:
@@ -206,12 +242,29 @@ class Game:
 
                 if event.type == pygame.MOUSEBUTTONDOWN:
                     if event.button == 1:
-                        if not self.weapon.reloading and not self.weapon.is_continuous:
-                            self.weapon.fire()
+                        if hasattr(self, 'weapon_selector') and self.weapon_selector.active:
+                            pass
+                        else:
+                            if not self.weapon.reloading and not self.weapon.is_continuous:
+                                self.weapon.fire()
 
                 if event.type == pygame.KEYDOWN:
-                    if event.key == pygame.K_SPACE:
+                    if event.key == binds["FIRE"]['key']:
                         self.weapon.fire()
+                        
+                # 🔥 ХАК ПЕРЕХВАТА КНОПОК 1-4:
+                # Селектор сожрет нажатие цифры и не пустит его дальше, открыв каскадное меню!
+                if self.weapon_selector.check_input(event):
+                    continue
+                    
+                # 2. 🔥 ЖЕСТКАЯ БЛОКИРОВКА КУРКА В ПАУЗЕ:
+                # Твой код стрельбы должен срабатывать ТОЛЬКО когда колесо закрыто!
+                if not self.weapon_selector.active:
+                    if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                        if not self.weapon.reloading and not self.weapon.is_continuous:
+                            self.weapon.fire()
+                            
+
 
                 if event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_1:
@@ -227,6 +280,19 @@ class Game:
 
                     if self.level_manager.current_weapon_index < len(self.inventory):
                         self.weapon = self.inventory[self.level_manager.current_weapon_index]
+                        
+                    if event.key == pygame.K_g:
+                        prev = self.weapon
+                        for w in self.inventory:
+                            if w.name == 'Grenade':
+                                self.weapon = w
+                                self.weapon.fire()
+                                if self.weapon.reloading:
+                                    self.weapon.update_animation()
+                                else:
+                                    self.weapon = prev
+                                break    
+                    
                         
                     # Интерактивное нажатие на секретку
                     if event.type == pygame.KEYDOWN:
@@ -250,13 +316,9 @@ class Game:
                             self.level_manager.current_weapon_index - 1
                         ) % len(self.inventory)
                     self.weapon = self.inventory[self.level_manager.current_weapon_index]
+                
 
-                if self.console.active:
-                    self.console.handle_event(event)
-                    return
 
-                if event.type == pygame.KEYDOWN and event.key == pygame.K_BACKQUOTE:
-                    self.console.toggle()
 
     def run(self):
         """Главный игровой цикл"""

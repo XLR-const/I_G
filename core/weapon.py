@@ -16,12 +16,19 @@ class Weapon:
 
         # Читаем конфигурацию из game_data.py
         config = WEAPON_CONFIG.get(weapon_name, {})
+        self.config = config
         self.name = config.get('name', weapon_name)
+        self.slot = config.get('slot', 4)
         self.damage = config.get('damage', 10)
         self.reload_time = config.get('reload_time', 150)
         self.is_continuous = config.get('continuous', False)
         self.ammo_start = config.get('ammo_start', 0)
         self.max_distance = config.get('max_distance', 5)
+        self.is_infinite = config.get('infinite_ammo', False)
+        # Параметры массового поражения (Splash Damage)
+        self.splash_radius = config.get('splash_radius', 0)
+        self.splash_damage = config.get('splash_damage', 0)
+
 
         # Параметры для спрайт-листов
         self.folder_name = config.get('folder_name', None)
@@ -44,6 +51,13 @@ class Weapon:
         self.idle_frames = []
         self.fire_frames = []
         self.current_frames = []
+        
+        # Состояния для отложенного выстрела (например, для БФГ)
+        self.pending_projectile = False
+        self.projectile_spawn_time = 0
+        self.pending_w_data = {}
+        self.pending_spread = 0.0
+
         
         # Текущий отображаемый спрайт для HUD интерфейса
         self.sprite = None
@@ -164,6 +178,34 @@ class Weapon:
     def update_animation(self):
         """Обновляет кадры анимации по таймеру (поддерживает циклическую анимацию покоя)"""
         now = pygame.time.get_ticks()
+        
+        # 🔥 ТРИГГЕР ОТЛОЖЕННОГО ВЫСТРЕЛA БФГ (БЕЗ КОСТЫЛЕЙ И ДОПОЛНИТЕЛЬНЫХ МЕТОДOВ)
+        # Если флаг взведен и время зарядки вышло — выпускаем снаряд
+        if getattr(self, 'pending_projectile', False):
+            if now >= getattr(self, 'projectile_spawn_time', 0):
+                self.pending_projectile = False
+                
+                from random import uniform
+                p_spread = getattr(self, 'pending_spread', 0.0)
+                proj_angle = self.game.player.angle + uniform(-p_spread, p_spread)
+                
+                try:
+                    from core.projectile import Projectile
+                    print(f"🟢 [БФГ-Аннигиляция] Энергия накоплена! Физический шар БФГ выпущен в мир.")
+                    
+                    new_projectile = Projectile(
+                        game=self.game,
+                        x=self.game.player.x,
+                        y=self.game.player.y,
+                        angle=proj_angle,
+                        config=getattr(self, 'pending_w_data', {})
+                    )
+                    
+                    if hasattr(self.game, 'projectiles'):
+                        self.game.projectiles.append(new_projectile)
+                except Exception as e:
+                    print(f"❌ [КРИТ] Ошибка отложенного спавна БФГ: {e}")
+
 
         if self.reloading:
             # Анимация выстрела (останавливается, когда доходит до конца списка)
@@ -200,41 +242,112 @@ class Weapon:
 
 
     def fire(self):
-        """Выполняет выстрел с использованием честного луча DDA"""
-        if self.reloading or self.ammo <= 0:
-            if self.ammo <= 0:
-                self.sound_empty_ammo.play()
+        """Запускает выстрел, прокручивает анимацию зарядки и откладывает спавн снаряда при наличии shoot_delay"""
+        current_time = pygame.time.get_ticks()
+        if hasattr(self, 'reload_timer') and current_time < self.reload_timer:
             return None
-
+            
+        if self.ammo <= 0:
+            self.sound_empty_ammo.play()
+            return None
+            
         self.reloading = True
-        self.last_shot_time = pygame.time.get_ticks()
-        
-        # Переключаемся на непрерывную ленту выстрела
+        self.reload_timer = current_time + self.reload_time
+        self.last_shot_time = current_time
         self.current_frames = self.fire_frames
         self.frame_index = 0
+        
         if self.fire_frames:
-            self.sprite = self.fire_frames[0]  # Гарантированно берем ПЕРВЫЙ кадр выстрела (вспышку)
+            self.sprite = self.fire_frames[0]
+        if hasattr(self, 'sound') and self.sound:
+            self.sound.play()
+            
+        if not self.is_infinite:
+            self.ammo -= 1
 
-        self.sound.play()
-        self.ammo -= 1
+        # Читаем параметры из свойств объекта пушки
+        spread = getattr(self, 'spread', 0.02)
+        slot_num = getattr(self, 'slot', 4)
+        
+        w_config = getattr(self, 'config', {})
+        weapon_type = w_config.get('type', 'hitscan')
+        
+        # 🔥 ЧИТАЕМ ЗАДЕРЖКУ ИЗ КОНФИГА БФГ
+        shoot_delay = w_config.get('shoot_delay', 0)
 
-        # Запускаем луч выстрела (DDA)
-        hit_x, hit_y, dist, side = self._get_hit_pos()
+        print(f"\n📢 [ВЫСТРЕЛ] Пушка: '{getattr(self, 'weapon_name', 'БЕЗ КЛЮЧА')}' | Тип: '{weapon_type}' | Задержка: {shoot_delay}мс")
 
-        # Спавним искры или кровь в точке попадания
+        from random import uniform
+        last_hit_data = (self.game.player.x, self.game.player.y, 0, 0)
+        
+        # ==================================================================
+        # 🚀 ВЕТВЛЕНИЕ 1: PROJECTILE (ПЛАЗМА / БФГ)
+        # ==================================================================
+        if weapon_type == 'projectile':
+            # Если у пушки прописана задержка (БФГ)
+            if shoot_delay > 0:
+                # Запоминаем, что нужно заспавнить шар чуть позже
+                self.pending_projectile = True
+                self.projectile_spawn_time = current_time + shoot_delay
+                self.pending_w_data = w_config
+                self.pending_spread = spread
+            else:
+                # Мгновенный физический спавн (для обычной плазмы)
+                proj_angle = self.game.player.angle + uniform(-spread, spread)
+                try:
+                    from core.projectile import Projectile
+                    new_projectile = Projectile(self.game, self.game.player.x, self.game.player.y, proj_angle, w_config)
+                    if hasattr(self.game, 'projectiles'):
+                        self.game.projectiles.append(new_projectile)
+                except Exception as e:
+                    print(f"❌ [КРИТ] Ошибка мгновенного спавна снаряда: {e}")
+            
+        # ==================================================================
+        # 🎯 ВЕТВЛЕНИЕ 2: HITSCAN (ЛУЧИ DDA ДЛЯ АВТОМАТОВ И ДРОБОВИКОВ)
+        # ==================================================================
+        else:
+            if slot_num == 3 or 'SHOTGUN' in getattr(self, 'key', '') or 'COCH' in getattr(self, 'key', ''):
+                num_pellets = w_config.get('pellets', 10)
+                for _ in range(num_pellets):
+                    pellet_angle = self.game.player.angle + uniform(-spread, spread)
+                    last_hit_data = self._spawn_bullet_hit(pellet_angle, side_blood_logic=True)
+            else:
+                bullet_angle = self.game.player.angle + uniform(-spread, spread)
+                last_hit_data = self._spawn_bullet_hit(bullet_angle, side_blood_logic=False)
+
+        return last_hit_data
+
+
+
+
+
+    def _spawn_bullet_hit(self, shot_angle, side_blood_logic=False):
+        """Вспомогательный метод: просчитывает DDA-луч под кастомным углом 
+        и спавнит искры/кровь в точке соприкосновения со стеной"""
+        # Вызываем твой DDA-луч, передавая ему вычисленный угол разброса пули!
+        # Метод _get_hit_pos(shot_angle) должен принимать этот аргумент angle=None
+        hit_x, hit_y, dist, side = self._get_hit_pos(shot_angle)
+
+        # Выбираем цвет партиклей: кровь (-1) или искры от стены
         particle_color = (200, 0, 0) if side == -1 else (255, 200, 50)
         
-        for _ in range(10):
+        # Спавним искры в точке попадания текущей пули/дробины
+        # Уменьшили число партиклей для дробовика до 3, чтобы 10 дробин не вешали игру
+        num_sparks = 3 if side_blood_logic else 10
+        for _ in range(num_sparks):
             p_x = hit_x + uniform(-0.02, 0.02)
             p_y = hit_y + uniform(-0.02, 0.02)
             self.game.particles.append(
                 Particle(self.game, (p_x, p_y), particle_color, uniform(0.001, 0.005))
             )
-
+        self.last_side = side
         return hit_x, hit_y, dist, side
 
-    def _get_hit_pos(self):
+
+    def _get_hit_pos(self, angle=None):
         """Улучшенный DDA алгоритм: считает точку попадания пули с учетом стен и врагов"""
+        if angle is None:
+            angle = self.game.player.angle
         ox, oy = self.game.player.x, self.game.player.y
         x_map, y_map = int(ox), int(oy)
         angle = self.game.player.angle

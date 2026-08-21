@@ -16,6 +16,8 @@ from ui.ui_manager import UIManager
 from utils.save_system import SaveSystem
 from ui.console import DevConsole
 from utils.intro_player import IntroPlayer
+from core.weapon_selector import WeaponSelector
+from rendering.flashlight import FlashlightMask
 
 
 class DevGame:
@@ -27,6 +29,7 @@ class DevGame:
             config: dict с настройками компонентов
         """
         self.config = config
+
         
         pygame.mouse.set_visible(False)
         self.screen = pygame.display.set_mode(RES, pygame.SCALED | pygame.FULLSCREEN)
@@ -42,6 +45,7 @@ class DevGame:
 
         pygame.mixer.init(frequency=22050, size=-16, channels=2, buffer=512)
         
+        self.weapon_selector = WeaponSelector(self)
         # UI Manager
         self.ui_manager = None
         if config.get('ui_manager', True):
@@ -59,7 +63,23 @@ class DevGame:
         self.music_manager = MusicManager() if config.get('music_manager', False) else None
         
         # Level Manager
+        # utils/level_manager.py
         self.level_manager = LevelManager(self) if config.get('level_manager', True) else None
+
+        # 🔥 ЖЕСТКАЯ НАСТРОЙКА ДЛЯ DEV_MODE:
+        # Принудительно выставляем менеджеру уровней индексы для act_test,
+        # чтобы при вызове load_level путь склеился в resources/levels/act_test/level_1.json
+        if self.level_manager:
+                    from config.game_data import ACTS_SEQUENCE
+                    
+                    # Если 'act_test' ещё нет в списке актов (чтобы не дублировать при перезапусках)
+                    if "act_test" not in ACTS_SEQUENCE:
+                        # Вставляем 'act_test' в САМОЕ НАЧАЛО списка актов, на нулевой индекс!
+                        ACTS_SEQUENCE.insert(0, "act_test")
+                    
+                    # Сбрасываем менеджер на нулевой индекс (теперь это 'act_test') и 1 уровень
+                    self.level_manager.current_act_index = 0
+                    self.level_manager.current_level = 1
 
         # Игровые объекты
         self.player = None
@@ -71,16 +91,22 @@ class DevGame:
         self.particles = []
         self.exit_pos = None
         self.total_kills = 0
+        
+        # Синхронизируем текущий уровень с менеджером
         self.current_level = 1
         self.level_start_time = 0
+        self.projectiles = []
 
         # Катсцена — всегда выключена
         self.intro_player = None
 
         # Загружаем уровень
         if self.level_manager:
+            # Вызов подхватит измененные выше индексы и загрузит act_test/level_1.json
             self.load_level(self.current_level)
-
+            
+        self.flashlight = FlashlightMask(self)
+        self.flashlight.active = True
         self._print_status()
 
     def _print_status(self):
@@ -126,6 +152,10 @@ class DevGame:
 
     def update(self):
         """Обновляет состояние игры"""
+        self.weapon_selector.update()
+        if self.weapon_selector.active:
+            return
+        
         if self.player:
             self.player.update()
 
@@ -144,7 +174,10 @@ class DevGame:
 
         # NPC
         for npc in self.npcs:
-            npc.update()
+            try:
+                npc.update()
+            except:
+                self.load_level(self.current_level)
 
         # Предметы
         for item in self.items[:]:
@@ -154,6 +187,12 @@ class DevGame:
         # Оружие
         if self.weapon:
             self.weapon.update_animation()
+            
+        # Снаряды
+        for proj in self.projectiles:
+            proj.update()
+        self.projectiles = [p for p in self.projectiles if p.alive]
+        
 
         # Стрельба
         mouse_buttons = pygame.mouse.get_pressed()
@@ -162,15 +201,15 @@ class DevGame:
                 self.weapon.fire()
 
         # Регенерация
-        if self.player:
-            self.player.update_regen()
+        '''if self.player:
+            self.player.update_regen()'''
 
         self.delta_time = self.clock.tick(FPS)
 
     def draw(self):
         """Отрисовывает игру"""
         if self.renderer:
-            self.renderer.draw_background()
+            self.renderer.draw_background_panoram()
 
         if self.raycasting:
             self.raycasting.ray_cast()
@@ -183,6 +222,7 @@ class DevGame:
         render_queue.extend(self.npcs)
         render_queue.extend(self.items)
         render_queue.extend(self.particles)
+        render_queue.extend([p for p in self.projectiles if p.alive])
 
         # Сортировка по дистанции
         render_queue.sort(
@@ -217,6 +257,7 @@ class DevGame:
         # Консоль
         if self.console:
             self.console.draw(self.screen)
+        self.weapon_selector.draw()
 
         pygame.display.flip()
 
@@ -257,6 +298,17 @@ class DevGame:
                         print("[DevMode] Выход по ESC")
                         pygame.quit()
                         sys.exit()
+                        
+            # 🔥 ОБНОВЛЕННЫЙ ТАКТИЧЕСКИЙ ПЕРЕХВАТ:
+            # Селектор теперь слушает и нажатия (для открытия), и отпускания (для закрытия/выбора)
+            if self.weapon_selector.check_input(event):
+                continue
+                
+            # Логика твоей стандартной стрельбы по ЛКМ (Блок else)
+            if not self.weapon_selector.active:
+                if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                    if not self.weapon.reloading and not self.weapon.is_continuous:
+                        self.weapon.fire()
 
             # Игровые события
             if event.type == pygame.KEYDOWN:
@@ -293,6 +345,18 @@ class DevGame:
                 if event.key == pygame.K_F5:
                     print("🔄 Перезагрузка уровня...")
                     self.load_level(self.current_level)
+                    
+                if event.key == pygame.K_g:
+                    prev = self.weapon
+                    for w in self.inventory:
+                        if w.name == 'Grenade':
+                            self.weapon = w
+                            self.weapon.fire()
+                            if self.weapon.reloading:
+                                self.weapon.update_animation()
+                            else:
+                                self.weapon = prev
+                            break
 
             # Стрельба и колесо мыши
             if event.type == pygame.MOUSEBUTTONDOWN:

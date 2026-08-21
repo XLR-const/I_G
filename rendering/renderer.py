@@ -1,7 +1,7 @@
 import pygame
 import math
 from setting import *
-
+import os
 
 class Renderer:
     """Класс для отрисовки фона, интерфейса и компаса
@@ -30,6 +30,9 @@ class Renderer:
         self.ceiling_texture = None
         self.floor_texture = None
         self.notifications = []
+        self.font_weapon = pygame.font.Font('resources/fonts/Fy.ttf', 48)
+        self.font_ammo = pygame.font.Font('resources/fonts/Fy.ttf', 50)
+
 
         try:
             self.nice_hp = pygame.image.load('resources/player/nice_hp.png').convert_alpha()
@@ -41,6 +44,22 @@ class Renderer:
             self.hp_positions = tuple(grid_to_pixel(col, row) for col, row in ((1, 14), (3, 14), (5, 14)))
         except Exception:
             self.hp_positions = tuple(grid_to_pixel(col, row) for col, row in ((1, 14), (3, 14), (5, 14)))
+        
+        # --- ОПТИМИЗАЦИЯ ЗАГРУЗКИ КЛЮЧ-КАРТ ---
+        self.key_sprites = {}
+        key_types = ['red', 'blue', 'yellow']
+        
+        for k_color in key_types:
+            path = f'resources/items/key_{k_color}.png'
+            if os.path.exists(path):
+                try:
+                    img = pygame.image.load(path).convert_alpha()
+                    # Масштабируем под размер ячейки сетки (CELL_W x CELL_H)
+                    # Если ключи покажутся мелкими, можно сделать (int(CELL_W * 1.5), int(CELL_H * 1.5))
+                    self.key_sprites[k_color] = pygame.transform.scale(img, (CELL_W, CELL_H))
+                except Exception as e:
+                    print(f"[Renderer] Ошибка загрузки ключа {k_color}: {e}")
+
 
     def set_background(self, background_data):
         """Устанавливает фон для текущего уровня из JSON
@@ -114,6 +133,90 @@ class Renderer:
             pygame.draw.rect(self.game.screen, self.floor_color, (0, HALF_HEIGHT - 5, WIDTH, HALF_HEIGHT + 5))
 
 
+    def draw_background_panoram(self):
+        """Рисует узорный пол и потолок с раздельной скоростью осей, 
+        полной зависимостью от движения, БЕЗ СИНУСОИД и с правильным направлением WASD"""
+        player = self.game.player
+        
+        # 1. СТРОГАЯ ПРИВЯЗКА К БАЗОВОЙ СКОРОСТИ ИГРОКА
+        # Достаем честную скорость из твоего класса Player
+        base_speed = getattr(player, 'speed', 1.0)
+        
+        # 2. БАЛАНСИРОВКА КОЭФФИЦИЕНТОВ СКОРОСТИ
+        # Горизонтальный масштаб (Стрейф) — делаем широким для динамики
+        scale_x = 48.0 * base_speed
+        # Вертикальный масштаб (Ходьба вперед) — срезаем в 3 раза относительно X, 
+        # чтобы убрать эффект бешеного поезда под ногами!
+        scale_y = 16.0 * base_speed 
+
+        # 3. МАТЕМАТИЧЕСКИЙ РАСЧЕТ СДВИГОВ ОСЕЙ БЕЗ СИНУСОИД
+        # Вертикаль застывает при вращении мыши на месте, работает только при WASD
+        y_movement = player.x * scale_y
+
+        # Горизонтальное смещение карты для стрейфа A/D
+        map_x_movement = -player.y * scale_x
+        
+        # 🔥 КАЛИБРОВКА МЫШИ (ПОВОРОТ НА 90° УВОДИТ ОБЛАКО ЗА ЭКРАН)
+        # Умножаем на (WIDTH * 4.0). Поскольку math.tau — это полный оборот 360°,
+        # то поворот ровно на 90° (четверть круга) сдвинет панораму ровно на WIDTH пикселей.
+        # Облако на 12 часах мгновенно улетит за левый или правый край экрана!
+        mouse_turn_offset = int((player.angle / math.tau) * (WIDTH * 4.0))
+        
+        # Результирующий горизонтальный сдвиг
+        x_movement = mouse_turn_offset + int(map_x_movement)
+
+        # Сохраняем оригинальный клиппинг экрана
+        original_clip = self.game.screen.get_clip()
+
+        # ==================================================================
+        # 1. ПОТОЛОК / НЕБО (СТРОГО В ВЕРХНЕЙ ПОЛОВИНЕ ЭКРАНА)
+        # ==================================================================
+        self.game.screen.set_clip(pygame.Rect(0, 0, WIDTH, HALF_HEIGHT + 5))
+        
+        if self.ceiling_texture:
+            try:
+                tex_w = self.ceiling_texture.get_width()
+                tex_h = self.ceiling_texture.get_height()
+                
+                move_x = int(x_movement) % tex_w
+                move_y = int(y_movement) % tex_h
+                
+                for x in range(-move_x, WIDTH + tex_w, tex_w):
+                    for y in range(-move_y, HALF_HEIGHT + 5 + tex_h, tex_h):
+                        self.game.screen.blit(self.ceiling_texture, (x, y))
+            except:
+                pygame.draw.rect(self.game.screen, self.ceiling_color, (0, 0, WIDTH, HALF_HEIGHT + 5))
+        else:
+            pygame.draw.rect(self.game.screen, self.ceiling_color, (0, 0, WIDTH, HALF_HEIGHT + 5))
+
+        # ==================================================================
+        # 2. ПОЛ (СТРОГО В НИЖНЕЙ ПОЛОВИНЕ ЭКРАНА)
+        # ==================================================================
+        floor_start_y = HALF_HEIGHT - 5
+        self.game.screen.set_clip(pygame.Rect(0, floor_start_y, WIDTH, HEIGHT - floor_start_y))
+        
+        if self.floor_texture:
+            try:
+                tex_w = self.floor_texture.get_width()
+                tex_h = self.floor_texture.get_height()
+                
+                move_x = int(x_movement) % tex_w
+                # Инвертируем вертикаль для пола, чтобы узор уходил под ноги, а не наползал сверху
+                move_y = int(-y_movement) % tex_h
+                
+                for x in range(-move_x, WIDTH + tex_w, tex_w):
+                    for y in range(floor_start_y - move_y, HEIGHT + tex_h, tex_h):
+                        self.game.screen.blit(self.floor_texture, (x, y))
+            except:
+                pygame.draw.rect(self.game.screen, self.floor_color, (0, floor_start_y, WIDTH, HEIGHT - floor_start_y))
+        else:
+            pygame.draw.rect(self.game.screen, self.floor_color, (0, floor_start_y, WIDTH, HEIGHT - floor_start_y))
+
+        # Восстанавливаем оригинальную область обрезки экрана
+        self.game.screen.set_clip(original_clip)
+
+
+
     def draw_fps(self):
         """Рисует счётчик FPS"""
         x, y = grid_to_pixel(0, 0)
@@ -122,11 +225,105 @@ class Renderer:
         self.game.screen.blit(fps_render, (x, y))
 
     def draw_crosshair(self):
-        """Рисует прицел"""
-        pygame.draw.circle(self.game.screen, 'red', (WIDTH // 2, HEIGHT // 2), 4, 1)
+        """Рисует тонкий пунктирный прицел, считывая разброс СТРОГО по номерам слотов,
+        полностью исключая баги с дефисами и именами пушек в конфиге!"""
+        cx, cy = WIDTH // 2, HEIGHT // 2
+        
+        color_neon = (0, 240, 255)    
+        color_accent = (255, 100, 0)  
+        color_white = (255, 255, 255) 
+        color_black = (10, 14, 18)    
+        
+        base_radius = 4
+
+        # Дефолтные значения на случай, если пушка не определена
+        weapon_spread = 0.02
+        is_firing = False
+        has_hit_enemy = False
+        
+        if hasattr(self.game, 'weapon') and self.game.weapon:
+            w_obj = self.game.weapon
+            
+            # Ловим самый первый кадр вспышки выстрела
+            if getattr(w_obj, 'reloading', False) and getattr(w_obj, 'frame_index', 0) == 0:
+                is_firing = True
+                if hasattr(w_obj, 'last_side') and w_obj.last_side == -1:
+                    has_hit_enemy = True
+
+            # 🔥 ГЛАВНЫЙ АРХИТЕКТУРНЫЙ ФИКС: ЧИТАЕМ РАЗБРОС НАПРЯМУЮ ПО СЛОТУ!
+            # Узнаем номер слота текущего оружия в руках (1, 2, 3, 4...)
+            current_slot = getattr(w_obj, 'slot', 2)
+            
+            try:
+                from config.game_data import WEAPON_CONFIG
+                
+                # Просто перебираем твой WEAPON_CONFIG и ищем пушку, у которой совпадает номер слота.
+                # Это на 100% страхует от любых нестыковок в именах 'AK-47', 'Toz' или 'COCH'!
+                for cfg_data in WEAPON_CONFIG.values():
+                    if cfg_data.get('slot') == current_slot:
+                        weapon_spread = cfg_data.get('spread', 0.02)
+                        break
+            except:
+                pass
+
+        # Переводим радианы разброса в пиксели на экране.
+        # Множитель 180 откалиброван: 
+        # Для Калаша (slot 4, spread 0.05) -> палочки прыгнут всего на 9 пикселей (аккуратно и узко)
+        # Для Дробовика (slot 3, spread 0.38) -> палочки сочно улетят на 68 пикселей (огромный ромб)!
+        dynamic_offset = int(weapon_spread * 180)
+        R = base_radius + dynamic_offset
+
+        # --------------------------------==================================
+        # 🎨 ЧАСТЬ 1. ЦЕНТРАЛЬНАЯ МИНИ-ТОЧКА И КРЕСТИК
+        # --------------------------------==================================
+        pygame.draw.circle(self.game.screen, color_black, (cx, cy), 3)
+        pygame.draw.circle(self.game.screen, color_neon, (cx, cy), 1)
+
+        cross_gap = 3   
+        cross_len = 4   
+        pygame.draw.line(self.game.screen, color_black, (cx, cy - cross_gap), (cx, cy - cross_gap - cross_len), 3)
+        pygame.draw.line(self.game.screen, color_black, (cx, cy + cross_gap), (cx, cy + cross_gap + cross_len), 3)
+        pygame.draw.line(self.game.screen, color_black, (cx - cross_gap, cy), (cx - cross_gap - cross_len, cy), 3)
+        pygame.draw.line(self.game.screen, color_black, (cx + cross_gap, cy), (cx + cross_gap + cross_len, cy), 3)
+        
+        center_color = color_accent if is_firing else color_neon
+        pygame.draw.line(self.game.screen, center_color, (cx, cy - cross_gap), (cx, cy - cross_gap - cross_len), 1)
+        pygame.draw.line(self.game.screen, center_color, (cx, cy + cross_gap), (cx, cy + cross_gap + cross_len), 1)
+        pygame.draw.line(self.game.screen, center_color, (cx - cross_gap, cy), (cx - cross_gap - cross_len, cy), 1)
+        pygame.draw.line(self.game.screen, center_color, (cx + cross_gap, cy), (cx + cross_gap + cross_len, cy), 1)
+
+        # --------------------------------==================================
+        # 🎨 ЧАСТЬ 2. ДИНАМИЧЕСКИЕ ПАЛОЧКИ РАЗБРОСА (ТОЛЬКО ПРИ ВЫСТРЕЛЕ)
+        # ----------------------------------------------------------------==
+        if is_firing:
+            spread_lines = [
+                (cx, cy - R, cx, cy - R + 4), 
+                (cx, cy + R, cx, cy + R - 4), 
+                (cx - R, cy, cx - R + 4, cy), 
+                (cx + R, cy, cx + R - 4, cy)  
+            ]
+            for sx, sy, ex, ey in spread_lines:
+                pygame.draw.line(self.game.screen, color_black, (sx, sy), (ex, ey), 3)
+                pygame.draw.line(self.game.screen, color_accent, (sx, sy), (ex, ey), 1)
+
+        # --------------------------------==================================
+        # 🎨 ЧАСТЬ 3. БЕЛЫЙ МАРКЕР ПОПАДАНИЯ (HITMARKER "X")
+        # ----------------------------------------------------------------==
+        if has_hit_enemy:
+            h_gap = 3   
+            h_len = 5   
+            hit_lines = [
+                (cx - h_gap, cy - h_gap, cx - h_gap - h_len, cy - h_gap - h_len), 
+                (cx + h_gap, cy - h_gap, cx + h_gap + h_len, cy - h_gap - h_len), 
+                (cx - h_gap, cy + h_gap, cx - h_gap - h_len, cy - h_gap - h_len), # Поправлен кортеж
+                (cx + h_gap, cy + h_gap, cx + h_gap + h_len, cy + h_gap + h_len)  
+            ]
+            for sx, sy, ex, ey in hit_lines:
+                pygame.draw.line(self.game.screen, color_black, (sx, sy), (ex, ey), 3)
+                pygame.draw.line(self.game.screen, color_white, (sx, sy), (ex, ey), 1)
 
     def draw_compass(self):
-        """Рисует компас с направлением к выходу"""
+        """Рисует компас в Sci-Fi стиле с полигональной скошенной рамкой под стиль HUD"""
         goal = self.game.map.exit_pos
         if goal is None:
             return
@@ -135,21 +332,45 @@ class Renderer:
         d_x, d_y = goal[0] - player[0], goal[1] - player[1]
         angle_to_goal = math.degrees(math.atan2(d_y, d_x))
 
+        # Исходные клетки из твоего конфига
         compass_col = 11
         compass_row = 0
         compass_width = 10
         compass_height = 1
 
-        compass_x = compass_col * CELL_W
-        compass_y = compass_row * CELL_H
-        compass_w = compass_width * CELL_W
-        compass_h = int(compass_height * CELL_H * 0.6)
+        # Базовые пиксельные границы ячеек сетки
+        x_start = compass_col * CELL_W
+        y_start = compass_row * CELL_H
+        w_total = compass_width * CELL_W
+        h_total = int(compass_height * CELL_H * 0.6)
+        x_end = x_start + w_total
+        y_end = y_start + h_total
 
-        pygame.draw.rect(self.game.screen, (100, 100, 100),
-                         (compass_x, compass_y, compass_w, compass_h), 2)
+        # ==================================================================
+        # 🔥 НОВАЯ Sci-Fi ПОЛИГОНАЛЬНАЯ РАМКА КОМПАСА (В СТИЛЕ РОМБОВ HUD)
+        # ==================================================================
+        # Делаем стильные скошенные углы по бокам, чтобы рамка выглядела агрессивно
+        bevel = 15  # Размер скоса углов в пикселях
+        compass_points = [
+            (x_start + bevel, y_start),     # Верхний левый после скоса
+            (x_end - bevel,   y_start),     # Верхний правый до скоса
+            (x_end,           y_start + bevel), # Переход на боковину справа
+            (x_end,           y_end),       # Нижний правый
+            (x_start,         y_end),       # Нижний левый
+            (x_start,         y_start + bevel)  # Переход на боковину слева
+        ]
+        
+        # Рисуем полупрозрачную темную подложку компаса
+        bg_surface = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
+        pygame.draw.polygon(bg_surface, (15, 20, 25, 160), compass_points)
+        self.game.screen.blit(bg_surface, (0, 0))
 
-        center_x = compass_x + compass_w // 2
-        center_y = compass_y + compass_h // 2
+        # Рисуем контур рамки фирменным неоново-бирюзовым цветом (0, 180, 255)
+        pygame.draw.polygon(self.game.screen, (0, 180, 255), compass_points, 2)
+
+        # Вычисляем математический центр панели для вывода делений
+        center_x = x_start + w_total // 2
+        center_y = y_start + h_total // 2
         player_angle_deg = math.degrees(self.game.player.angle)
 
         directions = [
@@ -159,8 +380,9 @@ class Renderer:
         ]
 
         visible_range = 120
-        pixels_per_degree = compass_w / visible_range
+        pixels_per_degree = w_total / visible_range
 
+        # Отрисовка направлений и меток
         for name, angle in directions:
             diff = angle - player_angle_deg
             while diff > 180:
@@ -171,102 +393,236 @@ class Renderer:
             if abs(diff) <= visible_range // 2:
                 x = center_x + diff * pixels_per_degree
 
-                if len(name) == 1 and name != '<!>':
-                    font_size = int(CELL_H * 0.45)
-                    color = (255, 255, 255)
-                elif name == '<!>':
-                    font_size = int(CELL_H * 0.95)
-                    color = 'yellow'
-                else:
-                    font_size = int(CELL_H * 0.3)
-                    color = (180, 180, 180)
+                # Защита текста от вылета за скошенные края рамки
+                if x_start + 10 <= x <= x_end - 10:
+                    if len(name) == 1 and name != '<!>':
+                        font_size = int(CELL_H * 0.45)
+                        color = (255, 255, 255)
+                    elif name == '<!>':
+                        font_size = int(CELL_H * 0.95)
+                        color = (0, 255, 255) # Метка выхода горит в цвет рамки
+                    else:
+                        font_size = int(CELL_H * 0.3)
+                        color = (140, 160, 180)
 
-                font = pygame.font.Font(None, font_size)
-                text = font.render(name, True, color)
-                text_rect = text.get_rect(center=(x, center_y))
-                self.game.screen.blit(text, text_rect)
+                    font = pygame.font.Font(None, font_size)
+                    text = font.render(name, True, color)
+                    text_rect = text.get_rect(center=(x, center_y))
+                    self.game.screen.blit(text, text_rect)
 
+        # Главная стрелка направления (Стильный неоново-оранжевый треугольник)
         triangle_points = [
-            (center_x, center_y - 15),
-            (center_x - 8, center_y + 5),
-            (center_x + 8, center_y + 5)
+            (center_x,     center_y - 12),
+            (center_x - 7, center_y + 6),
+            (center_x + 7, center_y + 6)
         ]
-        pygame.draw.polygon(self.game.screen, (255, 100, 0), triangle_points)
+        pygame.draw.polygon(self.game.screen, (255, 80, 0), triangle_points)
 
+        # Боковые неоновые насечки шкалы
         for offset in [-20, 20]:
-            pygame.draw.line(self.game.screen, (200, 200, 200),
-                             (center_x + offset, center_y - 10),
-                             (center_x + offset, center_y + 10), 2)
+            pygame.draw.line(self.game.screen, (0, 150, 220),
+                             (center_x + offset, center_y - 8),
+                             (center_x + offset, center_y + 8), 2)
 
-    def draw_health_sprite(self):
-        """Рисует иконку здоровья"""
+
+    def draw_health_sprite(self, center_x, center_y):
+        """Рисует иконку здоровья строго по переданным координатам центра ячейки сетки"""
         hp = self.game.player.hp
 
         if hp >= 80:
             sprite = self.nice_hp
-            pos = self.hp_positions[-1]
         elif 50 <= hp < 80:
             sprite = self.average_hp
-            pos = self.hp_positions[-2]
         else:
             sprite = self.bad_hp
-            pos = self.hp_positions[-3]
+
+        # Идеальное центрирование спрайта головы на сетке
+        fw, fh = sprite.get_size()
+        pos = (center_x - fw // 2, center_y - fh // 2)
 
         try:
             self.game.screen.blit(sprite, pos)
         except Exception:
             pass
 
+
     def draw_interface(self):
-        """Рисует интерфейс: полоску здоровья, оружие, патроны"""
-        hp = self.game.player.hp
+        """Sci-Fi HUD: Синусоидальный пульс здоровья и вращающийся циклотрон брони.
+        Полная автономность, нулевая привязка к полигонам, идеальный визуал!"""
+        if hasattr(self.game, 'flashlight'):
+            if self.game.level_manager.current_act_index == 4 and self.game.current_level in (1, 2):
+                self.game.flashlight.draw()
+        
+        hp = max(0, min(100, self.game.player.hp))
+        armor = max(0, min(100, self.game.player.armor))
+        
         if self.game.weapon:
-            current_weapon = self.game.weapon.name
-            ammo = self.game.weapon.ammo
+            cur_weapon = self.game.weapon
+            current_weapon = cur_weapon.name
+            if cur_weapon.is_infinite:
+                ammo = '-'
+            else:
+                ammo = self.game.weapon.ammo
         else:
             current_weapon = "Fists"
             ammo = 0
         font_path = 'resources/fonts/Fy.ttf'
-        
-        health_bar_pos = grid_to_pixel(1, 16)
-        health_bar_width = 6 * CELL_W
-        health_bar_height = 1 * CELL_H
-        health_bar_progress = (hp / 100) * health_bar_width
 
-        if health_bar_progress > 6 * CELL_W:
-            health_bar_progress = 6 * CELL_W
-        
-        armor = self.game.player.armor
-        armor_bar_pos = grid_to_pixel(1, 17)
-        armor_bar_width = 6 * CELL_W
-        armor_bar_height = 1 * CELL_H
+        # ==================================================================
+        # 1. СЕТОЧНЫЕ КООРДИНАТЫ (ПО КЛЕТКАМ СЕТКИ ИНТЕРФЕЙСА)
+        # ==================================================================
+        # 🔥 СДВИГ ГОЛОВЫ: Ставим центр лица игрока на 3-ю колонку сетки
+        cx, cy = grid_to_pixel(3, 15, 'center')
+        cy += 8  # Смещение по вертикали для прижатия к низу экрана
 
-        # Фон полоски брони
-        pygame.draw.rect(self.game.screen, (50, 50, 60),
-                        (armor_bar_pos[0], armor_bar_pos[1], armor_bar_width, armor_bar_height))
-        
-        # Заполнение полоски брони
-        armor_bar_progress = (armor / 100) * armor_bar_width
-        pygame.draw.rect(self.game.screen, (0, 100, 200),  # Синий цвет
-                        (armor_bar_pos[0], armor_bar_pos[1], armor_bar_progress, armor_bar_height))
+        # Базовое время игры для анимации волн и вращения
+        time_ms = pygame.time.get_ticks()
 
+        # Габариты приборных коробок
+        box_w = 140  
+        box_h = 32  
+        
+        # 🔥 СДВИГ БАРОВ ПО КЛЕТКАМ: Берем координату X начала 5-й колонки сетки!
+        # Это отодвинет бары вправо от лица ровно на расстояние клеток.
+        pan_x, _ = grid_to_pixel(5, 15, 'topleft')
+
+        # 🔥 СДВИГ ЦИФР ПО КЛЕТКАМ: Очки HP и AP будут выводиться строго с 8-й колонки!
+        text_x, _ = grid_to_pixel(8, 15, 'topleft')
+
+        # Шрифты для неонового вывода цифр рядом с приборами
+        font_stats = pygame.font.Font(font_path, 28)
+
+        # Рисуем голову игрока
+        self.draw_health_sprite(cx, cy)
+
+        # ==================================================================
+        # 2. МАТЕМАТИКА СИНУСОИДЫ ЗДОРОВЬЯ (НИЖНИЙ ЯРУС + СЕТОЧНЫЕ ЦИФРЫ)
+        # ==================================================================
+        hp_center_y = cy + 20
+
+        # Фон прибора здоровья
+        pygame.draw.rect(self.game.screen, (16, 8, 10), (pan_x, hp_center_y - box_h//2, box_w, box_h), 0, 4)
+        pygame.draw.rect(self.game.screen, (40, 20, 25), (pan_x, hp_center_y - box_h//2, box_w, box_h), 1, 4)
+
+        if hp > 0:
+            try:
+                frequency = 0.012 + 0.063 * (hp / 100.0)
+                wave_speed = 0.005 + 0.02 * (hp / 100.0)
+                amplitude = 2 + 10 * (hp / 100.0)
+                
+                if hp <= 30: hp_color = (255, 16, 50)
+                elif hp <= 65: hp_color = (255, 200, 0)
+                else: hp_color = (0, 240, 160)
+
+                pulse_points = []
+                for pixel_x in range(pan_x + 4, pan_x + box_w - 4):
+                    wave_y = hp_center_y + amplitude * math.sin((pixel_x * frequency) - (time_ms * wave_speed))
+                    
+                    heart_rate_period = int(120 - 50 * (hp / 100.0))
+                    if int(pixel_x - time_ms * (wave_speed * 10)) % heart_rate_period in (0, 1, 2):
+                        wave_y -= amplitude * 1.3
+                        
+                    pulse_points.append((pixel_x, wave_y))
+                
+                if len(pulse_points) > 1:
+                    pygame.draw.lines(self.game.screen, hp_color, False, pulse_points, 2)
+            except:
+                pass
+
+        # 🔥 ВЫВОД ОЧКОВ ЗДОРОВЬЯ ПО СЕТКЕ: Используем строго сеточную координату text_x!
+        hp_val_text = font_stats.render(f"{int(hp)} HP", True, hp_color if hp > 0 else (100, 100, 100))
+        self.game.screen.blit(hp_val_text, (text_x, hp_center_y - 14))
+
+        # ==================================================================
+        # 3. МАТЕМАТИКА ЦИКЛОТРОНА БРОНИ (ВЕРХНИЙ ЯРУС + СЕТОЧНЫЕ ЦИФРЫ)
+        # ==================================================================
+        ap_center_y = cy - 20
+
+        # Фон прибора брони
+        pygame.draw.rect(self.game.screen, (8, 12, 20), (pan_x, ap_center_y - box_h//2, box_w, box_h), 0, 4)
+        pygame.draw.rect(self.game.screen, (20, 30, 50), (pan_x, ap_center_y - box_h//2, box_w, box_h), 1, 4)
+
+        if armor > 0:
+            try:
+                rotation_speed = 0.002 + 0.006 * (armor / 100.0)
+                armor_color = (0, 150, 255)
+                
+                base_dots = int(8 + 16 * (armor / 100.0))
+                num_orbits = 1 if armor <= 40 else (2 if armor <= 75 else 3)
+                
+                for orbit_idx in range(num_orbits):
+                    orbit_phase_shift = orbit_idx * (math.pi / 3)
+                    orbit_tilt = 1.0 - (orbit_idx * 0.15) 
+                    
+                    ap_prev_x, ap_prev_y = None, None
+                    
+                    for dot_idx in range(base_dots):
+                        angle = (dot_idx * (math.tau / base_dots)) + (time_ms * rotation_speed) + orbit_phase_shift
+                        
+                        radius_x = 35 + 4 * math.sin(time_ms * 0.002 + orbit_idx)
+                        radius_y = int(9 * orbit_tilt)
+                        
+                        dot_x = pan_x + box_w // 2 + int(radius_x * math.cos(angle))
+                        dot_y = ap_center_y + int(radius_y * math.sin(angle))
+                        
+                        is_front = math.sin(angle) > 0
+                        dot_radius = 2 if is_front else 1
+                        
+                        current_color = armor_color if is_front else (0, 75, 130)
+                        pygame.draw.circle(self.game.screen, current_color, (dot_x, dot_y), dot_radius)
+                        
+                        if ap_prev_x is not None and is_front and armor > 30:
+                            pygame.draw.line(self.game.screen, (0, 180, 255), (ap_prev_x, ap_prev_y), (dot_x, dot_y), 1)
+                            
+                        ap_prev_x, ap_prev_y = dot_x, dot_y
+            except:
+                pass
+
+        # 🔥 ВЫВОД ОЧКОВ БРОНИ ПО СЕТКЕ: Выравниваем строго по вертикали с text_x!
+        ap_val_text = font_stats.render(f"{int(armor)} AP", True, (0, 180, 255) if armor > 0 else (60, 80, 100))
+        self.game.screen.blit(ap_val_text, (text_x, ap_center_y - 14))
+
+
+
+        # ==================================================================
+        # 4. ВЫВОД ТЕКСТА ОРУЖИЯ И ПАТРОНОВ (Остается твой родной код ниже)
+        # ==================================================================
         weapon_name_pos = grid_to_pixel(25, 15)
         weapon_ammo_pos = grid_to_pixel(25, 16)
 
         font = pygame.font.Font(font_path, 48)
         text_weapon = font.render(current_weapon, True, (255, 255, 255))
         font = pygame.font.Font(font_path, 50)
-        text_ammo = font.render(str(ammo), True, (255, 200, 255))
-
-        pygame.draw.rect(self.game.screen, (200, 50, 50),
-                         (health_bar_pos[0], health_bar_pos[1], health_bar_width, health_bar_height))
-        pygame.draw.rect(self.game.screen, (50, 240, 0),
-                         (health_bar_pos[0], health_bar_pos[1], health_bar_progress, health_bar_height))
+        text_ammo = font.render(str(ammo), True, (0, 240, 255))
 
         self.game.screen.blit(text_weapon, weapon_name_pos)
         self.game.screen.blit(text_ammo, weapon_ammo_pos)
-        self.draw_health_sprite()
+        
+        # ==================================================================
+        # 5. ОТРИСОВКА КЛЮЧ-КАРТ (Твой родной код)
+        # ==================================================================
+        start_key_col = 4
+        key_row = 17
+        
+        if hasattr(self.game.player, 'keys_inventory') and self.game.player.keys_inventory:
+            for key_obj in self.game.player.keys_inventory:
+                if isinstance(key_obj, str):
+                    key_color = key_obj.strip().lower()
+                else:
+                    key_color = getattr(key_obj, 'type', getattr(key_obj, 'color', 'red')).strip().lower()
+                
+                key_img = self.key_sprites.get(key_color)
+                
+                if key_img:
+                    key_pos = grid_to_pixel(start_key_col, key_row, 'topleft')
+                    self.game.screen.blit(key_img, key_pos)
+                    start_key_col += 1
+
         self.draw_compass()
+
+
+
+
         #self.draw_line_of_cells()
 
     def draw_line_of_cells(self):

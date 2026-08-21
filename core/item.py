@@ -10,6 +10,7 @@ import os
 
 class Item:
     """Базовый класс предмета"""
+    _sound_cache = {}
 
     def __init__(self, game, x, y, item_type, amount=0):
         self.game = game
@@ -25,6 +26,41 @@ class Item:
         self.sprite_ratio = 1.0
 
         self._load_sprite()
+        
+        # 🔥 АВТОНОМНАЯ ЛАЗЕРНАЯ ЗАГРУЗКА ИЗ СЛОВАРЯ В ИНИТЕ:
+        # Проверяем, инициализирован ли звук конкретно для ЭТОГО типа предмета
+        if self.item_type not in Item._sound_cache:
+            # Гарантируем, что звуковой микшер Pygame mixer запущен в памяти
+            if not pygame.mixer.get_init():
+                pygame.mixer.init()
+
+            # Маппинг типов предметов на точные имена аудиофайлов на диске
+            sound_files = {
+                'health': 'pick_up_hp.wav',
+                'armor':  'pick_up_armor.wav',
+                'weapon':   'pick_up_ammo.wav'
+            }
+            
+            file_name = sound_files.get(self.item_type)
+            if file_name:
+                sound_path = os.path.join('resources', 'items', file_name)
+                
+                if os.path.exists(sound_path):
+                    try:
+                        # Загружаем звук в ОЗУ и бережно складываем в наш словарь кэша класса
+                        loaded_sound = pygame.mixer.Sound(sound_path)
+                        loaded_sound.set_volume(0.05) # Оптимальная громкость 50%
+                        Item._sound_cache[self.item_type] = loaded_sound
+                        print(f"🔊 [Item] Аудиофайл '{file_name}' успешно кэширован в ОЗУ класса для типа '{self.item_type}'!")
+                    except Exception as e:
+                        print(f"❌ [Item] Ошибка загрузки звука для '{self.item_type}': {e}")
+                        Item._sound_cache[self.item_type] = None # Защита от повторных попыток чтения
+                else:
+                    print(f"⚠️ [Item] Аудиофайл не найден по пути: {sound_path}")
+                    Item._sound_cache[self.item_type] = None
+            else:
+                # Если прилетел неизведанный тип предмета (например, квестовый ключ)
+                Item._sound_cache[self.item_type] = None
 
     def _load_sprite(self):
         """Загружает спрайт предмета"""
@@ -147,6 +183,9 @@ class HealthItem(Item):
         if healed > 0:
             self.alive = False
             #print(f"[Аптечка] +{healed} HP")
+            active_sound = Item._sound_cache.get(self.item_type)
+            if active_sound:
+                active_sound.play()
             return True
 
         #print("[Аптечка] HP полное")
@@ -178,6 +217,9 @@ class ArmorItem(Item):
 
         if added > 0:
             self.alive = False
+            active_sound = Item._sound_cache.get(self.item_type)
+            if active_sound:
+                active_sound.play()
             #print(f"[Броня] +{added} Armor")
             return True
 
@@ -322,6 +364,9 @@ class WeaponItem(Item):
         if weapon_found:
             # Оружие уже есть → просто добавляем патроны в существующий ствол
             weapon_found.ammo += self.ammo
+            active_sound = Item._sound_cache.get("weapon")
+            if active_sound:
+                active_sound.play()
             self.alive = False
             return True
         else:
@@ -336,7 +381,9 @@ class WeaponItem(Item):
             if len(inventory) == 1 or self.game.weapon is None:
                 self.game.weapon = new_weapon
                 self.game.level_manager.current_weapon_index = len(inventory) - 1
-
+            active_sound = Item._sound_cache.get("weapon")
+            if active_sound:
+                active_sound.play()
             self.alive = False
             return True
 
@@ -397,6 +444,9 @@ class KeyItem(Item):
         if self.key_color not in player.keys_inventory:
             player.keys_inventory.append(self.key_color)
             self.alive = False
+            active_sound = Item._sound_cache.get("armor")
+            if active_sound:
+                active_sound.play()
             print(f"[ИНВЕНТАРЬ] Подобрана {self.key_color.upper()} ключ-карта!")
             return True
 

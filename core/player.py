@@ -2,7 +2,7 @@ import pygame
 import math
 from setting import *
 from config.game_data import *
-
+import config.user_settings as us
 
 class Player:
     """Класс игрока
@@ -23,6 +23,7 @@ class Player:
         self.game = game
         self.x, self.y = PLAYER_POS
         self.angle = PLAYER_ANGLE
+        self.speed = PLAYER_SPEED
         self.hp = 100
         self.armor = 0
         self.max_hp = 100
@@ -80,18 +81,24 @@ class Player:
         cos_a = math.cos(self.angle)
         dx, dy = 0, 0
         speed = PLAYER_SPEED * self.game.delta_time
-
+        
+        binds = us.USER_SETTINGS["KEYBINDS"]
         keys = pygame.key.get_pressed()
-        if keys[pygame.K_w]:
+        forward_key  = binds["FORWARD"]["key"]
+        backward_key = binds["BACKWARD"]["key"]
+        left_key     = binds["LEFT"]["key"]
+        right_key    = binds["RIGHT"]["key"]
+
+        if keys[forward_key]:
             dx += speed * cos_a
             dy += speed * sin_a
-        if keys[pygame.K_s]:
+        if keys[backward_key]:
             dx += -speed * cos_a
             dy += -speed * sin_a
-        if keys[pygame.K_a]:
+        if keys[left_key]:
             dx += speed * sin_a
             dy += -speed * cos_a
-        if keys[pygame.K_d]:
+        if keys[right_key]:
             dx += -speed * sin_a
             dy += speed * cos_a
 
